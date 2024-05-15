@@ -1,59 +1,51 @@
 "use client";
 
-import { useState, FormEvent } from "react";
-import axios from "axios";
+import { useState, FormEvent, useEffect } from "react";
+import { signIn, useSession } from "next-auth/react";
 import { toast } from "react-hot-toast";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import AFBuilding from "@/app/images/actfast-building.jpg";
 import AFlogo from "@/app/images/actfast-logo.jpg";
 import google from "@/app/images/googleIcon.svg";
 import facebook from "@/app/images/facebookIcon.svg";
-import { signIn } from "next-auth/react";
-import Link from "next/link";
 import { handleEnterKeyPress } from "@/app/libs/actions";
+import Link from "next/link";
 
-export default function Register() {
+export default function Login() {
+	const { data: session, status } = useSession();
 	const router = useRouter();
+	const searchParams = useSearchParams();
+	const errorParams = searchParams.get("error");
 	const [disabled, setDisabled] = useState(false);
-
-	// useStates
 	const [data, setData] = useState({
-		name: "",
 		email: "",
-		password: "",
-		confirmpassword: ""
+		password: ""
 	});
 
-	const registerUser = async (e: FormEvent) => {
-		setDisabled(true);
-		e.preventDefault();
-		try {
-			const response = await axios.post(`api/register`, data);
-
-			if (response.data.status !== 200) {
-				const errorMessage = response.data?.error || "An error occurred";
-				toast.error(errorMessage);
-				setTimeout(() => setDisabled(false), 4000);
-			} else {
-				toast.success("Registration successful!");
-				setTimeout(
-					() =>
-						toast.loading("Redirecting now to the login page...", {
-							duration: 4000
-						}),
-					1000
-				);
-				setTimeout(() => {
-					toast.dismiss();
-					router.push("/login");
-				}, 2000);
-			}
-		} catch (err) {
-			const errorMessage = "An error occurred";
-			toast.error(errorMessage);
+	useEffect(() => {
+		// Check if the session is still loading
+		if (status === "loading") {
+			return;
 		}
-	};
+
+		// If there is a session, redirect to the login page
+		if (session) {
+			if (session?.user.isNewUser) {
+				router.replace("/create-profile");
+			} else {
+				if (session?.user.provider === "credentials") {
+					router.push("/dashboard?provider=credentials");
+				}
+			}
+		}
+
+		// Handle errorParams
+		if (errorParams) {
+			toast.error("Email already exists, please login using the provider you initially used to register");
+			router.replace("/login");
+		}
+	}, [session, status, router]);
 
 	const loginWithFacebook = async () => {
 		const response = signIn("facebook", {
@@ -62,7 +54,7 @@ export default function Register() {
 
 		response
 			.then(() => {
-				toast.loading("Signing in using your facebook account...", {
+				toast.loading("Logging in using your facebook account...", {
 					duration: 4000
 				});
 			})
@@ -72,7 +64,7 @@ export default function Register() {
 	};
 
 	const loginWithGoogle = async () => {
-		toast.loading("Signing in...", {
+		toast.loading("Logging in...", {
 			duration: 4000
 		});
 
@@ -83,17 +75,43 @@ export default function Register() {
 		}, 4000);
 
 		setTimeout(() => {
-			signIn("google", {
+			const response = signIn("google", {
 				callbackUrl: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard?provider=google`
 			});
+
+			response
+				.then(() => {})
+				.catch(error => {
+					toast.error("Something went wrong", error);
+				});
 		}, 4000);
 	};
 
+	const loginUser = async (e: FormEvent) => {
+		setDisabled(true);
+		e.preventDefault();
+
+		toast.loading("Logging in...", {
+			duration: 2000
+		});
+		setTimeout(() => setDisabled(false), 5000);
+		setTimeout(() => {
+			signIn("credentials", {
+				...data,
+				redirect: false
+			}).then(callback => {
+				if (callback?.error) {
+					toast.error(callback.error);
+				}
+			});
+		}, 2000);
+	};
+
 	return (
-		<div className='flex w-full min-h-screen'>
-			<div className='flex w-full justify-center items-center'>
+		<div className='flex w-full'>
+			<div className='flex w-full justify-center items-center '>
 				<div className='flex justify-center w-full  md:max-w-full md:w-full lg:w-1/2 xl:w-1/2 '>
-					<div className=' flex justify-center w-full  mt-4 px-4 '>
+					<div className=' flex justify-center  w-full  mt-4 px-4 '>
 						<div className='w-full max-w-[400px]'>
 							<div className='flex justify-center'>
 								<Link href='/'>
@@ -102,72 +120,52 @@ export default function Register() {
 							</div>
 							<h1 className='text-3xl font-bold mb-2 mt-4 text-center'>
 								Welcome to <span className='text-4xl text-red-600 italic inline-block'>ActFAST</span>{" "}
-								<span className="inline-block">Registration Portal</span>
+								<span className="inline-block">Login Portal</span>
 							</h1>
 							<div
-								className='flex flex-col mt-4 min-w-full xl:w-[340px]'
-								onKeyDown={e => handleEnterKeyPress(e, registerUser, disabled, setDisabled)}>
+								className='flex flex-col mt-4  min-w-full xl:w-[340px]'
+								onKeyDown={e => handleEnterKeyPress(e, loginUser, disabled, setDisabled)}>
 								<input
-									type='text'
-									placeholder='Name'
 									className='border-2 border-gray-300 h-[45px] rounded-md pl-4'
-									id='name'
-									name='name'
-									//   required
-									value={data.name}
-									onChange={e => setData({ ...data, name: e.target.value })}
-								/>
-
-								<input
-									placeholder='Email'
-									className='border-2 border-gray-300 h-[45px] rounded-md pl-4 mt-4'
 									id='email'
 									name='email'
 									type='email'
 									autoComplete='email'
-									//   required
+									placeholder='Email'
 									value={data.email}
 									onChange={e => setData({ ...data, email: e.target.value })}
 								/>
-
 								<input
-									placeholder='Password'
-									className='border-2 border-gray-300 h-[45px] rounded-md pl-4 mt-4'
+									className='border-2 border-gray-300 h-[45px] rounded-md mt-4 pl-4'
 									id='password'
 									name='password'
 									type='password'
 									autoComplete='current-password'
-									//   required
+									placeholder='Password'
 									value={data.password}
 									onChange={e => setData({ ...data, password: e.target.value })}
 								/>
-
-								<input
-									placeholder='Confirm Password'
-									className='border-2 border-gray-300 h-[45px] rounded-md pl-4 mt-4'
-									id='confirmpassword'
-									name='confirmpassword'
-									type='password'
-									//   required
-									value={data.confirmpassword}
-									onChange={e => setData({ ...data, confirmpassword: e.target.value })}
-								/>
-
+								<a className='text-blue-500 text-[12px] mt-4' href='#'>
+									Forgot-password?
+								</a>
 								<button
 									className={`${
 										disabled
 											? "text-center bg-blue-500 opacity-50 text-white font-bold w-auto rounded h-[45px] cursor-not-allowed mt-4"
 											: "text-center bg-blue-500 text-white font-bold w-auto rounded h-[45px] hover:bg-white hover:text-blue-500 hover:border-[2px] hover:border-blue-500 hover:ease-in-out duration-300 mt-4"
 									}`}
-									onClick={registerUser}
+									onClick={loginUser}
 									disabled={disabled}>
-									Sign up
+									Sign in
 								</button>
-								<div className='inline-flex items-center w-full'>
-									<hr className='w-full h-px my-8 bg-gray-200 border-0 bg-gray-700'></hr>
-									<span className=' text-[12px] text-gray-900  bg-white ml-4 mr-4'>OR</span>
-									<hr className='w-full h-px my-8 bg-gray-200 border-0 bg-gray-700'></hr>
-								</div>
+							</div>
+
+							<div className='inline-flex items-center w-full'>
+								<hr className='w-full h-px my-8 bg-gray-200 border-0 bg-gray-700'></hr>
+								<span className=' text-[12px] text-gray-900  bg-white ml-4 mr-4'>OR</span>
+								<hr className='w-full h-px my-8 bg-gray-200 border-0 bg-gray-700'></hr>
+							</div>
+							<div className='flex flex-col '>
 								<button
 									className='bg-white hover:opacity-80 border-2 font-bold text-[12px] rounded w-auto h-[45px] flex flex-row items-center justify-center'
 									onClick={loginWithGoogle}>
@@ -181,18 +179,18 @@ export default function Register() {
 									<Image src={facebook} alt='google' className='w-[20px] h-[20px] mr-2' />
 									<p className=''>Sign in with Facebook</p>
 								</button>
-								<a className='text-blue-600 text-[12px]' href='/login'>
-									Already have an account? Sign in
+								<a className='text-blue-600 text-[12px] ' href='/register'>
+									Dont have an account? Sign up
 								</a>
 							</div>
 						</div>
 					</div>
 				</div>
-				<div className='w-[0%] lg:w-1/2 h-full items-center'>
+				<div className='w-[0%] lg:w-1/2 relative'>
 					<img
 						src={AFBuilding.src}
 						alt='Login'
-						className=' h-full w-full object-cover hidden md:hidden lg:block xl:block'
+						className=' h-screen w-screen object-cover hidden md:block lg:block xl:block'
 					/>
 				</div>
 			</div>

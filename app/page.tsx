@@ -1,20 +1,21 @@
 // For handling of session
-// import { getServerSession } from "next-auth/next";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/libs/authOption";
 
 // For Redirection
 import { redirect } from "next/navigation";
 import Link from "next/link";
 
 export default async function Home() {
-	// const session = await getServerSession(authOptions);
+	const session = await getServerSession(authOptions);
 
-	// if (session) {
-	// 	if (session?.user?.isNewUser === true) {
-	// 		redirect("/create-profile");
-	// 	} else {
-	// 		redirect("/dashboard");
-	// 	}
-	// }
+	if (session) {
+		if (session?.user?.isNewUser === true) {
+			redirect("/create-profile");
+		} else {
+			redirect("/dashboard");
+		}
+	}
 
 	return (
 		<>

@@ -1,0 +1,91 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String    @id @default(auto()) @map("_id") @db.ObjectId
+  name           String?
+  email          String?   @unique
+  emailVerified  DateTime?
+  image          String?
+  provider       String?
+  hashedPassword String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  accounts Account[]
+  Profile  Profile?
+}
+
+model Account {
+  id                String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String  @db.ObjectId
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.String
+  access_token      String? @db.String
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.String
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Profile {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  // Profile Details
+  lastName    String?
+  firstName   String?
+  nickname    String?
+  birthday    String?
+  phonenumber String?
+  image       String?
+
+  // Hidden Details
+  employeeID     String?
+  role           String?
+  driversLicense String?
+
+  // Define the 1-to-1 relationship with User using email as the reference
+  userEmail String @unique @map("userEmail")
+  user      User   @relation(fields: [userEmail], references: [email])
+
+  // 1-to-1 relationship - This is the relationship to Address
+  location Location?
+}
+
+model Location {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  lng       Float
+  lat       Float
+  address   Address?
+  profile   Profile  @relation(fields: [profileId], references: [id])
+  profileId String   @unique @db.ObjectId
+}
+
+model Address {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  fullAddress     String
+  pointOfInterest String
+  city            String
+  country         String
+  location        Location @relation(fields: [locationId], references: [id])
+  locationId      String   @unique @db.ObjectId
+}
