@@ -53,3 +53,9 @@ export interface FormData {
 		};
 	};
 }
+
+export interface APIErr {
+	code: number;
+	message: string;
+	cause: string | Error;
+}

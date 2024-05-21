@@ -26,8 +26,8 @@ export const validateImage = (imageBase64: string) => {
   return false; // Invalid image format
 };
 
-export const validateEmail = (email: string) => {
-  const emailRegEx = /^[a-zA-Z0-9]+@[a-zA-Z0-9]+\.[A-Za-z]+$/;
+export const validateEmail = (email: string): boolean => {
+  const emailRegEx = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   return emailRegEx.test(email);
 };
 

@@ -160,7 +160,7 @@ export default function CreateProfile() {
 			<div className='flex flex-col items-center text-center'>
 				<img src={AFlogo.src} alt='logo' className='h-[90px] w-[250px] mt-10 mb-5' />
 
-				<div className=''>
+				<div className='w-full max-w-[420px]'>
 					<h1 className='bold text-4xl'>
 						Profile <a className='text-blue-500'>Creation</a> Page
 					</h1>
@@ -177,7 +177,7 @@ export default function CreateProfile() {
 				</div>
 
 				<div
-					className='flex flex-col items-center max-w-[420px] mx-auto px-4'
+					className='flex flex-col items-center w-full max-w-[420px] mx-auto px-4'
 					onKeyDown={e => handleEnterKeyPress(e, submitProfile, disabled, setDisabled)}>
 					<label htmlFor='profileImage' className=''>
 						Click to upload a profile image
