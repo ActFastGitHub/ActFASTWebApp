@@ -52,6 +52,7 @@ export default function Register() {
 		} catch (err) {
 			const errorMessage = "An error occurred";
 			toast.error(errorMessage);
+			setTimeout(() => setDisabled(false), 4000);
 		}
 	};
 

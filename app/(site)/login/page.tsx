@@ -41,7 +41,7 @@ export default function Login() {
 		}
 
 		// Handle errorParams
-    const searchParams = new URLSearchParams(window.location.search);
+		const searchParams = new URLSearchParams(window.location.search);
 		const errorParams = searchParams.get("error");
 
 		if (errorParams) {
