@@ -107,19 +107,19 @@ const ClickableGrid: React.FC = () => {
 				</select>
 
 				<div className='flex space-x-12 justify-center'>
-					<div className='flex flex-col mt-[192px] lg:mt-[448px]'>
+					<div className='flex flex-col mt-[192px] lg:mt-[386px] xl:mt-[448px]'>
 						{currentBoxes.slice(0, 5).map(box => (
 							<Box key={box.id} id={box.id} name={box.name} color={box.color} />
 						))}
 					</div>
 					<div className='flex space-x-0'>
-						<div className='flex flex-col lg:pl-20 mt-[144px] lg:mt-[336px]'>
+						<div className='flex flex-col lg:pl-20 mt-[144px] lg:mt-[288px] xl:mt-[336px]'>
 							<div className='flex flex-col'>
 								{currentBoxes.slice(5, 6).map(box => (
 									<Box key={box.id} id={box.id} name={box.name} color={box.color} />
 								))}
 							</div>
-							<div className='flex flex-col mt-[48px] lg:mt-[112px]'>
+							<div className='flex flex-col mt-[48px] lg:mt-[96px] xl:mt-[112px]'>
 								{currentBoxes.slice(6, 9).map(box => (
 									<Box key={box.id} id={box.id} name={box.name} color={box.color} />
 								))}
@@ -131,7 +131,7 @@ const ClickableGrid: React.FC = () => {
 									<Box key={box.id} id={box.id} name={box.name} color={box.color} />
 								))}
 							</div>
-							<div className='flex flex-col mt-[48px] lg:mt-[112px]'>
+							<div className='flex flex-col mt-[48px] lg:mt-[96px] xl:mt-[112px]'>
 								{currentBoxes.slice(12, 15).map(box => (
 									<Box key={box.id} id={box.id} name={box.name} color={box.color} />
 								))}
