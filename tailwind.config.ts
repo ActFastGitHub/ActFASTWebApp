@@ -13,10 +13,10 @@ const config: Config = {
         "gradient-conic":
           "conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))",
       },
-      // spacing: {
-      //   '1stCol': '34rem',
-      //   '2ndCol': '44rem'
-      // }
+      fontSize: {
+        'xxs': '0.625rem', // 10px
+        'xxxs': '0.5rem', // 8px
+      },
     },
   },
   plugins: [],

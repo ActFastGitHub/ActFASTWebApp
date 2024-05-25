@@ -19,10 +19,10 @@ const Box: React.FC<BoxProps> = ({ id, name, color }) => {
   return (
     <button
       onClick={handleClick}
-      className={`${color} border border-gray-400 w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 lg:w-32 lg:h-32 xl:w-36 xl:h-36 flex flex-col items-start justify-start p-1`}
+      className={`${color} border border-gray-400 w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 lg:w-24 lg:h-24 xl:w-28 xl:h-28 flex flex-col items-start justify-start p-1 overflow-auto`}
     >
-      <div className="text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl">{id}</div>
-      <div className="flex-1 flex items-center justify-center cursor-pointer text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl">
+      <div className="text-xxs sm:text-sm md:text-base lg:text-lg xl:text-xl">{id}</div>
+      <div className="flex-1 flex items-center justify-center cursor-pointer text-xxs sm:text-sm md:text-base lg:text-lg xl:text-xl">
         {name}
       </div>
     </button>
