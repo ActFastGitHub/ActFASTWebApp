@@ -6,6 +6,13 @@ import { authOptions } from "@/app/libs/authOption";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 
+// Components
+import HeroSection from "@/app/components/heroSection";
+import ServicesSection from "@/app/components/servicesSection";
+import AboutSection from "@/app/components/aboutSection";
+import TestimonialsSection from "@/app/components/testimonialSection";
+import Footer from "@/app/components/footer";
+
 export default async function Home() {
 	const session = await getServerSession(authOptions);
 
@@ -19,6 +26,11 @@ export default async function Home() {
 
 	return (
 		<>
+			<HeroSection />
+			<ServicesSection />
+			<AboutSection />
+			<TestimonialsSection />
+			<Footer />
 			<h1>THIS WOULD EVENTUALLY BE THE LANDING PAGE</h1>
 			<Link href={`/register`}>
 				<button
