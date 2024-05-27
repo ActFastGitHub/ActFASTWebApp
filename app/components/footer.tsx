@@ -7,7 +7,7 @@ import AFlogo from "@/app/images/actfast-logo.jpg";
 const Footer = () => (
   <footer className='bg-gray-800 text-white py-8'>
     <div className='container mx-auto px-4 text-center'>
-      <div className='flex flex-col md:flex-row justify-center space-y-4 md:space-y-0 md:space-x-8 mb-4'>
+      <div className='flex flex-row justify-center space-x-4 md:space-x-8 mb-4'>
         <Link href='#' className='hover:underline'>
           Home
         </Link>
