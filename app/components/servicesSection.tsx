@@ -13,32 +13,40 @@ const services = [
     title: "Water Damage Restoration", 
     description: "Quick and efficient water damage repair services.",
     images: [
-      "https://swiperjs.com/demos/images/nature-1.jpg",
-      "https://swiperjs.com/demos/images/nature-2.jpg"
+      "/images/WaterDamage/image1.jpg",
+      "/images/WaterDamage/image2.jpg",
+      "/images/WaterDamage/image3.jpg",
+      "/images/WaterDamage/image4.jpg",
     ]
   },
   { 
     title: "Fire Damage Restoration", 
     description: "Comprehensive fire damage restoration and cleanup.",
     images: [
-      "https://swiperjs.com/demos/images/nature-3.jpg",
-      "https://swiperjs.com/demos/images/nature-4.jpg"
+      "/images/FireDamage/image1.jpg",
+      "/images/FireDamage/image2.jpg",
+      "/images/FireDamage/image3.jpg",
+      "/images/FireDamage/image4.jpg",
     ]
   },
   { 
     title: "Mold Remediation", 
     description: "Safe and effective mold removal services.",
     images: [
-      "https://swiperjs.com/demos/images/nature-5.jpg",
-      "https://swiperjs.com/demos/images/nature-6.jpg"
+      "/images/MoldRemediation/image1.jpg",
+      "/images/MoldRemediation/image2.jpg",
+      "/images/MoldRemediation/image3.jpg",
+      "/images/MoldRemediation/image4.jpg",
     ]
   },
   { 
     title: "General Repairs", 
     description: "Quality repairs for all parts of your home.",
     images: [
-      "https://swiperjs.com/demos/images/nature-1.jpg",
-      "https://swiperjs.com/demos/images/nature-2.jpg"
+      "/images/GeneralRepairs/image1.jpg",
+      "/images/GeneralRepairs/image2.jpg",
+      "/images/GeneralRepairs/image1.jpg",
+      "/images/GeneralRepairs/image1.jpg",
     ]
   }
 ];
@@ -74,4 +82,3 @@ const ServicesSection = () => (
 );
 
 export default ServicesSection;
-

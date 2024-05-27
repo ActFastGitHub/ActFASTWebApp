@@ -1,9 +1,6 @@
-// For handling of session
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/libs/authOption";
+"use client";
 
-// For Redirection
-import { redirect } from "next/navigation";
+import React, { useState } from "react";
 import Link from "next/link";
 
 // Components
@@ -12,40 +9,29 @@ import ServicesSection from "@/app/components/servicesSection";
 import AboutSection from "@/app/components/aboutSection";
 import TestimonialsSection from "@/app/components/testimonialSection";
 import Footer from "@/app/components/footer";
+import Modal from "@/app/components/modal";
 
-export default async function Home() {
-	const session = await getServerSession(authOptions);
+export default function Home() {
+	const [showModal, setShowModal] = useState(false);
 
-	if (session) {
-		if (session?.user?.isNewUser === true) {
-			redirect("/create-profile");
-		} else {
-			redirect("/dashboard");
-		}
-	}
+	const handlePortalClick = () => {
+		setShowModal(true);
+	};
+
+	const handleCloseModal = () => {
+		setShowModal(false);
+	};
 
 	return (
-		<>
-			<HeroSection />
-			<ServicesSection />
-			<AboutSection />
-			<TestimonialsSection />
-			<Footer />
-			<h1>THIS WOULD EVENTUALLY BE THE LANDING PAGE</h1>
-			<Link href={`/register`}>
-				<button
-					className='bg-blue-500 text-white font-bold text-[15px] rounded w-[300px] h-[45px] hover:bg-white hover:text-blue-500 hover:border-[3px] hover:border-blue-500 hover:ease-in-out duration-500'
-					style={{ boxShadow: "0px 4px 4px rgba(0, 0, 0, 0.25)" }}>
-					Register
-				</button>
-			</Link>
-			<Link href={`/pods-mapping`}>
-				<button
-					className='bg-blue-500 text-white font-bold text-[15px] rounded w-[300px] h-[45px] hover:bg-white hover:text-blue-500 hover:border-[3px] hover:border-blue-500 hover:ease-in-out duration-500'
-					style={{ boxShadow: "0px 4px 4px rgba(0, 0, 0, 0.25)" }}>
-					Pods Mapping
-				</button>
-			</Link>
-		</>
+		<div className='relative'>
+			<div className={`${showModal ? "blur-sm" : ""}`}>
+				<HeroSection onPortalClick={handlePortalClick} />
+				<ServicesSection />
+				<AboutSection />
+				<TestimonialsSection />
+				<Footer />
+			</div>
+			<Modal showModal={showModal} onClose={handleCloseModal} />
+		</div>
 	);
 }
