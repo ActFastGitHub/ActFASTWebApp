@@ -122,7 +122,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onPortalClick }) => {
 				)}
 			</nav>
 			<div className='absolute inset-0 bg-black bg-opacity-50 flex flex-col justify-center items-center text-center text-white p-4'>
-				<h1 className='text-4xl md:text-6xl font-bold mb-4'>24/7 EMERGENCY SERVICE</h1>
+				<h1 className='text-4xl md:text-6xl font-bold mb-4 italic animate-fade-in-up hover:animate-text bg-gradient-to-r from-teal-500 via-purple-500 to-orange-500 bg-clip-text text-transparent text-5xl font-black'>24/7 EMERGENCY SERVICE</h1>
 				<p className='text-lg md:text-2xl mb-6'>Bringing your home back to life</p>
 				<Link className='bg-red-800 hover:bg-red-600 text-white font-bold py-2 px-4 rounded' href='tel:+16045185129'>
 					CALL NOW
