@@ -11,8 +11,8 @@ const Footer = () => (
         <Link href='#' className='hover:underline'>
           Home
         </Link>
-        <Link href='#' className='hover:underline'>
-          Services
+        <Link href='/pods-mapping' className='hover:underline'>
+          Pods Mapping
         </Link>
         <Link href='#' className='hover:underline'>
           About

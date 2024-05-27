@@ -4,6 +4,7 @@
 
 import React, { useState } from "react";
 import Box from "@/app/components/box";
+import { useRouter } from "next/navigation";
 
 interface BoxData {
 	id: number;
@@ -77,9 +78,15 @@ const initialLevelConfig: LevelConfig = {
 const ClickableGrid: React.FC = () => {
 	const [levelConfig, setLevelConfig] = useState<LevelConfig>(initialLevelConfig);
 	const [currentLevel, setCurrentLevel] = useState<number>(1);
+	const router = useRouter();
+
 
 	const handleLevelChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
 		setCurrentLevel(Number(event.target.value));
+	};
+
+	const handleBack = () => {
+		router.back();
 	};
 
 	const currentBoxes = levelConfig[currentLevel];
@@ -87,6 +94,11 @@ const ClickableGrid: React.FC = () => {
 	return (
 		<div className='min-h-screen bg-gray-300 flex items-center justify-center p-8'>
 			<div className='relative w-full max-w-screen-xl p-8 bg-white rounded shadow-2xl flex flex-col items-center space-y-4'>
+				<button
+					onClick={handleBack}
+					className='absolute top-4 left-4 bg-blue-500 text-white px-4 py-2 rounded shadow hover:bg-blue-700 transition duration-200'>
+					Back
+				</button>
 				<h1 className='text-2xl font-bold text-center text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl'>
 					Pods Mapping
 				</h1>
