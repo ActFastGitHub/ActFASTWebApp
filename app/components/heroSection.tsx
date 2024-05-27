@@ -103,12 +103,12 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onPortalClick }) => {
 								Home
 							</Link>
 							<Link
-								href='/services'
+								href='/under-construction'
 								className='text-gray-300 hover:text-white block px-3 py-2 rounded-md text-base font-medium'>
 								Services
 							</Link>
 							<Link
-								href='/featured'
+								href='/under-construction'
 								className='text-gray-300 hover:text-white block px-3 py-2 rounded-md text-base font-medium'>
 								Featured
 							</Link>
