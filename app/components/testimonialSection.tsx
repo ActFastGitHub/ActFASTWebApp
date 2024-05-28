@@ -15,9 +15,9 @@ const testimonials = [
 
 const TestimonialsSection = () => {
   return (
-    <section className="py-12 bg-gray-100">
+    <section className="py-12 bg-gray-800">
       <div className="container mx-auto px-4">
-        <h2 className="text-3xl font-bold text-center mb-8">Testimonials</h2>
+        <h2 className="text-3xl font-bold text-center text-white mb-8">Testimonials</h2>
         <Swiper
           effect={'coverflow'}
           grabCursor={true}
@@ -30,13 +30,13 @@ const TestimonialsSection = () => {
             modifier: 1,
             slideShadows: true,
           }}
-          pagination={{ clickable: true }}
+          pagination={false}
           modules={[EffectCoverflow, Pagination]}
           className="mySwiper"
         >
           {testimonials.map((testimonial, index) => (
             <SwiperSlide key={index}>
-              <div className="bg-white p-6 shadow rounded text-center">
+              <div className="bg-white p-6 shadow-2xl rounded text-center">
                 <img src={testimonial.image} alt={testimonial.name} className="w-16 h-16 rounded-full mx-auto mb-4"/>
                 <p className="text-xl font-semibold mb-4">"{testimonial.feedback}"</p>
                 <p className="text-gray-600">- {testimonial.name}</p>
