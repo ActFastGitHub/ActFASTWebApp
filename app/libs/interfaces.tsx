@@ -5,9 +5,9 @@ export interface ModeContextType {
 
 export interface UserProps {
 	id: string;
-	name: string;
-	ethnicity: string;
-	gender: string;
+	lastName: string;
+	firstName: string;
+	nickname: string;
 	birthday: string;
 	phonenumber: string;
 	image: string;
@@ -37,10 +37,10 @@ export interface LocationData {
 }
 
 export interface FormData {
-	name: string;
+	lastName: string;
+	firstName: string;
+	nickname: string;
 	birthday: string;
-	ethnicity: string;
-	gender: string;
 	phonenumber: string;
 	location: {
 		lng: number;

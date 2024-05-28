@@ -143,7 +143,7 @@ const AboutSection = () => (
 				</div>
 			</div>
 			<div className='flex flex-col lg:flex-row justify-center items-center lg:space-x-8'>
-				<div className='flex flex-col items-center mb-8 lg:mb-0 w-full lg:w-1/2'>
+				<div className='flex flex-col items-center w-full lg:w-1/2'>
 					<div className='bg-gray-100 p-6 pt-20 rounded-lg shadow-lg relative flex flex-col items-center'>
 						<div className='w-40 h-40 mb-4 absolute -top-8'>
 							<img
@@ -161,7 +161,7 @@ const AboutSection = () => (
 						</div>
 					</div>
 				</div>
-				<div className='flex flex-col items-center w-full lg:w-1/2'>
+				<div className='flex flex-col items-center mt-12 lg:mt-6 w-full lg:w-1/2'>
 					<div className='bg-gray-100 p-6 pt-20 rounded-lg shadow-lg relative flex flex-col items-center'>
 						<div className='w-40 h-40 mb-4 absolute -top-8'>
 							<img

@@ -18,10 +18,10 @@ export default function CreateProfile() {
 	const [disabled, setDisabled] = useState(false);
 
 	const [data, setData] = useState<FormData>({
-		name: "",
+		lastName: "",
+		firstName: "",
+		nickname: "",
 		birthday: "",
-		ethnicity: "",
-		gender: "",
 		phonenumber: "",
 		location: {
 			lng: 0,
@@ -39,9 +39,7 @@ export default function CreateProfile() {
 	const [address, setAddress] = useState("");
 	const [suggestions, setSuggestions] = useState<LocationFeature[]>([]);
 
-	//   // Check if the session is still loading
 	if (status === "loading") {
-		// return <p>Loading...</p>;
 		return null;
 	}
 
@@ -58,7 +56,6 @@ export default function CreateProfile() {
 	const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
 		const selectedFile = e.target.files && e.target.files[0];
 		if (selectedFile) {
-			// Read the selected image file and convert it to base64
 			const reader = new FileReader();
 			reader.onload = () => {
 				const base64Data = reader.result?.toString();
@@ -72,8 +69,7 @@ export default function CreateProfile() {
 		const val = e.target.value;
 		setAddress(val);
 
-		const endpoint = `https://api.mapbox.com/geocoding/v5/mapbox.places/${val}
-      .json?&country=ca&proximity=ip&types=address%2Cpoi&language=en&limit=3&access_token=${process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN}`;
+		const endpoint = `https://api.mapbox.com/geocoding/v5/mapbox.places/${val}.json?&country=ca&proximity=ip&types=address%2Cpoi&language=en&limit=3&access_token=${process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN}`;
 		try {
 			const response = await axios.get(endpoint);
 			setLocation(response.data);
@@ -93,10 +89,10 @@ export default function CreateProfile() {
 			});
 
 			const requestBody = {
-				name: data.name,
+				lastName: data.lastName,
+				firstName: data.firstName,
+				nickname: data.nickname,
 				birthday: data.birthday,
-				ethnicity: data.ethnicity,
-				gender: data.gender,
 				phonenumber: data.phonenumber,
 				location: {
 					lng: location?.features[0]?.geometry.coordinates[0],
@@ -137,22 +133,37 @@ export default function CreateProfile() {
 		}
 	};
 
-	const handleNameChange = (e: ChangeEvent<HTMLInputElement>) => {
+	const handleLastNameChange = (e: ChangeEvent<HTMLInputElement>) => {
 		// Allow only letters and spaces in the name field
 		const newName = e.target.value.replace(/[^a-zA-Z\s]/g, "");
-		setData({ ...data, name: newName });
+		setData({ ...data, lastName: newName });
+	};
+
+	const handleFirstNameChange = (e: ChangeEvent<HTMLInputElement>) => {
+		// Allow only letters and spaces in the name field
+		const newName = e.target.value.replace(/[^a-zA-Z\s]/g, "");
+		setData({ ...data, firstName: newName });
+	};
+
+	const handleNickNameChange = (e: ChangeEvent<HTMLInputElement>) => {
+		// Allow only letters and spaces in the name field
+		const newName = e.target.value.replace(/[^a-zA-Z\s]/g, "");
+		setData({ ...data, nickname: newName });
 	};
 
 	const handlePhoneNumberChange = (e: ChangeEvent<HTMLInputElement>) => {
 		const value = e.target.value;
 		let formattedValue: string | RegExpMatchArray | null = value.replace(/\D/g, "");
 		if (formattedValue.length > 0) {
-			formattedValue = formattedValue.match(/(\d{1,3})(\d{0,3})(\d{0,4})/); // split into groups of 3 digits
+			formattedValue = formattedValue.match(/(\d{1,3})(\d{0,3})(\d{0,4})/);
 			formattedValue = [formattedValue![1], formattedValue![2], formattedValue![3]]
 				.filter(group => group.length > 0)
-				.join("-"); // join groups with dashes
+				.join("-");
 		}
-		setData({ ...data, phonenumber: formattedValue });
+		setData(prevData => ({
+			...prevData,
+			phonenumber: formattedValue
+		}));
 	};
 
 	return (
@@ -212,12 +223,30 @@ export default function CreateProfile() {
 						onChange={handleFileChange}
 					/>
 					<input
-						id='name'
-						name='name'
+						id='lastName'
+						name='lastName'
 						type='text'
-						placeholder='Name'
-						value={data.name}
-						onChange={handleNameChange}
+						placeholder='Last Name'
+						value={data.lastName}
+						onChange={handleLastNameChange}
+						className='border-2 border-gray-300 h-[45px] rounded-md pl-4 mt-8 w-full'
+					/>
+					<input
+						id='firstName'
+						name='firstName'
+						type='text'
+						placeholder='First Name'
+						value={data.firstName}
+						onChange={handleFirstNameChange}
+						className='border-2 border-gray-300 h-[45px] rounded-md pl-4 mt-8 w-full'
+					/>
+					<input
+						id='nickname'
+						name='nickname'
+						type='text'
+						placeholder='Nickname'
+						value={data.nickname}
+						onChange={handleNickNameChange}
 						className='border-2 border-gray-300 h-[45px] rounded-md pl-4 mt-8 w-full'
 					/>
 
@@ -232,7 +261,10 @@ export default function CreateProfile() {
 								const date = e.target.value;
 								if (!date) return;
 								const formattedDate = new Date(date).toISOString().split("T")[0];
-								setData({ ...data, birthday: formattedDate });
+								setData(prevData => ({
+									...prevData,
+									birthday: formattedDate
+								}));
 							}}
 							className='border-2 border-gray-300 h-[45px] rounded-md pl-4  w-full'
 						/>
