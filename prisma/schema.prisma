@@ -1,8 +1,127 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// generator client {
+//   provider = "prisma-client-js"
+// }
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// datasource db {
+//   provider = "mongodb"
+//   url      = env("DATABASE_URL")
+// }
+
+// model User {
+//   id             String    @id @default(auto()) @map("_id") @db.ObjectId
+//   name           String?
+//   email          String?   @unique
+//   emailVerified  DateTime?
+//   image          String?
+//   provider       String?
+//   hashedPassword String?
+//   createdAt      DateTime  @default(now())
+//   updatedAt      DateTime  @updatedAt
+
+//   accounts Account[]
+//   Profile  Profile?
+// }
+
+// model Account {
+//   id                String  @id @default(auto()) @map("_id") @db.ObjectId
+//   userId            String  @db.ObjectId
+//   type              String
+//   provider          String
+//   providerAccountId String
+//   refresh_token     String? @db.String
+//   access_token      String? @db.String
+//   expires_at        Int?
+//   token_type        String?
+//   scope             String?
+//   id_token          String? @db.String
+//   session_state     String?
+
+//   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+//   @@unique([provider, providerAccountId])
+// }
+
+// model Profile {
+//   id String @id @default(auto()) @map("_id") @db.ObjectId
+
+//   // Profile Details
+//   lastName    String?
+//   firstName   String?
+//   nickname    String? @unique
+//   birthday    String?
+//   phonenumber String?
+//   image       String?
+
+//   // Hidden Details
+//   employeeID     String?
+//   role           String?
+//   driversLicense String?
+
+//   // Define the 1-to-1 relationship with User using email as the reference
+//   userEmail String @unique @map("userEmail")
+//   user      User   @relation(fields: [userEmail], references: [email])
+
+//   // 1-to-1 relationship - This is the relationship to Address
+//   location Location?
+
+//   // 1-to-many relationship with Boxes
+//   boxes Box[]
+
+//   // 1-to-many relationship with Items
+//   items Item[]
+// }
+
+// model Location {
+//   id        String   @id @default(auto()) @map("_id") @db.ObjectId
+//   lng       Float
+//   lat       Float
+//   address   Address?
+//   profile   Profile  @relation(fields: [profileId], references: [id])
+//   profileId String   @unique @db.ObjectId
+// }
+
+// model Address {
+//   id              String   @id @default(auto()) @map("_id") @db.ObjectId
+//   fullAddress     String
+//   pointOfInterest String
+//   city            String
+//   country         String
+//   location        Location @relation(fields: [locationId], references: [id])
+//   locationId      String   @unique @db.ObjectId
+// }
+
+// model Box {
+//   id               String   @id @default(auto()) @map("_id") @db.ObjectId
+//   name             String
+//   color            String
+//   createdAt        DateTime @default(now())
+//   updatedAt        DateTime @updatedAt
+//   lastModifiedBy   Profile? @relation(fields: [lastModifiedById], references: [id])
+//   lastModifiedById String?  @db.ObjectId
+
+//   owner   Profile @relation(fields: [ownerId], references: [id])
+//   ownerId String  @db.ObjectId
+
+//   items  Item[]
+// }
+
+// model Item {
+//   id               String   @id @default(auto()) @map("_id") @db.ObjectId
+//   name             String
+//   description      String?
+//   addedAt          DateTime @default(now())
+//   lastModifiedAt   DateTime @updatedAt
+//   addedBy         Profile? @relation("AddedByProfile", fields: [addedById], references: [id])
+//   addedById        String?  @db.ObjectId
+//   lastModifiedBy  Profile? @relation("ModifiedByProfile", fields: [lastModifiedById], references: [id])
+//   lastModifiedById String?  @db.ObjectId
+
+//   box    Box     @relation("BoxItems", fields: [boxId], references: [id])
+//   boxId  String  @db.ObjectId
+//   User   User?   @relation(fields: [userId], references: [id])
+//   userId String? @db.ObjectId
+//   Box    Box     @relation(fields: [boxId], references: [id])
+// }
 
 generator client {
   provider = "prisma-client-js"
@@ -53,7 +172,7 @@ model Profile {
   // Profile Details
   lastName    String?
   firstName   String?
-  nickname    String?
+  nickname    String? @unique
   birthday    String?
   phonenumber String?
   image       String?
@@ -69,6 +188,15 @@ model Profile {
 
   // 1-to-1 relationship - This is the relationship to Address
   location Location?
+
+  // 1-to-many relationship with Boxes last modified by this profile
+  boxesModified Box[] @relation("LastModifiedProfile")
+
+  // 1-to-many relationship with Items added by this profile
+  itemsAdded Item[] @relation("AddedByProfile")
+
+  // 1-to-many relationship with Items last modified by this profile
+  itemsModified Item[] @relation("ModifiedByProfile")
 }
 
 model Location {
@@ -88,4 +216,34 @@ model Address {
   country         String
   location        Location @relation(fields: [locationId], references: [id])
   locationId      String   @unique @db.ObjectId
+}
+
+model Box {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  boxNumber        String   @unique
+  name             String
+  color            String
+  level            Int
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  lastModifiedById String?  @db.ObjectId
+
+  lastModifiedBy   Profile? @relation("LastModifiedProfile", fields: [lastModifiedById], references: [id])
+
+  items  Item[]    @relation("BoxItems")
+}
+
+model Item {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  name             String
+  description      String?
+  addedAt          DateTime @default(now())
+  lastModifiedAt   DateTime @updatedAt
+  addedById        String?  @db.ObjectId
+  lastModifiedById String?  @db.ObjectId
+  boxId            String   @db.ObjectId
+
+  addedBy         Profile? @relation("AddedByProfile", fields: [addedById], references: [id])
+  lastModifiedBy  Profile? @relation("ModifiedByProfile", fields: [lastModifiedById], references: [id])
+  box             Box      @relation("BoxItems", fields: [boxId], references: [id])
 }

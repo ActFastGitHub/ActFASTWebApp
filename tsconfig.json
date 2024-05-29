@@ -1,13 +1,13 @@
 {
   "compilerOptions": {
     "lib": ["dom", "dom.iterable", "esnext"],
-    "allowJs": true,
+    "allowJs": true, 
     "skipLibCheck": true,
     "strict": true,
     "noEmit": true,
     "esModuleInterop": true,
-    "module": "esnext",
-    "moduleResolution": "bundler",
+    "module": "ESNext", // esnext for normal, CommonJS to seed
+    "moduleResolution": "Bundler", // Bundler for normal, Node to seed
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",

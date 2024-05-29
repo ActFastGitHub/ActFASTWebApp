@@ -109,7 +109,7 @@ const ClickableGrid: React.FC = () => {
 			<div className='relative w-full max-w-screen-xl p-8 bg-white rounded shadow-2xl flex flex-col items-center space-y-4'>
 				<button
 					onClick={handleBack}
-					className='absolute top-4 left-4 bg-blue-500 text-white px-4 py-2 rounded shadow hover:bg-blue-700 transition duration-200'>
+					className='absolute top-4 left-4 bg-blue-500 text-white px-4 py-2 rounded shadow hover:bg-blue-700 transition duration-200 text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl w-13'>
 					Back
 				</button>
 				<h1 className='text-2xl font-bold text-center text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl'>
@@ -123,7 +123,7 @@ const ClickableGrid: React.FC = () => {
 				<select
 					value={currentLevel}
 					onChange={handleLevelChange}
-					className='absolute top-2 right-10 sm:top-4 sm:right-8 md:top-6 md:right-6 lg:top-8 lg:right-6 xl:top-10 xl:right-6 bg-blue-500 text-white px-2 py-2 rounded shadow-2xl text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl w-13'>
+					className='absolute top-2 right-4 sm:top-4 sm:right-8 md:top-6 md:right-6 lg:top-8 lg:right-6 xl:top-10 xl:right-6 bg-blue-500 text-white px-2 py-2 rounded shadow-2xl text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl w-13'>
 					{Object.keys(levelConfig).map(level => (
 						<option key={level} value={level}>
 							Level {level}
