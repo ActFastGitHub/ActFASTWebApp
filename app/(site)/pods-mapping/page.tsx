@@ -2,9 +2,10 @@
 
 // site/ClickableGrid.tsx
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Box from "@/app/components/box";
 import { useRouter } from "next/navigation";
+import { signOut, useSession } from "next-auth/react";
 
 interface BoxData {
 	id: number;
@@ -76,10 +77,22 @@ const initialLevelConfig: LevelConfig = {
 };
 
 const ClickableGrid: React.FC = () => {
+	const { data: session, status } = useSession();
+	const [isMounted, setIsMounted] = useState(false);
+
 	const [levelConfig, setLevelConfig] = useState<LevelConfig>(initialLevelConfig);
 	const [currentLevel, setCurrentLevel] = useState<number>(1);
 	const router = useRouter();
 
+	useEffect(() => {
+		if (status !== "loading" && !session) {
+			router.push("/login");
+		}
+		if (session?.user.isNewUser) {
+			router.push("/create-profile");
+		}
+		setIsMounted(true);
+	}, [session, status, router]);
 
 	const handleLevelChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
 		setCurrentLevel(Number(event.target.value));

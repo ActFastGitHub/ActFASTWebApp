@@ -6,6 +6,7 @@ import { UserProps } from "@/app/libs/interfaces";
 import { usePathname, useRouter } from "next/navigation";
 import { useMode } from "@/app/context/ModeContext"; // Import the useMode hook from your context
 import AFLogo from "@/app/images/actfast-logo.jpg";
+import Link from "next/link";
 
 const Navbar = () => {
 	const { data: session, status } = useSession();
@@ -36,22 +37,15 @@ const Navbar = () => {
 				<div className='flex items-center'>
 					<div className='flex items-center space-x-2'>
 						<img src={AFLogo.src} alt='ActFast Logo' className='w-auto h-12' />
-						<span className='text-white text-lg font-semibold'>Dashboard</span>
 					</div>
 				</div>
-				<div className='flex items-center space-x-4'>
-					<a
-						href='/dashboard'
-						className={`relative group text-white ${pathname === "/dashboard" ? isLinkActive : ""}`}>
-						Dashboard
-						<div className='absolute left-0 w-0 h-[2px] bg-blue-500 group-hover:w-full transition-transform transform origin-left scale-x-0 group-hover:scale-x-100'></div>
-					</a>
-					<a
+				<div className='flex items-center space-x-4'>				
+					{/* <Link
 						href='/profilepage'
 						className={`relative group text-white ${pathname === "/profilepage" ? isLinkActive : ""}`}>
 						Profile
 						<div className='absolute left-0 w-0 h-[2px] bg-blue-500 group-hover:w-full transition-transform transform origin-left scale-x-0 group-hover:scale-x-100'></div>
-					</a>
+					</Link> */}
 					{user ? (
 						<div className='relative inline-block'>
 							<img

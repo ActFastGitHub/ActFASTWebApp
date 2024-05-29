@@ -7,18 +7,32 @@ import Link from "next/link";
 import AFBuilding from "@/app/images/actfast-building.jpg";
 import AFlogo from "@/app/images/actfast-logo.jpg";
 import PhoneIcon from "@/app/images/phone-icon.svg";
+import { useRouter } from "next/navigation";
 
 // Define the props interface
 interface HeroSectionProps {
 	onPortalClick: () => void;
 }
-  
 
 const HeroSection: React.FC<HeroSectionProps> = ({ onPortalClick }) => {
 	const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+	const router = useRouter();
 
 	const toggleMobileMenu = () => {
 		setIsMobileMenuOpen(!isMobileMenuOpen);
+	};
+
+	const handlePortalClick = () => {
+		const localStorageAccessCode = localStorage.getItem("accessCode");
+		const envAccessCode = process.env.NEXT_PUBLIC_ACTFAST_ACCESS_CODE;
+
+		if (localStorageAccessCode === envAccessCode) {
+			// Redirect to /register if codes match
+			router.push("/register");
+		} else {
+			// Otherwise, open the modal
+			onPortalClick();
+		}
 	};
 
 	return (
@@ -87,7 +101,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onPortalClick }) => {
 									Featured
 								</Link>
 								<button
-									onClick={onPortalClick}
+									onClick={handlePortalClick}
 									className='text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium'>
 									Employee Portal
 								</button>
