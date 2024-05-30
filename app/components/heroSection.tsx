@@ -129,7 +129,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onPortalClick }) => {
 								Featured
 							</Link>
 							<button
-								onClick={onPortalClick}
+								onClick={handlePortalClick}
 								className='text-gray-300 hover:text-white block px-3 py-2 rounded-md text-base font-medium'>
 								Employee Portal
 							</button>
