@@ -25,9 +25,12 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
 	const id = params.id;
 	const initialName = searchParams.get("name") || "";
 	const initialColor = searchParams.get("color") || "bg-blue-500";
+	const initalLevel = searchParams.get("level") || "";
+
 
 	const [name, setName] = useState<string>(initialName);
 	const [color, setColor] = useState<string>(initialColor);
+	const [level, setLevel] = useState<string>(initalLevel);
 	const [disabled, setDisabled] = useState(false);
 
 	useEffect(() => {
@@ -55,7 +58,7 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
 				setTimeout(() => {
 					toast.dismiss();
           toast.success("Pod data successfully updated");
-					router.push("/pods-mapping");
+					router.push(`/pods-mapping/?level=${level}`);
 				}, 2000);
 			} else {
 				throw new Error(response.data?.error || "An error occurred");
@@ -96,12 +99,21 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
 						))}
 					</select>
 				</div>
+				<div className='mb-4'>
+					<label className='block text-sm font-medium text-gray-700'>Level</label>
+					<input
+						type='text'
+						value={level}
+						onChange={e => setLevel(e.target.value)}
+						className='mt-1 p-2 border border-gray-300 rounded w-full'
+						disabled
+					/>
+				</div>
 				<div className='flex space-x-4'>
 					<button
 						type='button'
 						onClick={handleBack}
-						className='bg-gray-500 text-white px-4 py-2 rounded'
-						disabled={disabled}>
+						className='bg-gray-500 text-white px-4 py-2 rounded'>
 						Back
 					</button>
 					<button type='submit' className='bg-blue-500 text-white px-4 py-2 rounded' disabled={disabled}>

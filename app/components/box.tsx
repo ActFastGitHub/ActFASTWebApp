@@ -7,13 +7,14 @@ interface BoxProps {
   id: string;
   name: string;
   color: string;
+  level: Number;
 }
 
-const Box: React.FC<BoxProps> = ({ id, name, color }) => {
+const Box: React.FC<BoxProps> = ({ id, name, color, level }) => {
   const router = useRouter();
 
   const handleClick = () => {
-    router.push(`/edit-box/${id}?name=${name}&color=${color}`);
+    router.push(`/edit-box/${id}?name=${name}&color=${color}&level=${level}`);
   };
 
   return (
