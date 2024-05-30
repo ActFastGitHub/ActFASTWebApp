@@ -25,18 +25,34 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
 	const id = params.id;
 	const initialName = searchParams.get("name") || "";
 	const initialColor = searchParams.get("color") || "bg-blue-500";
-	const initalLevel = searchParams.get("level") || "";
-
+	const initialLevel = searchParams.get("level") || "";
 
 	const [name, setName] = useState<string>(initialName);
 	const [color, setColor] = useState<string>(initialColor);
-	const [level, setLevel] = useState<string>(initalLevel);
+	const [level, setLevel] = useState<string>(initialLevel);
+	const [lastModifiedBy, setLastModifiedBy] = useState<string>("");
 	const [disabled, setDisabled] = useState(false);
 
 	useEffect(() => {
 		setName(initialName);
 		setColor(initialColor);
+		fetchBoxDetails();
 	}, [initialName, initialColor]);
+
+	const fetchBoxDetails = async () => {
+		try {
+			const response = await axios.get(`/api/pods`);
+			const boxes = response.data.boxes;
+			const currentBox = boxes.find((box: any) => box.boxNumber === id);
+
+			console.log("CURRENT BOX", currentBox);
+			if (currentBox) {
+				setLastModifiedBy(currentBox.lastModifiedById || "Unknown");
+			}
+		} catch (error) {
+			console.error("Error fetching box details:", error);
+		}
+	};
 
 	const updateBox = async (e: FormEvent) => {
 		e.preventDefault();
@@ -57,7 +73,8 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
 			if (response.status === 200) {
 				setTimeout(() => {
 					toast.dismiss();
-          toast.success("Pod data successfully updated");
+					toast.success("Pod data successfully updated");
+					fetchBoxDetails();
 					router.push(`/pods-mapping/?level=${level}`);
 				}, 2000);
 			} else {
@@ -109,11 +126,17 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
 						disabled
 					/>
 				</div>
+				<div className='mb-4'>
+					<label className='block text-sm font-medium text-gray-700'>Last Modified By</label>
+					<input
+						type='text'
+						value={lastModifiedBy}
+						className='mt-1 p-2 border border-gray-300 rounded w-full'
+						disabled
+					/>
+				</div>
 				<div className='flex space-x-4'>
-					<button
-						type='button'
-						onClick={handleBack}
-						className='bg-gray-500 text-white px-4 py-2 rounded'>
+					<button type='button' onClick={handleBack} className='bg-gray-500 text-white px-4 py-2 rounded'>
 						Back
 					</button>
 					<button type='submit' className='bg-blue-500 text-white px-4 py-2 rounded' disabled={disabled}>
