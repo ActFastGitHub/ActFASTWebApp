@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Box from "@/app/components/box";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import axios from "axios";
 
@@ -22,9 +22,7 @@ const ClickableGrid: React.FC = () => {
     const { data: session, status } = useSession();
     const [isMounted, setIsMounted] = useState(false);
     const [levelConfig, setLevelConfig] = useState<LevelConfig>({});
-    const searchParams = useSearchParams();
-    const initialLevel = Number(searchParams.get("level")) || 1;
-    const [currentLevel, setCurrentLevel] = useState<number>(initialLevel);
+    const [currentLevel, setCurrentLevel] = useState<number>(1);
     const router = useRouter();
 
     useEffect(() => {
@@ -36,6 +34,12 @@ const ClickableGrid: React.FC = () => {
         }
         setIsMounted(true);
     }, [session, status, router]);
+
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const initialLevel = Number(urlParams.get("level")) || 1;
+        setCurrentLevel(initialLevel);
+    }, []);
 
     useEffect(() => {
         const fetchBoxes = async () => {
