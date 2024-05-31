@@ -7,6 +7,7 @@ import FacebookProvider from "next-auth/providers/facebook";
 import bcrypt from "bcrypt";
 import { validateEmail } from "@/app/libs/validations";
 
+
 export const authOptions: NextAuthOptions = {
 	adapter: PrismaAdapter(prisma),
 	providers: [

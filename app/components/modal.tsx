@@ -16,7 +16,7 @@ const Modal: React.FC<ModalProps> = ({ showModal, onClose }) => {
 
 	const handleAccessCodeSubmit = () => {
 		if (accessCode === process.env.NEXT_PUBLIC_ACTFAST_ACCESS_CODE) {
-			setCookie("accessCode", accessCode, { path: "/" });
+			setCookie("accessCode", accessCode, { path: "/", maxAge: 7 * 24 * 60 * 60 }); // Expires in 7 days
 			localStorage.setItem("accessCode", accessCode);
 			router.push("/register");
 		} else {

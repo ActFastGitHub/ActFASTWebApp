@@ -13,6 +13,8 @@ import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { handleEnterKeyPress } from "@/app/libs/actions";
 
+
+
 export default function Register() {
 	const router = useRouter();
 	const [disabled, setDisabled] = useState(false);

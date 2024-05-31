@@ -10,6 +10,7 @@ import AFlogo from "@/app/images/actfast-logo.jpg";
 import { LocationData, LocationFeature, FormData } from "@/app/libs/interfaces";
 import { handleEnterKeyPress } from "@/app/libs/actions";
 
+
 export default function CreateProfile() {
 	const { data: session, status } = useSession();
 	const router = useRouter();

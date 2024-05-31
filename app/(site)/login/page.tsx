@@ -13,6 +13,7 @@ import { handleEnterKeyPress } from "@/app/libs/actions";
 import Link from "next/link";
 import { Suspense } from "react";
 
+
 export default function Login() {
 	const { data: session, status } = useSession();
 	const router = useRouter();
@@ -52,7 +53,7 @@ export default function Login() {
 
 	const loginWithFacebook = async () => {
 		const response = signIn("facebook", {
-			callbackUrl: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard?provider=facebook`
+			callbackUrl: `${process.env.NEXT_PUBLIC}/dashboard?provider=facebook`
 		});
 
 		response
