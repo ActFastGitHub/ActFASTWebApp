@@ -1,3 +1,5 @@
+'use client'
+
 // app/components/BoxList.tsx
 import { useEffect, useState } from "react";
 import { groupAndCountNames } from "../utils/groupAndCountNames";
