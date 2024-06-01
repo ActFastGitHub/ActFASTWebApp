@@ -1,61 +1,85 @@
-import React, { useEffect, useState } from "react";
-import axios from "axios";
+// app/components/BoxList.tsx
+import { useEffect, useState } from "react";
+import { groupAndCountNames } from "../utils/groupAndCountNames";
 
-interface BoxNameData {
+// Define the Box and GroupedName types
+interface Box {
+	id: string;
+	boxNumber: string;
 	name: string;
-	_count: {
-		name: number;
-	};
+	color: string;
+	level: number;
+	createdAt: Date;
+	updatedAt: Date;
+	lastModifiedById?: string;
+	items: any[]; // Replace `any` with your `Item` type if you have it
 }
 
-const BoxNames: React.FC = () => {
-	const [boxNames, setBoxNames] = useState<BoxNameData[]>([]);
+interface GroupedName {
+	name: string;
+	count: number;
+}
+
+const BoxList = () => {
+	const [boxes, setBoxes] = useState<Box[]>([]);
+	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const [groupedNames, setGroupedNames] = useState<GroupedName[]>([]);
 
 	useEffect(() => {
-		const fetchBoxNames = async () => {
+		const fetchBoxes = async () => {
 			try {
-				const response = await axios.get("/api/podnames");
-
-				 console.log("RESPONSE", response.data)
-				// Trim and remove spaces from box names
-				const formattedBoxNames = response.data.boxes.map((box: BoxNameData) => ({
-					...box,
-					name: box.name.trim().replace(/\s+/g, " ")
-				}));
-
-				console.log("FORMATTED", formattedBoxNames)
-				// Sort box names by count in descending order
-				const sortedBoxNames = formattedBoxNames.sort(
-					(a: { _count: { name: number } }, b: { _count: { name: number } }) => b._count.name - a._count.name
-				);
-
-				console.log("SORTED", sortedBoxNames)
-				setBoxNames(sortedBoxNames);
-			} catch (err) {
-				setError("Failed to fetch box names");
+				const response = await fetch("/api/podnames");
+				const data = await response.json();
+				if (response.ok) {
+					setBoxes(data.boxes);
+					const grouped = groupAndCountNames(data.boxes).sort((a, b) => a.name.localeCompare(b.name));
+					setGroupedNames(grouped);
+				} else {
+					setError(data.error);
+				}
+			} catch (error) {
+				setError("Failed to fetch boxes");
+			} finally {
+				setLoading(false);
 			}
 		};
 
-		fetchBoxNames();
+		fetchBoxes();
 	}, []);
 
+	if (loading) {
+		return (
+			<div className='flex justify-center items-center min-h-screen'>
+				<p className='text-lg font-medium'>Loading...</p>
+			</div>
+		);
+	}
+
 	if (error) {
-		return <div>{error}</div>;
+		return (
+			<div className='flex justify-center items-center min-h-screen'>
+				<p className='text-lg font-medium text-red-600'>Error: {error}</p>
+			</div>
+		);
 	}
 
 	return (
-		<div className='p-4'>
-			<h2 className='text-xl font-bold mb-4'>Pod Summary</h2>
-			<ul className='space-y-2'>
-				{boxNames.map(box => (
-					<li key={box.name}>
-						<div className='inline-flex justify-between items-center bg-gray-100 p-2 rounded-md shadow-sm'>
-							<span className='font-medium'>{box.name}</span>
-							<span className='bg-blue-500 text-white px-2 py-1 rounded-full ml-2'>
-								{box._count.name}
-							</span>
-						</div>
+		<div className='container mx-auto p-4'>
+			<h1 className='text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-center mb-6'>
+				Pods Summary
+			</h1>
+			<ul className='flex flex-col items-center space-y-4'>
+				{groupedNames.map(({ name, count }) => (
+					<li
+						key={name}
+						className='flex w-full max-w-md justify-between items-center py-2 border-b border-gray-200'>
+						<span className='text-lg sm:text-xl md:text-2xl lg:text-3xl font-semibold text-gray-800'>
+							{name}
+						</span>
+						<span className='flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 bg-blue-600 text-white text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold rounded-full'>
+							{count}
+						</span>
 					</li>
 				))}
 			</ul>
@@ -63,4 +87,4 @@ const BoxNames: React.FC = () => {
 	);
 };
 
-export default BoxNames;
+export default BoxList;
