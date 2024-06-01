@@ -21,10 +21,14 @@ const BoxNames: React.FC = () => {
 					...box,
 					name: box.name.trim().replace(/\s+/g, " ")
 				}));
+
+				console.log("FORMATTED", formattedBoxNames)
 				// Sort box names by count in descending order
 				const sortedBoxNames = formattedBoxNames.sort(
 					(a: { _count: { name: number } }, b: { _count: { name: number } }) => b._count.name - a._count.name
 				);
+
+				console.log("SORTED", sortedBoxNames)
 				setBoxNames(sortedBoxNames);
 			} catch (err) {
 				setError("Failed to fetch box names");
@@ -32,11 +36,13 @@ const BoxNames: React.FC = () => {
 		};
 
 		fetchBoxNames();
-	}, []);
+	}, [boxNames]);
 
 	if (error) {
 		return <div>{error}</div>;
 	}
+
+	console.log("BOX NAMES", boxNames)
 
 	return (
 		<div className='p-4'>
