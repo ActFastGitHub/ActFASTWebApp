@@ -36,13 +36,11 @@ const BoxNames: React.FC = () => {
 		};
 
 		fetchBoxNames();
-	}, [boxNames]);
+	}, []);
 
 	if (error) {
 		return <div>{error}</div>;
 	}
-
-	console.log("BOX NAMES", boxNames)
 
 	return (
 		<div className='p-4'>
