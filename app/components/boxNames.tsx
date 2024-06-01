@@ -29,11 +29,7 @@ const BoxList = () => {
 	useEffect(() => {
 		const fetchBoxes = async () => {
 			try {
-				const response = await fetch("/api/podnames", {
-					headers: {
-						"Cache-Control": "no-store"
-					}
-				});
+				const response = await fetch("/api/podnames");
 				const data = await response.json();
 				if (response.ok) {
 					setBoxes(data.boxes);
