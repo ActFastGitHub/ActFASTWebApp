@@ -69,7 +69,7 @@ const BoxList = () => {
 	return (
 		<div className='container mx-auto p-4'>
 			<h1 className='text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-center mb-6'>
-				Grouped Box Names
+				Pods Summary
 			</h1>
 			<ul className='flex flex-col items-center space-y-4'>
 				{groupedNames.map(({ name, count }) => (
