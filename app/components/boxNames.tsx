@@ -29,7 +29,11 @@ const BoxList = () => {
 	useEffect(() => {
 		const fetchBoxes = async () => {
 			try {
-				const response = await fetch("/api/podnames");
+				const response = await fetch("/api/podnames", {
+					headers: {
+						"Cache-Control": "no-store"
+					}
+				});
 				const data = await response.json();
 				if (response.ok) {
 					setBoxes(data.boxes);
@@ -67,7 +71,7 @@ const BoxList = () => {
 	return (
 		<div className='container mx-auto p-4'>
 			<h1 className='text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-center mb-6'>
-				Pods Summary
+				Grouped Box Names
 			</h1>
 			<ul className='flex flex-col items-center space-y-4'>
 				{groupedNames.map(({ name, count }) => (
