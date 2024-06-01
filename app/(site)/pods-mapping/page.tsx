@@ -201,7 +201,7 @@
 
 import React, { useEffect, useState } from "react";
 import Box from "@/app/components/box";
-// import BoxNames from "@/app/components/boxNames"; // Import the BoxNames component
+import BoxNames from "@/app/components/boxNames"; // Import the BoxNames component
 import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import axios from "axios";
@@ -388,10 +388,10 @@ const ClickableGrid: React.FC = () => {
 								))}
 							</div>
 						</div>
-						{/* <BoxNames /> Include the BoxNames component */}
-						<Link href={"/pods-summary"} className='bg-gray-500 text-white px-4 py-2 rounded'>
+						<BoxNames />
+						{/* <Link href={"/pods-summary"} className='bg-gray-500 text-white px-4 py-2 rounded'>
 							Pods Summary
-						</Link>
+						</Link> */}
 					</main>
 				</div>
 			</div>
