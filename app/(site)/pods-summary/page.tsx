@@ -2,7 +2,7 @@
 
 // app/components/BoxList.tsx
 import { useEffect, useState } from "react";
-import { groupAndCountNames } from "../utils/groupAndCountNames";
+import { groupAndCountNames } from "@/app/utils/groupAndCountNames";
 
 // Define the Box and GroupedName types
 interface Box {
