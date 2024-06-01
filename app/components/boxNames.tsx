@@ -31,7 +31,7 @@ const BoxList = () => {
 	useEffect(() => {
 		const fetchBoxes = async () => {
 			try {
-				const response = await fetch("/api/podnames");
+				const response = await fetch("/api/pods");
 				const data = await response.json();
 				if (response.ok) {
 					setBoxes(data.boxes);
