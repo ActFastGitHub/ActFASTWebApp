@@ -17,13 +17,13 @@ export async function GET() {
 			}
 		});
 
-		// Trim and remove spaces from box names
-		const formattedBoxes = boxes.map(box => ({
-			name: box.name.trim().replace(/\s+/g, " "),
-			_count: box._count
-		}));
+		// // Trim and remove spaces from box names
+		// const formattedBoxes = boxes.map(box => ({
+		// 	name: box.name.trim().replace(/\s+/g, " "),
+		// 	_count: box._count
+		// }));
 
-		return NextResponse.json({ boxes: formattedBoxes, status: 200 });
+		return NextResponse.json({ boxes, status: 200 });
 	} catch (error) {
 		const { code = 500, message = "internal server error" } = error as APIErr;
 		return NextResponse.json({

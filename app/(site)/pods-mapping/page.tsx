@@ -339,7 +339,7 @@ const ClickableGrid: React.FC = () => {
 								</div>
 								<div className='flex flex-col pl-0'>
 									<div className='flex flex-col'>
-										{currentBoxes.slice(8, 12).map(box => (
+										{currentBoxes.slice(9, 13).map(box => (
 											<Box
 												key={box.id}
 												id={box.boxNumber}
@@ -350,7 +350,7 @@ const ClickableGrid: React.FC = () => {
 										))}
 									</div>
 									<div className='flex flex-col mt-[48px] md:mt-[80px] lg:mt-[96px] xl:mt-[112px]'>
-										{currentBoxes.slice(12, 15).map(box => (
+										{currentBoxes.slice(13, 16).map(box => (
 											<Box
 												key={box.id}
 												id={box.boxNumber}
@@ -363,7 +363,7 @@ const ClickableGrid: React.FC = () => {
 								</div>
 							</div>
 							<div className='flex flex-col lg:pl-20'>
-								{currentBoxes.slice(15, 25).map(box => (
+								{currentBoxes.slice(16, 26).map(box => (
 									<Box
 										key={box.id}
 										id={box.boxNumber}
@@ -376,7 +376,7 @@ const ClickableGrid: React.FC = () => {
 						</div>
 						<div className='flex justify-center mt-12'>
 							<div className='grid grid-cols-1 gap-4'>
-								{currentBoxes.slice(25).map(box => (
+								{currentBoxes.slice(26).map(box => (
 									<Box
 										key={box.id}
 										id={box.boxNumber}

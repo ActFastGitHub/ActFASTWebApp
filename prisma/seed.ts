@@ -6,7 +6,7 @@ const prisma = new PrismaClient()
 
 const initialLevelConfig = {
   1: [
-    { id: 1, name: "Correa/Rogel", color: "bg-blue-500" },
+    { id: 1, name: "Box 1", color: "bg-blue-500" },
     { id: 2, name: "Box 2", color: "bg-green-500" },
     { id: 3, name: "Box 3", color: "bg-yellow-500" },
     { id: 4, name: "Box 4", color: "bg-red-500" },
@@ -31,12 +31,12 @@ const initialLevelConfig = {
     { id: 23, name: "Box 23", color: "bg-green-500" },
     { id: 24, name: "Box 24", color: "bg-green-500" },
     { id: 25, name: "Box 25", color: "bg-green-500" },
-    { id: 26, name: "Box 26", color: "bg-green-500" }
+    { id: 26, name: "Box 26", color: "bg-green-500" },
+    { id: 27, name: "Box 27", color: "bg-green-500" },
   ],
   2: [
-    { id: 27, name: "Correa", color: "bg-blue-500" },
-    { id: 28, name: "Box A", color: "bg-green-500" },
-    { id: 29, name: "Box B", color: "bg-yellow-500" },
+    { id: 28, name: "Box Z", color: "bg-blue-500" },
+    { id: 29, name: "Box A", color: "bg-green-500" },
     { id: 30, name: "Box C", color: "bg-red-500" },
     { id: 31, name: "Box D", color: "bg-blue-500" },
     { id: 32, name: "Box E", color: "bg-green-500" },
@@ -59,7 +59,9 @@ const initialLevelConfig = {
     { id: 49, name: "Box V", color: "bg-green-500" },
     { id: 50, name: "Box W", color: "bg-green-500" },
     { id: 51, name: "Box X", color: "bg-green-500" },
-    { id: 52, name: "Box Y", color: "bg-green-500" }
+    { id: 52, name: "Box Y", color: "bg-green-500" },    
+    { id: 53, name: "Box B", color: "bg-yellow-500" },    
+    { id: 54, name: "Box AB", color: "bg-yellow-500" },
   ]
 };
 
