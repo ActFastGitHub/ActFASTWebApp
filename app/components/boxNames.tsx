@@ -16,6 +16,8 @@ const BoxNames: React.FC = () => {
 		const fetchBoxNames = async () => {
 			try {
 				const response = await axios.get("/api/podnames");
+
+				 console.log("RESPONSE", response.data)
 				// Trim and remove spaces from box names
 				const formattedBoxNames = response.data.boxes.map((box: BoxNameData) => ({
 					...box,
