@@ -117,18 +117,18 @@ export async function DELETE(request: Request) {
 	}
 }
 
-export default async (req: Request) => {
-	switch (req.method) {
-		case "GET":
-			return GET(req);
-		case "POST":
-			return POST(req);
-		case "DELETE":
-			return DELETE(req);
-		default:
-			return NextResponse.json({
-				status: 405,
-				error: `Method ${req.method} Not Allowed`
-			});
-	}
-};
+// export default async (req: Request) => {
+// 	switch (req.method) {
+// 		case "GET":
+// 			return GET(req);
+// 		case "POST":
+// 			return POST(req);
+// 		case "DELETE":
+// 			return DELETE(req);
+// 		default:
+// 			return NextResponse.json({
+// 				status: 405,
+// 				error: `Method ${req.method} Not Allowed`
+// 			});
+// 	}
+// };
