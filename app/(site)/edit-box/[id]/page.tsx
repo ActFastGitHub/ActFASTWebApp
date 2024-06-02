@@ -45,8 +45,11 @@
 // 		setName(initialName);
 // 		setColor(initialColor);
 // 		fetchBoxDetails();
+// 	}, [initialName, initialColor]);
+
+// 	useEffect(() => {
 // 		fetchItems();
-// 	}, [initialName, initialColor, page]);
+// 	}, [page]);
 
 // 	const fetchBoxDetails = async () => {
 // 		try {
@@ -152,7 +155,9 @@
 // 	};
 
 // 	const handlePageChange = (newPage: number) => {
-// 		setPage(newPage);
+// 		if (newPage > 0 && newPage <= totalPages) {
+// 			setPage(newPage);
+// 		}
 // 	};
 
 // 	return (
@@ -282,7 +287,7 @@
 // 					<button
 // 						onClick={() => handlePageChange(page + 1)}
 // 						className='bg-gray-500 text-white px-4 py-2 rounded'
-// 						disabled={page >= totalPages}>
+// 						disabled={page >= totalPages || items.length < ITEMS_PER_PAGE}>
 // 						Next
 // 					</button>
 // 				</div>
@@ -331,6 +336,9 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
 	const [newItemName, setNewItemName] = useState<string>("");
 	const [disabled, setDisabled] = useState(false);
 	const [showDetails, setShowDetails] = useState<{ [key: string]: boolean }>({});
+	const [editingItem, setEditingItem] = useState<{ [key: string]: boolean }>({});
+	const [searchTerm, setSearchTerm] = useState<string>("");
+	const [filteredItems, setFilteredItems] = useState<any[]>([]);
 	const [page, setPage] = useState(1);
 	const [totalPages, setTotalPages] = useState(1);
 
@@ -344,7 +352,7 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
 
 	useEffect(() => {
 		fetchItems();
-	}, [page]);
+	}, [page, searchTerm]);
 
 	const fetchBoxDetails = async () => {
 		try {
@@ -364,10 +372,11 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
 	const fetchItems = async () => {
 		try {
 			const response = await axios.get(`/api/pods/items`, {
-				params: { boxId: id, page, limit: ITEMS_PER_PAGE }
+				params: { boxId: id, page, limit: ITEMS_PER_PAGE, searchTerm }
 			});
 			setItems(response.data.items);
 			setTotalPages(response.data.totalPages);
+			setFilteredItems(response.data.items);
 		} catch (error) {
 			console.error("Error fetching items:", error);
 		}
@@ -438,8 +447,32 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
 		}
 	};
 
+	const editItem = async (itemId: string, name: string, description: string) => {
+		try {
+			const response = await axios.patch(`/api/pods/items/${itemId}`, {
+				data: { name, description }
+			});
+
+			if (response.status === 200) {
+				fetchItems();
+				toast.success("Item updated successfully");
+			} else {
+				throw new Error(response.data?.error || "An error occurred");
+			}
+		} catch (error: any) {
+			toast.error(error.message || "An error occurred");
+		}
+	};
+
 	const toggleDetails = (itemId: string) => {
 		setShowDetails(prevState => ({
+			...prevState,
+			[itemId]: !prevState[itemId]
+		}));
+	};
+
+	const toggleEdit = (itemId: string) => {
+		setEditingItem(prevState => ({
 			...prevState,
 			[itemId]: !prevState[itemId]
 		}));
@@ -532,33 +565,66 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
 						Add Item
 					</button>
 				</div>
+				<div className='mb-4'>
+					<input
+						type='text'
+						value={searchTerm}
+						onChange={e => setSearchTerm(e.target.value)}
+						placeholder='Search items'
+						className='p-2 border border-gray-300 rounded w-full'
+					/>
+				</div>
 				<ul className='space-y-2'>
-					{items.map(item => (
+					{filteredItems.map(item => (
 						<li
 							key={item.id}
 							className='p-2 border border-gray-300 rounded flex justify-between items-center'>
 							<div>
-								<h3 className='text-lg font-medium'>{item.name}</h3>
-								{showDetails[item.id] && (
-									<div className='mt-2 text-sm text-gray-600 space-y-1'>
-										<p>Description: {item.description || "N/A"}</p>
-										<p>Added: {new Date(item.addedAt).toLocaleString()}</p>
-										<p>Added By: {item.addedById || "Unknown"}</p>
-										<p>Last Modified: {new Date(item.lastModifiedAt).toLocaleString()}</p>
-										<p>Modified By: {item.lastModifiedBy?.nickname || "Unknown"}</p>
+								{editingItem[item.id] ? (
+									<div>
+										<input
+											type='text'
+											defaultValue={item.name}
+											onBlur={e => {
+												editItem(item.id, e.target.value, item.description);
+												toggleEdit(item.id);
+											}}
+											className='mt-1 p-2 border border-gray-300 rounded w-full'
+										/>
+										<textarea
+											defaultValue={item.description}
+											onBlur={e => {
+												editItem(item.id, item.name, e.target.value);
+												toggleEdit(item.id);
+											}}
+											className='mt-1 p-2 border border-gray-300 rounded w-full'
+										/>
+									</div>
+								) : (
+									<div>
+										<h3 className='text-lg font-medium'>{item.name}</h3>
+										{showDetails[item.id] && (
+											<div className='mt-2 text-sm text-gray-600 space-y-1'>
+												<p>Description: {item.description || "N/A"}</p>
+												<p>Added: {new Date(item.addedAt).toLocaleString()}</p>
+												<p>Added By: {item.addedById || "Unknown"}</p>
+												<p>Last Modified: {new Date(item.lastModifiedAt).toLocaleString()}</p>
+												<p>Modified By: {item.lastModifiedBy?.nickname || "Unknown"}</p>
+											</div>
+										)}
+										<button
+											onClick={() => toggleDetails(item.id)}
+											className='mt-2 text-sm text-blue-500 hover:underline'>
+											{showDetails[item.id] ? "Hide Details" : "Show Details"}
+										</button>
 									</div>
 								)}
-								<button
-									onClick={() => toggleDetails(item.id)}
-									className='mt-2 text-sm text-blue-500 hover:underline'>
-									{showDetails[item.id] ? "Hide Details" : "Show Details"}
-								</button>
 							</div>
 							<div className='flex items-center space-x-2'>
 								<button
-									onClick={() => router.push(`/edit-item/${item.id}`)}
-									className='bg-blue-500 text-white px-4 py-2 rounded'>
-									Edit
+									onClick={() => toggleEdit(item.id)}
+									className='bg-yellow-500 text-white px-4 py-2 rounded'>
+									{editingItem[item.id] ? "Save" : "Edit"}
 								</button>
 								<button
 									onClick={() => deleteItem(item.id)}
@@ -582,7 +648,7 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
 					<button
 						onClick={() => handlePageChange(page + 1)}
 						className='bg-gray-500 text-white px-4 py-2 rounded'
-						disabled={page >= totalPages || items.length < ITEMS_PER_PAGE}>
+						disabled={page >= totalPages}>
 						Next
 					</button>
 				</div>
