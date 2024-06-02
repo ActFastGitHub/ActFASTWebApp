@@ -103,9 +103,9 @@ model Box {
   updatedAt        DateTime @updatedAt
   lastModifiedById String?
 
-  lastModifiedBy   Profile? @relation("LastModifiedProfile", fields: [lastModifiedById], references: [nickname])
+  lastModifiedBy Profile? @relation("LastModifiedProfile", fields: [lastModifiedById], references: [nickname])
 
-  items  Item[]    @relation("BoxItems")
+  items Item[] @relation("BoxItems")
 }
 
 model Item {
@@ -116,9 +116,9 @@ model Item {
   lastModifiedAt   DateTime @updatedAt
   addedById        String?
   lastModifiedById String?
-  boxId            String   @db.ObjectId
+  boxId            String
 
-  addedBy         Profile? @relation("AddedByProfile", fields: [addedById], references: [nickname])
-  lastModifiedBy  Profile? @relation("ModifiedByProfile", fields: [lastModifiedById], references: [nickname])
-  box             Box      @relation("BoxItems", fields: [boxId], references: [id])
+  addedBy        Profile? @relation("AddedByProfile", fields: [addedById], references: [nickname])
+  lastModifiedBy Profile? @relation("ModifiedByProfile", fields: [lastModifiedById], references: [nickname])
+  box            Box      @relation("BoxItems", fields: [boxId], references: [boxNumber])
 }
