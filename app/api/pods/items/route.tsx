@@ -8,12 +8,24 @@ import { APIErr } from "@/app/libs/interfaces";
 export async function GET(request: Request) {
 	const { searchParams } = new URL(request.url);
 	const boxId = searchParams.get("boxId");
+	const page = parseInt(searchParams.get("page") || "1", 10);
+	const limit = parseInt(searchParams.get("limit") || "50", 10);
+	const skip = (page - 1) * limit;
 
 	try {
-		const items = await prisma.item.findMany({
-			where: { boxId: boxId! }
-		});
-		return NextResponse.json({ items, status: 200 });
+		const [items, totalCount] = await Promise.all([
+			prisma.item.findMany({
+				where: { boxId: boxId ?? undefined },
+				skip,
+				take: limit,
+				include: { lastModifiedBy: true, addedBy: true }
+			}),
+			prisma.item.count({ where: { boxId: boxId ?? undefined } })
+		]);
+
+		const totalPages = Math.ceil(totalCount / limit);
+
+		return NextResponse.json({ items, totalPages }, { status: 200 });
 	} catch (error) {
 		const { code = 500, message = "internal server error" } = error as APIErr;
 		return NextResponse.json({
@@ -105,18 +117,18 @@ export async function DELETE(request: Request) {
 	}
 }
 
-// export default async (req: Request) => {
-// 	switch (req.method) {
-// 		case "GET":
-// 			return GET(req);
-// 		case "POST":
-// 			return POST(req);
-// 		case "DELETE":
-// 			return DELETE(req);
-// 		default:
-// 			return NextResponse.json({
-// 				status: 405,
-// 				error: `Method ${req.method} Not Allowed`
-// 			});
-// 	}
-// };
+export default async (req: Request) => {
+	switch (req.method) {
+		case "GET":
+			return GET(req);
+		case "POST":
+			return POST(req);
+		case "DELETE":
+			return DELETE(req);
+		default:
+			return NextResponse.json({
+				status: 405,
+				error: `Method ${req.method} Not Allowed`
+			});
+	}
+};

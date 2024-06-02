@@ -103,18 +103,18 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
 	}
 }
 
-// export default async (req: Request, context: { params: { id: string } }) => {
-//   switch (req.method) {
-//     case "GET":
-//       return GET(req, context);
-//     case "PATCH":
-//       return PATCH(req, context);
-//     case "DELETE":
-//       return DELETE(req, context);
-//     default:
-//       return NextResponse.json({
-//         status: 405,
-//         error: `Method ${req.method} Not Allowed`,
-//       });
-//   }
-// };
+export default async (req: Request, context: { params: { id: string } }) => {
+  switch (req.method) {
+    case "GET":
+      return GET(req, context);
+    case "PATCH":
+      return PATCH(req, context);
+    case "DELETE":
+      return DELETE(req, context);
+    default:
+      return NextResponse.json({
+        status: 405,
+        error: `Method ${req.method} Not Allowed`,
+      });
+  }
+};
