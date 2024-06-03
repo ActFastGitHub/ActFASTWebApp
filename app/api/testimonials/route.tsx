@@ -27,7 +27,7 @@ import { NextResponse } from "next/server";
 import { APIErr } from "@/app/libs/interfaces";
 
 const placeId = "ChIJVRq4RobXhVQRXka36Lg-0mY";
-const apiKey = "AIzaSyBAdWJH9RgOcq8ziBAx03Fk9PjWlHB1Kt4";
+const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
 
 // READ
 export async function GET(request: Request) {
