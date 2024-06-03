@@ -53,7 +53,7 @@ export default function Login() {
 
 	const loginWithFacebook = async () => {
 		const response = signIn("facebook", {
-			callbackUrl: `${process.env.NEXT_PUBLIC}/dashboard?provider=facebook`
+			callbackUrl: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard?provider=facebook`
 		});
 
 		response
