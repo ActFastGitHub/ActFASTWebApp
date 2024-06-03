@@ -10,7 +10,6 @@ import AFlogo from "@/app/images/actfast-logo.jpg";
 import { LocationData, LocationFeature, FormData } from "@/app/libs/interfaces";
 import { handleEnterKeyPress } from "@/app/libs/actions";
 
-
 export default function CreateProfile() {
 	const { data: session, status } = useSession();
 	const router = useRouter();
@@ -70,7 +69,7 @@ export default function CreateProfile() {
 		const val = e.target.value;
 		setAddress(val);
 
-		const endpoint = `https://api.mapbox.com/geocoding/v5/mapbox.places/${val}.json?&country=ca&proximity=ip&types=address%2Cpoi&language=en&limit=3&access_token=${process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN}`;
+		const endpoint = `https://api.mapbox.com/search/geocode/v6/forward?q=${val}&country=ca&limit=3&proximity=ip&language=en&access_token=${process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN}`;
 		try {
 			const response = await axios.get(endpoint);
 			setLocation(response.data);
@@ -89,6 +88,8 @@ export default function CreateProfile() {
 				duration: 4000
 			});
 
+			const selectedFeature = location?.features[0];
+
 			const requestBody = {
 				lastName: data.lastName,
 				firstName: data.firstName,
@@ -96,13 +97,13 @@ export default function CreateProfile() {
 				birthday: data.birthday,
 				phonenumber: data.phonenumber,
 				location: {
-					lng: location?.features[0]?.geometry.coordinates[0],
-					lat: location?.features[0]?.geometry.coordinates[1],
+					lng: selectedFeature?.geometry.coordinates[0],
+					lat: selectedFeature?.geometry.coordinates[1],
 					address: {
-						fullAddress: location?.features[0]?.place_name,
-						pointOfInterest: location?.features[0]?.context[0]?.text,
-						city: location?.features[0]?.context[2]?.text,
-						country: location?.features[0]?.context[5]?.text
+						fullAddress: selectedFeature?.properties.full_address,
+						pointOfInterest: selectedFeature?.properties.context.address.name,
+						city: selectedFeature?.properties.context.place.name,
+						country: selectedFeature?.properties.context.country.name
 					}
 				},
 				image: imageBase64
@@ -288,10 +289,10 @@ export default function CreateProfile() {
 									className='p-4 cursor-pointer text-sm text-black transition duration-200 ease-in-out bg-gray-100 hover:bg-green-200'
 									key={index}
 									onClick={() => {
-										setAddress(suggestion.place_name);
+										setAddress(suggestion.properties.full_address);
 										setSuggestions([]);
 									}}>
-									{suggestion.place_name}
+									{suggestion.properties.full_address}
 								</p>
 							))}
 						</div>

@@ -28,8 +28,14 @@ export interface LocationFeature {
 	geometry: {
 		coordinates: [number, number];
 	};
-	place_name: string;
-	context: Array<{ text: string }>;
+	properties: {
+		full_address: string;
+		context: {
+			address: { name: string };
+			place: { name: string };
+			country: { name: string };
+		};
+	};
 }
 
 export interface LocationData {
