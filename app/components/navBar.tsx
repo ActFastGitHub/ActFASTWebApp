@@ -39,7 +39,7 @@ const Navbar = () => {
 						<img src={AFLogo.src} alt='ActFast Logo' className='w-auto h-12' />
 					</div>
 				</div>
-				<div className='flex items-center space-x-4'>				
+				<div className='flex items-center space-x-4'>
 					{/* <Link
 						href='/profilepage'
 						className={`relative group text-white ${pathname === "/profilepage" ? isLinkActive : ""}`}>

@@ -56,6 +56,7 @@ model Profile {
   employeeID     String?
   role           String?
   driversLicense String?
+  active         Boolean?
 
   // Define the 1-to-1 relationship with User using email as the reference
   userEmail String @unique @map("userEmail")
@@ -117,8 +118,24 @@ model Item {
   addedById        String?
   lastModifiedById String?
   boxId            String
+  projectCode      String?
 
   addedBy        Profile? @relation("AddedByProfile", fields: [addedById], references: [nickname])
   lastModifiedBy Profile? @relation("ModifiedByProfile", fields: [lastModifiedById], references: [nickname])
   box            Box      @relation("BoxItems", fields: [boxId], references: [boxNumber])
+}
+
+model Project {
+  id           String  @id @default(auto()) @map("_id") @db.ObjectId
+  code         String  @unique
+  insured      String?
+  address      String?
+  claimNo      String?
+  adjuster     String?
+  typeOfDamage String?
+  category     String?
+  dateOfLoss   String?
+  dateAttended String?
+  lockBoxCode  String?
+  notes        String?
 }
