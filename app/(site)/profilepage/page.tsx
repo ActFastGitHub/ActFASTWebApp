@@ -1,138 +1,8 @@
-// "use client";
-
-// import Navbar from "@/app/components/navBar";
-// import { useState, useEffect } from "react";
-// import { useSearchParams, useRouter } from "next/navigation";
-// import { useSession } from "next-auth/react";
-// import { UserProps } from "@/app/libs/interfaces";
-// import email from "@/app/images/email.svg";
-// import phone from "@/app/images/phone.svg";
-// import bday from "@/app/images/bday.svg";
-// import loc from "@/app/images/location.svg";
-// import EditProfile from "@/app/components/editProfile";
-
-// const Profilepage = () => {
-//   const { data: session, status } = useSession();
-//   const router = useRouter();
-
-//   const searchParams = useSearchParams();
-//   const userParams = searchParams.get("user");
-
-//   const [isFormVisible, setIsFormVisible] = useState(false);
-//   const [disabled, setDisabled] = useState(false);
-//   const [editable, setEditable] = useState(false);
-//   const [user, setUser] = useState<Partial<UserProps>>({});
-
-//   useEffect(() => {
-//     if (status !== "loading" && !session) {
-//       router.push("/login");
-//     }
-//     if (session?.user.isNewUser) {
-//       router.push("/create-profile");
-//     }
-//   }, [session, status, router]);
-
-//   useEffect(() => {
-//     const getUser = async (userEmail: string | null) => {
-//       const response = await fetch(`/api/user/profile/${userEmail}`);
-//       const data = await response.json();
-//       setUser(data);
-//     };
-
-//     if (session?.user.email && userParams === null) {
-//       getUser(session?.user.email);
-//     } else if (session?.user.email && userParams !== null) {
-//       getUser(userParams);
-//     }
-//   }, [session?.user.email]);
-
-//   const HandleEditProfileClick = () => {
-//     setIsFormVisible(!isFormVisible);
-//   };
-
-//   return (
-//     <main className="pl-24 pr-24">
-//       <Navbar />
-//       <div
-//         className={`mt-12 flex w-full flex-row gap-4 ${
-//           isFormVisible ? "pointer-events-none blur-sm" : ""
-//         }`}
-//       >
-//         <div className="w-[40%]">
-//           {user ? (
-//             <div
-//               className="mt-12 h-auto rounded-[5px] pl-12 pr-12"
-//               style={{ boxShadow: "2px 2px 5px rgba(0, 0, 0, 0.5)" }}
-//             >
-//               <div className="flex flex-col items-center">
-//                 <img
-//                   src={user?.image}
-//                   alt=""
-//                   className="item-center mt-[-50px] h-[100px] w-[100px] rounded-full object-cover"
-//                   style={{ boxShadow: "3px 3px 8px rgba(0, 0, 0, 0.5)" }}
-//                 />
-//                 <div className="text-center">
-//                   <div className="mt-2 text-xl font-bold">
-//                     {user.firstName} {user.lastName}
-//                   </div>
-//                   <p className="">{user.nickname}</p>
-//                 </div>
-//                 <div className="mt-4 flex flex-col gap-4 text-xl">
-//                   <p className="text-lg">
-//                     <img src={email.src} alt="x" className="inline-block w-6" />{" "}
-//                     {user.userEmail}
-//                   </p>
-//                   <p className="text-lg">
-//                     <img src={bday.src} alt="x" className="inline-block w-6" />{" "}
-//                     {user.birthday}
-//                   </p>
-//                   <p className="text-lg">
-//                     <img src={phone.src} alt="x" className="inline-block w-6" />{" "}
-//                     {user.phonenumber}
-//                   </p>
-//                   <p className="mb-4 text-lg">
-//                     <img src={loc.src} alt="x" className="inline-block w-6" />{" "}
-//                     {user?.location?.address.fullAddress}
-//                   </p>
-//                 </div>
-//                 {userParams ? null : (
-//                   <>
-//                     {user.location !== undefined && (
-//                       <button
-//                         className="mb-6 ml-4 mr-4 h-[45px] w-full rounded bg-blue-500 text-center font-bold text-white duration-300 hover:border-[2px] hover:border-blue-500 hover:bg-white hover:text-blue-500 hover:ease-in-out"
-//                         onClick={HandleEditProfileClick}
-//                       >
-//                         Edit Profile
-//                       </button>
-//                     )}
-//                   </>
-//                 )}
-//               </div>
-//             </div>
-//           ) : null}
-//         </div>
-//       </div>
-
-//       <EditProfile
-//         isFormVisible={isFormVisible}
-//         setIsFormVisible={setIsFormVisible}
-//         disabled={disabled}
-//         editProfileData={user!}
-//         setEditProfileData={setUser}
-//         editable={editable}
-//         setEditable={setEditable}
-//         setDisabled={setDisabled}
-//       />
-//     </main>
-//   );
-// };
-
-// export default Profilepage;
 "use client";
 
 import Navbar from "@/app/components/navBar";
 import { useState, useEffect } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { UserProps } from "@/app/libs/interfaces";
 import email from "@/app/images/email.svg";
@@ -145,14 +15,19 @@ const ProfilePage = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  const searchParams = useSearchParams();
-  const userParams = searchParams.get("user");
-
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [disabled, setDisabled] = useState(false);
   const [editable, setEditable] = useState(false);
   const [user, setUser] = useState<Partial<UserProps>>({});
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [userParams, setUserParams] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search);
+      setUserParams(searchParams.get("user"));
+    }
+  }, []);
 
   useEffect(() => {
     if (status !== "loading" && !session) {
@@ -175,7 +50,7 @@ const ProfilePage = () => {
     } else if (session?.user.email && userParams !== null) {
       getUser(userParams);
     }
-  }, [session?.user.email]);
+  }, [session?.user.email, userParams]);
 
   const handleEditProfileClick = () => {
     setIsFormVisible(!isFormVisible);
