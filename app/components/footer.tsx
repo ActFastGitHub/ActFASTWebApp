@@ -18,7 +18,7 @@ const Footer = () => (
           Featured
         </Link>
         <Link href='#' className='hover:underline'>
-          Contact
+          Team
         </Link>
       </div>
       <img src={AFlogo.src} className='w-auto h-12 bg-gray-500 mx-auto mb-4'></img>

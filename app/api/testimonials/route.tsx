@@ -1,30 +1,4 @@
-// import { NextResponse } from "next/server";
-// import { APIErr } from "@/app/libs/interfaces";
-
-// const placeId = "ChIJVRq4RobXhVQRXka36Lg-0mY";
-// const apiKey = "AIzaSyBAdWJH9RgOcq8ziBAx03Fk9PjWlHB1Kt4";
-
-// // READ
-// export async function GET(request: Request) {
-// 	try {
-// 		const response = await fetch(
-// 			`https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=address_components&key=${apiKey}`
-// 		);
-
-// 		const data = await response.json();
-//         console.log("REVIEWS", data.result)
-// 		return NextResponse.json({ data, status: 200 });
-// 	} catch (error) {
-// 		const { code = 500, message = "internal server error" } = error as APIErr;
-// 		return NextResponse.json({
-// 			status: code,
-// 			error: message
-// 		});
-// 	}
-// }
-
 import { NextResponse } from "next/server";
-import { APIErr } from "@/app/libs/interfaces";
 
 const placeId = "ChIJVRq4RobXhVQRXka36Lg-0mY";
 const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;

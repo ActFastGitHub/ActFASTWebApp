@@ -113,12 +113,18 @@ model Item {
   id               String   @id @default(auto()) @map("_id") @db.ObjectId
   name             String
   description      String?
+  location         String?
+  boxed            Boolean?
+  category         String?
+  packedIn         DateTime @updatedAt
+  packedOut        DateTime @updatedAt
   addedAt          DateTime @default(now())
   lastModifiedAt   DateTime @updatedAt
   addedById        String?
   lastModifiedById String?
   boxId            String
   projectCode      String?
+  notes            String?
 
   addedBy        Profile? @relation("AddedByProfile", fields: [addedById], references: [nickname])
   lastModifiedBy Profile? @relation("ModifiedByProfile", fields: [lastModifiedById], references: [nickname])
