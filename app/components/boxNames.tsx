@@ -69,7 +69,7 @@ const BoxList = () => {
   }
 
   return (
-    <div className="container mx-auto p-4">
+    <div className="container mx-auto p-4 pt-10">
       <h1 className="mb-6 text-center text-2xl font-bold sm:text-3xl md:text-4xl lg:text-5xl">
         Pods Summary
       </h1>

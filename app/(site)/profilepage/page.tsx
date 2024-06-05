@@ -21,6 +21,7 @@ const ProfilePage = () => {
   const [user, setUser] = useState<Partial<UserProps>>({});
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userParams, setUserParams] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -40,9 +41,11 @@ const ProfilePage = () => {
 
   useEffect(() => {
     const getUser = async (userEmail: string | null) => {
+      setLoading(true);
       const response = await fetch(`/api/user/profile/${userEmail}`);
       const data = await response.json();
       setUser(data);
+      setLoading(false);
     };
 
     if (session?.user.email && userParams === null) {
@@ -67,7 +70,7 @@ const ProfilePage = () => {
         <div
           className={`fixed inset-y-0 left-0 w-32 transform bg-gray-800 text-white sm:w-48 ${
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
-          } transition-transform duration-300 ease-in-out`}
+          } overflow-auto transition-transform duration-300 ease-in-out`}
         >
           <div className="p-4">
             <h2 className="pt-20 text-2xl font-bold">Sidebar</h2>
@@ -79,7 +82,9 @@ const ProfilePage = () => {
           </div>
         </div>
         <div
-          className={`flex-1 transition-all duration-300 ${sidebarOpen ? "ml-32 sm:ml-48" : "ml-0"}`}
+          className={`flex-1 transition-all duration-300 ${
+            sidebarOpen ? "ml-32 sm:ml-48" : "ml-0"
+          } overflow-auto`}
         >
           <main className="p-6 pt-24">
             <button
@@ -93,56 +98,80 @@ const ProfilePage = () => {
                 isFormVisible ? "pointer-events-none blur-sm" : ""
               }`}
             >
-              {user && (
+              {loading ? (
                 <div className="w-full rounded-lg bg-white p-6 shadow-lg sm:w-2/3 lg:w-1/2">
                   <div className="flex flex-col items-center">
-                    <img
-                      src={user?.image}
-                      alt=""
-                      className="mt-[-50px] h-[100px] w-[100px] rounded-full object-cover shadow-md"
-                    />
-                    <div className="mt-4 text-center">
-                      <div className="text-2xl font-bold">
-                        {user.firstName} {user.lastName}
-                      </div>
-                      <p className="text-gray-600">{user.nickname}</p>
+                    <div className="mt-[-50px] h-[100px] w-[100px] rounded-full bg-gray-300"></div>
+                    <div className="mt-4 w-full space-y-4 text-center">
+                      <div className="mx-auto h-8 w-1/2 rounded bg-gray-300"></div>
+                      <div className="mx-auto h-6 w-1/3 rounded bg-gray-300"></div>
+                      <div className="mx-auto h-4 w-3/4 rounded bg-gray-300"></div>
+                      <div className="mx-auto h-4 w-1/2 rounded bg-gray-300"></div>
+                      <div className="mx-auto h-4 w-1/3 rounded bg-gray-300"></div>
+                      <div className="mx-auto h-4 w-2/3 rounded bg-gray-300"></div>
                     </div>
-                    <div className="mt-6 w-full space-y-4">
-                      <p className="flex items-center text-lg">
-                        <img src={email.src} alt="Email" className="mr-2 w-6" />{" "}
-                        {user.userEmail}
-                      </p>
-                      <p className="flex items-center text-lg">
-                        <img
-                          src={bday.src}
-                          alt="Birthday"
-                          className="mr-2 w-6"
-                        />{" "}
-                        {user.birthday}
-                      </p>
-                      <p className="flex items-center text-lg">
-                        <img src={phone.src} alt="Phone" className="mr-2 w-6" />{" "}
-                        {user.phonenumber}
-                      </p>
-                      <p className="flex items-center text-lg">
-                        <img
-                          src={loc.src}
-                          alt="Location"
-                          className="mr-2 w-6"
-                        />{" "}
-                        {user?.location?.address.fullAddress}
-                      </p>
-                    </div>
-                    {!userParams && (
-                      <button
-                        className="mt-6 w-full rounded bg-blue-500 py-2 font-bold text-white hover:bg-blue-600"
-                        onClick={handleEditProfileClick}
-                      >
-                        Edit Profile
-                      </button>
-                    )}
                   </div>
                 </div>
+              ) : (
+                user && (
+                  <div className="w-full rounded-lg bg-white p-6 shadow-lg sm:w-2/3 lg:w-1/2">
+                    <div className="flex flex-col items-center">
+                      <img
+                        src={user?.image}
+                        alt=""
+                        className="mt-[-50px] h-[100px] w-[100px] rounded-full object-cover shadow-md"
+                      />
+                      <div className="mt-4 text-center">
+                        <div className="text-2xl font-bold">
+                          {user.firstName} {user.lastName}
+                        </div>
+                        <p className="text-gray-600">{user.nickname}</p>
+                      </div>
+                      <div className="mt-6 w-full space-y-4">
+                        <p className="flex items-center text-lg">
+                          <img
+                            src={email.src}
+                            alt="Email"
+                            className="mr-2 w-6"
+                          />{" "}
+                          <span className="overflow-hidden text-ellipsis whitespace-nowrap">{user.userEmail}</span>{" "}
+                        </p>
+                        <p className="flex items-center text-lg">
+                          <img
+                            src={bday.src}
+                            alt="Birthday"
+                            className="mr-2 w-6"
+                          />{" "}
+                          {user.birthday}
+                        </p>
+                        <p className="flex items-center text-lg">
+                          <img
+                            src={phone.src}
+                            alt="Phone"
+                            className="mr-2 w-6"
+                          />{" "}
+                          {user.phonenumber}
+                        </p>
+                        <p className="flex items-center text-lg">
+                          <img
+                            src={loc.src}
+                            alt="Location"
+                            className="mr-2 w-6"
+                          />{" "}
+                          {user?.location?.address.fullAddress}
+                        </p>
+                      </div>
+                      {!userParams && (
+                        <button
+                          className="mt-6 w-full rounded bg-blue-500 py-2 font-bold text-white hover:bg-blue-600"
+                          onClick={handleEditProfileClick}
+                        >
+                          Edit Profile
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
               )}
             </div>
           </main>

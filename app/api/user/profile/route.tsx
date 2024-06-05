@@ -187,6 +187,8 @@ export async function POST(request: Request) {
               },
             },
           },
+          role: "member",
+          active: true,
           user: {
             connect: {
               email: session.user?.email!,
@@ -376,7 +378,15 @@ export async function GET(request: Request) {
     });
   } else {
     try {
-      const profiles = await prisma.profile.findMany();
+      const profiles = await prisma.profile.findMany({
+        include: {
+          location: {
+            include: {
+              address: true,
+            },
+          },
+        },
+      });
 
       if (!profiles) {
         return NextResponse.json(

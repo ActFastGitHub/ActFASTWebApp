@@ -84,7 +84,7 @@ const ClickableGrid: React.FC = () => {
         <div className="flex-1 transition-all duration-300">
           <main className="relative flex-col p-6 pt-24">
             <div className="mb-4 flex w-full justify-center">
-              <h1 className="text-center text-sm font-bold sm:text-sm md:text-base lg:text-2xl xl:text-2xl">
+              <h1 className="text-center text-2xl font-bold sm:text-3xl md:text-4xl lg:text-5xl">
                 Pods Mapping
               </h1>
             </div>

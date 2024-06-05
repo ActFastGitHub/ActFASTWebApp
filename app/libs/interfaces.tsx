@@ -5,14 +5,14 @@ export interface ModeContextType {
 
 export interface UserProps {
   id: string;
-  lastName: string;
-  firstName: string;
-  nickname: string;
-  birthday: string;
-  phonenumber: string;
-  image: string;
+  lastName?: string;
+  firstName?: string;
+  nickname?: string;
+  birthday?: string;
+  phonenumber?: string;
+  image?: string;
   userEmail: string;
-  location: {
+  location?: {
     lng: number;
     lat: number;
     address: {
@@ -22,6 +22,11 @@ export interface UserProps {
       country: string;
     };
   };
+
+  role?: string;
+  employeeID?: string;
+  driversLicense?: string;
+  active?: boolean;
 }
 
 export interface LocationFeature {
@@ -90,4 +95,24 @@ export interface EditProfileFormProps {
   setEditProfileData: React.Dispatch<React.SetStateAction<Partial<UserProps>>>;
   editable: boolean;
   setEditable: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
+export interface ProfileData {
+  id: string;
+  lastName?: string;
+  firstName?: string;
+  nickname?: string;
+  birthday?: string;
+  phonenumber?: string;
+  image?: string;
+  employeeID?: string;
+  role?: string;
+  driversLicense?: string;
+  active?: boolean;
+  userEmail: string;
+  location?: {
+    address: {
+      fullAddress: string;
+    };
+  };
 }

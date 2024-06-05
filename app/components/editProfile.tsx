@@ -1,5 +1,3 @@
-"use client";
-
 import {
   EditProfileFormProps,
   LocationData,
@@ -9,6 +7,8 @@ import x from "@/app/images/x.svg";
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
+import { useSession } from "next-auth/react";
+import defaultProfileImage from "@/app/images/blank-profile.jpg";
 
 const EditProfile: React.FC<EditProfileFormProps> = ({
   isFormVisible,
@@ -20,6 +20,7 @@ const EditProfile: React.FC<EditProfileFormProps> = ({
   setEditable,
   setDisabled,
 }) => {
+  const { data: session } = useSession();
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [location, setLocation] = useState<LocationData | undefined>(undefined);
@@ -116,8 +117,8 @@ const EditProfile: React.FC<EditProfileFormProps> = ({
 
   return (
     isFormVisible && (
-      <main className="fixed inset-0 z-10 flex items-center justify-center bg-gray-800 bg-opacity-50 pt-20">
-        <div className="relative mx-4 w-full max-w-lg rounded-lg bg-white p-6 shadow-lg md:mx-0">
+      <main className="fixed inset-0 z-10 flex items-center justify-center overflow-y-auto bg-gray-800 bg-opacity-50 p-4 pt-72 md:pt-2 lg:pt-72 xl:pt-72">
+        <div className="relative mx-4 mt-16 w-full max-w-lg rounded-lg bg-white p-6 shadow-lg">
           <img
             src={x.src}
             alt="Close"
@@ -143,7 +144,7 @@ const EditProfile: React.FC<EditProfileFormProps> = ({
               ) : (
                 <div className="flex flex-col items-center">
                   <img
-                    src={editProfileData.image}
+                    src={editProfileData.image || defaultProfileImage.src}
                     alt="Default Image"
                     className="mt-4 h-[100px] w-[100px] cursor-pointer rounded-full object-cover hover:opacity-80"
                   />
@@ -237,6 +238,72 @@ const EditProfile: React.FC<EditProfileFormProps> = ({
               onChange={handleLocationChange}
               required
             />
+            {session?.user.role === "admin" && (
+              <>
+                <input
+                  type="text"
+                  placeholder="Employee ID"
+                  className={`mt-4 w-full rounded-md border border-gray-300 px-4 py-2 focus:ring-blue-400 ${
+                    editable ? "" : "pointer-events-none"
+                  }`}
+                  value={editProfileData.employeeID}
+                  onChange={(e) =>
+                    setEditProfileData({
+                      ...editProfileData,
+                      employeeID: e.target.value,
+                    })
+                  }
+                />
+                <select
+                  className={`mt-4 w-full rounded-md border border-gray-300 px-4 py-2 focus:ring-blue-400 ${
+                    editable ? "" : "pointer-events-none"
+                  }`}
+                  value={editProfileData.role}
+                  onChange={(e) =>
+                    setEditProfileData({
+                      ...editProfileData,
+                      role: e.target.value,
+                    })
+                  }
+                >
+                  <option value="" disabled>
+                    Select role
+                  </option>
+                  <option value="admin">Admin</option>
+                  <option value="lead">Lead</option>
+                  <option value="member">Member</option>
+                  <option value="owner">Owner</option>
+                </select>
+                <input
+                  type="text"
+                  placeholder="Driver's License"
+                  className={`mt-4 w-full rounded-md border border-gray-300 px-4 py-2 focus:ring-blue-400 ${
+                    editable ? "" : "pointer-events-none"
+                  }`}
+                  value={editProfileData.driversLicense}
+                  onChange={(e) =>
+                    setEditProfileData({
+                      ...editProfileData,
+                      driversLicense: e.target.value,
+                    })
+                  }
+                />
+                <label className="mt-4 flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    checked={editProfileData.active || false}
+                    onChange={(e) =>
+                      setEditProfileData({
+                        ...editProfileData,
+                        active: e.target.checked,
+                      })
+                    }
+                  />
+                  <span>Active</span>
+                </label>
+              </>
+            )}
             {suggestions.length > 0 && (
               <div className="mt-2 w-full rounded-md border border-gray-300 bg-white shadow-md">
                 {suggestions.map((suggestion, index) => (

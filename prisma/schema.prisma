@@ -54,7 +54,7 @@ model Profile {
 
   // Hidden Details
   employeeID     String?
-  role           String?
+  role           String? // Admin, Member, Lead
   driversLicense String?
   active         Boolean?
 
@@ -114,10 +114,10 @@ model Item {
   name             String
   description      String?
   location         String?
-  boxed            Boolean?
+  boxed            Boolean? @default(false)
   category         String?
-  packedIn         DateTime @updatedAt
-  packedOut        DateTime @updatedAt
+  packedInAt       DateTime @updatedAt
+  packedOutAt      DateTime @updatedAt
   addedAt          DateTime @default(now())
   lastModifiedAt   DateTime @updatedAt
   addedById        String?
@@ -129,6 +129,12 @@ model Item {
   addedBy        Profile? @relation("AddedByProfile", fields: [addedById], references: [nickname])
   lastModifiedBy Profile? @relation("ModifiedByProfile", fields: [lastModifiedById], references: [nickname])
   box            Box      @relation("BoxItems", fields: [boxId], references: [boxNumber])
+
+  @@index([name])
+  @@index([description])
+  @@index([projectCode])
+  @@index([packedInAt])
+  @@index([packedOutAt])
 }
 
 model Project {

@@ -4,6 +4,7 @@ import axios from "axios";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, FormEvent } from "react";
 import { ProjectProps } from "@/app/libs/interfaces";
+import Navbar from "@/app/components/navBar";
 import toast from "react-hot-toast";
 
 const colorOptions = [
@@ -211,8 +212,9 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center bg-gray-200 p-4 pt-16">
-      <h1 className="mb-4 text-2xl">Edit Box {id}</h1>
+    <div className="relative flex min-h-screen flex-col items-center bg-gray-200 p-4 pt-16">
+      <Navbar />
+      <h1 className="mb-4 text-2xl pt-10">Edit Box {id}</h1>
       <form
         onSubmit={updateBox}
         className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-md"
