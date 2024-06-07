@@ -231,6 +231,10 @@ export async function PATCH(request: Request) {
         phonenumber,
         location,
         image,
+        employeeID,
+        role,
+        driversLicense,
+        active,
       } = body;
 
       // Validate the image
@@ -329,6 +333,10 @@ export async function PATCH(request: Request) {
         nickname,
         birthday,
         phonenumber,
+        role,
+        active,
+        employeeID,
+        driversLicense,
         location: {
           update: {
             lng: location.lng,

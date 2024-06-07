@@ -51,6 +51,9 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
   const [totalPages, setTotalPages] = useState(1);
   const [packedInItems, setPackedInItems] = useState<any[]>([]);
   const [packedOutItems, setPackedOutItems] = useState<any[]>([]);
+  const [searchTermIn, setSearchTermIn] = useState<string>("");
+  const [searchTermOut, setSearchTermOut] = useState<string>("");
+  const [searchTermProject, setSearchTermProject] = useState<string>("");
 
   const ITEMS_PER_PAGE = 10;
 
@@ -210,6 +213,31 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
     }
   };
 
+  const handleSearchInChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTermIn(e.target.value);
+  };
+
+  const handleSearchOutChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTermOut(e.target.value);
+  };
+
+  const handleSearchProjectChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTermProject(e.target.value);
+  };
+
+  const filteredPackedInItems = packedInItems.filter((item) =>
+    item.name.toLowerCase().includes(searchTermIn.toLowerCase()),
+  );
+
+  const filteredPackedOutItems = packedOutItems.filter((item) =>
+    item.name.toLowerCase().includes(searchTermOut.toLowerCase()),
+  );
+
+  const filteredItems = items.filter(
+    (item) => !packedInItems.some((inItem) => inItem.id === item.id) && 
+              item.name.toLowerCase().includes(searchTermProject.toLowerCase())
+  );
+
   return (
     <div className="relative flex min-h-screen flex-col items-center bg-gray-200 p-4 pt-16">
       <Navbar />
@@ -310,9 +338,16 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
             </option>
           ))}
         </select>
-        {items.length > 0 ? (
+        <input
+          type="text"
+          placeholder="Search Project Items"
+          value={searchTermProject}
+          onChange={handleSearchProjectChange}
+          className="mb-4 w-full rounded border border-gray-300 p-2"
+        />
+        {filteredItems.length > 0 ? (
           <div className="space-y-4">
-            {items.map((item) => (
+            {filteredItems.map((item) => (
               <div key={item.id} className="rounded bg-white p-4 shadow">
                 <div className="flex justify-between">
                   <div>
@@ -384,9 +419,16 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
       </div>
       <div className="mt-6 w-full max-w-2xl rounded-lg bg-white p-6 shadow-md">
         <h2 className="mb-4 text-xl font-bold">Packed In Items</h2>
-        {packedInItems.length > 0 ? (
+        <input
+          type="text"
+          placeholder="Search Packed In Items"
+          value={searchTermIn}
+          onChange={handleSearchInChange}
+          className="mb-4 w-full rounded border border-gray-300 p-2"
+        />
+        {filteredPackedInItems.length > 0 ? (
           <div className="space-y-4">
-            {packedInItems.map((item) => (
+            {filteredPackedInItems.map((item) => (
               <div key={item.id} className="rounded bg-white p-4 shadow">
                 <div className="flex justify-between">
                   <div>
@@ -436,9 +478,16 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
       </div>
       <div className="mt-6 w-full max-w-2xl rounded-lg bg-white p-6 shadow-md">
         <h2 className="mb-4 text-xl font-bold">Packed Out Items</h2>
-        {packedOutItems.length > 0 ? (
+        <input
+          type="text"
+          placeholder="Search Packed Out Items"
+          value={searchTermOut}
+          onChange={handleSearchOutChange}
+          className="mb-4 w-full rounded border border-gray-300 p-2"
+        />
+        {filteredPackedOutItems.length > 0 ? (
           <div className="space-y-4">
-            {packedOutItems.map((item) => (
+            {filteredPackedOutItems.map((item) => (
               <div key={item.id} className="rounded bg-white p-4 shadow">
                 <div className="flex justify-between">
                   <div>

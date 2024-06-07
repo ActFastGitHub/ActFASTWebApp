@@ -291,7 +291,9 @@ const EditProfile: React.FC<EditProfileFormProps> = ({
                 <label className="mt-4 flex items-center space-x-3">
                   <input
                     type="checkbox"
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className={`h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 ${
+                      editable ? "" : "pointer-events-none"
+                    }`}
                     checked={editProfileData.active || false}
                     onChange={(e) =>
                       setEditProfileData({
@@ -299,6 +301,7 @@ const EditProfile: React.FC<EditProfileFormProps> = ({
                         active: e.target.checked,
                       })
                     }
+                    disabled={!editable} // Disable checkbox if not editable
                   />
                   <span>Active</span>
                 </label>
