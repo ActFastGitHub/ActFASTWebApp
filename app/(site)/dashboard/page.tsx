@@ -158,6 +158,34 @@ export default function Dashboard() {
                     </div>
                   </div>
                 </Link>
+                <Link href="/projectspage">
+                  <div className="block rounded-lg bg-purple-500 p-4 text-white shadow-lg transition duration-200 ease-in-out hover:bg-purple-600">
+                    <div className="flex items-center">
+                      <div className="mr-4">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-6 w-6"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M12 8c1.104.002 2.162-.43 2.95-1.2A4.146 4.146 0 0016 4.5 4.144 4.144 0 0012 3a4.143 4.143 0 00-4 1.5A4.146 4.146 0 007.05 6.8C6.267 7.57 5.209 8 4.5 8m7.5 4v4m-3-4v4m6-4v4M12 4v1M6.27 10H4.13a1.121 1.121 0 00-1.13 1.1V19a1.1 1.1 0 001.1 1.1h15.74a1.1 1.1 0 001.1-1.1v-7.9a1.1 1.1 0 00-1.1-1.1h-2.14M7.5 16h.01M12 16h.01M16.5 16h.01"
+                          />
+                        </svg>
+                      </div>
+                      <div>
+                        <h2 className="mb-1 text-lg font-semibold">
+                          Project Details
+                        </h2>
+                        <p className="text-sm text-gray-200">Create, Edit, View ActFast projects.</p>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
               </div>
             </main>
           </div>

@@ -23,28 +23,38 @@ const ViewAllProjects = () => {
   const router = useRouter();
   const [projects, setProjects] = useState<Partial<Project>[]>([]);
   const [filteredProjects, setFilteredProjects] = useState<Partial<Project>[]>(
-    []
+    [],
   );
   const [editProjectData, setEditProjectData] = useState<EditProjectData>({});
   const [isMounted, setIsMounted] = useState(false);
   const [newProjectCode, setNewProjectCode] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [showMoreDetails, setShowMoreDetails] = useState<string | null>(null);
-  const [editableProjectId, setEditableProjectId] = useState<string | null>(null);
+  const [editableProjectId, setEditableProjectId] = useState<string | null>(
+    null,
+  );
   const [disabled, setDisabled] = useState(false);
 
-  useEffect(() => {
-    const fetchProjects = async () => {
-      try {
-        const response = await axios.get("/api/projects");
-        setProjects(response.data.projects);
-        setFilteredProjects(response.data.projects);
-      } catch (error) {
-        console.error("Error fetching projects:", error);
-        toast.error("Failed to fetch projects");
-      }
-    };
+  const fetchProjects = async () => {
+    try {
+      const response = await axios.get("/api/projects");
+      const sortedProjects = response.data.projects.sort(
+        (a: Partial<Project>, b: Partial<Project>) => {
+          if (a.code && b.code) {
+            return b.code.localeCompare(a.code);
+          }
+          return 0;
+        },
+      );
+      setProjects(sortedProjects);
+      setFilteredProjects(sortedProjects);
+    } catch (error) {
+      console.error("Error fetching projects:", error);
+      toast.error("Failed to fetch projects");
+    }
+  };
 
+  useEffect(() => {
     if (session?.user.email) fetchProjects();
   }, [session?.user.email]);
 
@@ -63,14 +73,18 @@ const ViewAllProjects = () => {
         code: newProjectCode.trim().toUpperCase(),
       });
       if (response.data.status === 201) {
-        setProjects([...projects, response.data.project]);
-        setFilteredProjects([...projects, response.data.project]);
+        const newProject = response.data.project;
+        const updatedProjects = [newProject, ...projects].sort((a, b) =>
+          b.code!.localeCompare(a.code!),
+        );
+        setProjects(updatedProjects);
+        setFilteredProjects(updatedProjects);
         setNewProjectCode("");
         toast.success("Project created successfully!");
       } else {
         toast.error(
           response.data.error ||
-            "An error occurred while creating the project."
+            "An error occurred while creating the project.",
         );
       }
     } catch (error) {
@@ -84,7 +98,7 @@ const ViewAllProjects = () => {
     const filtered = projects.filter(
       (project) =>
         project.code?.toUpperCase().includes(e.target.value.toUpperCase()) ||
-        project.insured?.toUpperCase().includes(e.target.value.toUpperCase())
+        project.insured?.toUpperCase().includes(e.target.value.toUpperCase()),
     );
     setFilteredProjects(filtered);
   };
@@ -112,7 +126,7 @@ const ViewAllProjects = () => {
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-    projectId: string
+    projectId: string,
   ) => {
     setEditProjectData((prevData) => ({
       ...prevData,
@@ -131,7 +145,10 @@ const ViewAllProjects = () => {
     });
 
     try {
-      const response = await axios.patch("/api/projects", editProjectData[projectId]);
+      const response = await axios.patch(
+        "/api/projects",
+        editProjectData[projectId],
+      );
       if (response.data.status !== 200) {
         const errorMessage = response.data?.error || "An error occurred";
         toast.error(errorMessage);
@@ -158,13 +175,13 @@ const ViewAllProjects = () => {
       <div className="p-6 pt-24">
         <div className="mb-6 flex flex-col items-center justify-between space-y-4 sm:flex-row sm:space-y-0">
           <h1 className="text-3xl font-bold">View All Projects</h1>
-          <div className="flex flex-col items-center space-y-4 sm:flex-row sm:space-y-0 sm:space-x-4">
+          <div className="flex flex-col items-center space-y-4 sm:flex-row sm:space-x-4 sm:space-y-0">
             <input
               type="text"
               value={searchQuery}
               onChange={handleSearch}
               placeholder="Search by code or insured"
-              className="rounded border px-4 py-2 w-full sm:w-auto"
+              className="w-full rounded border px-4 py-2 sm:w-auto"
             />
             {["admin", "lead"].includes(session?.user.role) && (
               <>
@@ -173,11 +190,11 @@ const ViewAllProjects = () => {
                   value={newProjectCode}
                   onChange={(e) => setNewProjectCode(e.target.value)}
                   placeholder="Enter project code"
-                  className="rounded border px-4 py-2 w-full sm:w-auto"
+                  className="w-full rounded border px-4 py-2 sm:w-auto"
                 />
                 <button
                   onClick={handleCreateProject}
-                  className="rounded bg-blue-500 px-4 py-2 font-bold text-white hover:bg-blue-600 w-full sm:w-auto"
+                  className="w-full rounded bg-blue-500 px-4 py-2 font-bold text-white hover:bg-blue-600 sm:w-auto"
                 >
                   Create Project
                 </button>
@@ -209,9 +226,13 @@ const ViewAllProjects = () => {
                           <input
                             type="text"
                             name="insured"
-                            value={editProjectData[project?.id]?.insured || project?.insured || ""}
+                            value={
+                              editProjectData[project?.id]?.insured ||
+                              project?.insured ||
+                              ""
+                            }
                             onChange={(e) => handleChange(e, project?.id!)}
-                            className="ml-2 rounded border px-2 py-1 w-full"
+                            className="ml-2 w-full rounded border px-2 py-1"
                           />
                         ) : (
                           project?.insured
@@ -223,9 +244,13 @@ const ViewAllProjects = () => {
                           <input
                             type="text"
                             name="phoneNumber"
-                            value={editProjectData[project?.id]?.phoneNumber || project?.phoneNumber || ""}
+                            value={
+                              editProjectData[project?.id]?.phoneNumber ||
+                              project?.phoneNumber ||
+                              ""
+                            }
                             onChange={(e) => handleChange(e, project?.id!)}
-                            className="ml-2 rounded border px-2 py-1 w-full"
+                            className="ml-2 w-full rounded border px-2 py-1"
                           />
                         ) : (
                           project?.phoneNumber
@@ -237,9 +262,13 @@ const ViewAllProjects = () => {
                           <input
                             type="text"
                             name="typeOfDamage"
-                            value={editProjectData[project?.id]?.typeOfDamage || project?.typeOfDamage || ""}
+                            value={
+                              editProjectData[project?.id]?.typeOfDamage ||
+                              project?.typeOfDamage ||
+                              ""
+                            }
                             onChange={(e) => handleChange(e, project?.id!)}
-                            className="ml-2 rounded border px-2 py-1 w-full"
+                            className="ml-2 w-full rounded border px-2 py-1"
                           />
                         ) : (
                           project?.typeOfDamage
@@ -251,9 +280,13 @@ const ViewAllProjects = () => {
                           <input
                             type="text"
                             name="category"
-                            value={editProjectData[project?.id]?.category || project?.category || ""}
+                            value={
+                              editProjectData[project?.id]?.category ||
+                              project?.category ||
+                              ""
+                            }
                             onChange={(e) => handleChange(e, project?.id!)}
-                            className="ml-2 rounded border px-2 py-1 w-full"
+                            className="ml-2 w-full rounded border px-2 py-1"
                           />
                         ) : (
                           project?.category
@@ -267,9 +300,13 @@ const ViewAllProjects = () => {
                               <input
                                 type="email"
                                 name="email"
-                                value={editProjectData[project?.id]?.email || project?.email || ""}
+                                value={
+                                  editProjectData[project?.id]?.email ||
+                                  project?.email ||
+                                  ""
+                                }
                                 onChange={(e) => handleChange(e, project?.id!)}
-                                className="ml-2 rounded border px-2 py-1 w-full"
+                                className="ml-2 w-full rounded border px-2 py-1"
                               />
                             ) : (
                               project?.email
@@ -281,9 +318,14 @@ const ViewAllProjects = () => {
                               <input
                                 type="text"
                                 name="insuranceProvider"
-                                value={editProjectData[project?.id]?.insuranceProvider || project?.insuranceProvider || ""}
+                                value={
+                                  editProjectData[project?.id]
+                                    ?.insuranceProvider ||
+                                  project?.insuranceProvider ||
+                                  ""
+                                }
                                 onChange={(e) => handleChange(e, project?.id!)}
-                                className="ml-2 rounded border px-2 py-1 w-full"
+                                className="ml-2 w-full rounded border px-2 py-1"
                               />
                             ) : (
                               project?.insuranceProvider
@@ -295,9 +337,13 @@ const ViewAllProjects = () => {
                               <input
                                 type="text"
                                 name="claimNo"
-                                value={editProjectData[project?.id]?.claimNo || project?.claimNo || ""}
+                                value={
+                                  editProjectData[project?.id]?.claimNo ||
+                                  project?.claimNo ||
+                                  ""
+                                }
                                 onChange={(e) => handleChange(e, project?.id!)}
-                                className="ml-2 rounded border px-2 py-1 w-full"
+                                className="ml-2 w-full rounded border px-2 py-1"
                               />
                             ) : (
                               project?.claimNo
@@ -309,9 +355,13 @@ const ViewAllProjects = () => {
                               <input
                                 type="text"
                                 name="adjuster"
-                                value={editProjectData[project?.id]?.adjuster || project?.adjuster || ""}
+                                value={
+                                  editProjectData[project?.id]?.adjuster ||
+                                  project?.adjuster ||
+                                  ""
+                                }
                                 onChange={(e) => handleChange(e, project?.id!)}
-                                className="ml-2 rounded border px-2 py-1 w-full"
+                                className="ml-2 w-full rounded border px-2 py-1"
                               />
                             ) : (
                               project?.adjuster
@@ -323,9 +373,13 @@ const ViewAllProjects = () => {
                               <input
                                 type="date"
                                 name="dateOfLoss"
-                                value={editProjectData[project?.id]?.dateOfLoss || project?.dateOfLoss || ""}
+                                value={
+                                  editProjectData[project?.id]?.dateOfLoss ||
+                                  project?.dateOfLoss ||
+                                  ""
+                                }
                                 onChange={(e) => handleChange(e, project?.id!)}
-                                className="ml-2 rounded border px-2 py-1 w-full"
+                                className="ml-2 w-full rounded border px-2 py-1"
                               />
                             ) : (
                               project?.dateOfLoss
@@ -337,9 +391,13 @@ const ViewAllProjects = () => {
                               <input
                                 type="date"
                                 name="dateAttended"
-                                value={editProjectData[project?.id]?.dateAttended || project?.dateAttended || ""}
+                                value={
+                                  editProjectData[project?.id]?.dateAttended ||
+                                  project?.dateAttended ||
+                                  ""
+                                }
                                 onChange={(e) => handleChange(e, project?.id!)}
-                                className="ml-2 rounded border px-2 py-1 w-full"
+                                className="ml-2 w-full rounded border px-2 py-1"
                               />
                             ) : (
                               project?.dateAttended
@@ -351,9 +409,13 @@ const ViewAllProjects = () => {
                               <input
                                 type="text"
                                 name="lockBoxCode"
-                                value={editProjectData[project?.id]?.lockBoxCode || project?.lockBoxCode || ""}
+                                value={
+                                  editProjectData[project?.id]?.lockBoxCode ||
+                                  project?.lockBoxCode ||
+                                  ""
+                                }
                                 onChange={(e) => handleChange(e, project?.id!)}
-                                className="ml-2 rounded border px-2 py-1 w-full"
+                                className="ml-2 w-full rounded border px-2 py-1"
                               />
                             ) : (
                               project?.lockBoxCode
@@ -364,9 +426,13 @@ const ViewAllProjects = () => {
                             {editableProjectId === project?.id ? (
                               <textarea
                                 name="notes"
-                                value={editProjectData[project?.id]?.notes || project?.notes || ""}
+                                value={
+                                  editProjectData[project?.id]?.notes ||
+                                  project?.notes ||
+                                  ""
+                                }
                                 onChange={(e) => handleChange(e, project?.id!)}
-                                className="ml-2 rounded border px-2 py-1 w-full"
+                                className="ml-2 w-full rounded border px-2 py-1"
                               />
                             ) : (
                               project?.notes
