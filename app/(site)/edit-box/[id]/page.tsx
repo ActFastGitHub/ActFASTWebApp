@@ -3,9 +3,16 @@
 import axios from "axios";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, FormEvent } from "react";
-import { ProjectProps } from "@/app/libs/interfaces";
 import Navbar from "@/app/components/navBar";
 import toast from "react-hot-toast";
+import {
+  FaEdit,
+  FaTrashAlt,
+  FaEye,
+  FaEyeSlash,
+  FaLink,
+  FaUnlink,
+} from "react-icons/fa";
 
 const colorOptions = [
   { value: "bg-blue-500", label: "Company Assets (Blue)" },
@@ -23,7 +30,6 @@ interface EditBoxProps {
 const EditBox: React.FC<EditBoxProps> = ({ params }) => {
   const router = useRouter();
   const searchParams = useSearchParams();
-
   const id = params.id;
   const initialName = searchParams.get("name") || "";
   const initialColor = searchParams.get("color") || "bg-blue-500";
@@ -35,21 +41,16 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
   const [lastModifiedBy, setLastModifiedBy] = useState<string>("");
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [items, setItems] = useState<any[]>([]);
-  const [newItemName, setNewItemName] = useState<string>("");
-  const [newItemProject, setNewItemProject] = useState<string>("");
+  const [projects, setProjects] = useState<any[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>("");
-  const [projects, setProjects] = useState<ProjectProps[]>([]);
-  const [disabled, setDisabled] = useState(false);
   const [showDetails, setShowDetails] = useState<{ [key: string]: boolean }>(
     {},
   );
-  const [editingItem, setEditingItem] = useState<{ [key: string]: boolean }>(
-    {},
-  );
-  const [searchTerm, setSearchTerm] = useState<string>("");
-  const [filteredItems, setFilteredItems] = useState<any[]>([]);
+  const [disabled, setDisabled] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [packedInItems, setPackedInItems] = useState<any[]>([]);
+  const [packedOutItems, setPackedOutItems] = useState<any[]>([]);
 
   const ITEMS_PER_PAGE = 10;
 
@@ -62,7 +63,11 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
 
   useEffect(() => {
     fetchItems();
-  }, [page, searchTerm, selectedProject]);
+  }, [page, selectedProject]);
+
+  useEffect(() => {
+    fetchPackedItems();
+  }, [id]);
 
   const fetchBoxDetails = async () => {
     try {
@@ -83,16 +88,14 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
     try {
       const response = await axios.get(`/api/pods/items`, {
         params: {
-          boxId: id,
+          projectCode: selectedProject,
           page,
           limit: ITEMS_PER_PAGE,
-          searchTerm,
-          projectCode: selectedProject,
         },
       });
+
       setItems(response.data.items);
       setTotalPages(response.data.totalPages);
-      setFilteredItems(response.data.items);
     } catch (error) {
       console.error("Error fetching items:", error);
     }
@@ -104,6 +107,23 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
       setProjects(response.data.projects);
     } catch (error) {
       console.error("Error fetching projects:", error);
+    }
+  };
+
+  const fetchPackedItems = async () => {
+    try {
+      const response = await axios.get(`/api/pods/items`, {
+        params: { boxId: id },
+      });
+      const allItems = response.data.items;
+      setPackedInItems(
+        allItems.filter((item: any) => item.packedStatus === "In"),
+      );
+      setPackedOutItems(
+        allItems.filter((item: any) => item.packedStatus === "Out"),
+      );
+    } catch (error) {
+      console.error("Error fetching packed items:", error);
     }
   };
 
@@ -137,30 +157,6 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
     }
   };
 
-  const addItem = async () => {
-    if (!newItemName.trim() || !newItemProject) {
-      toast.error("Please provide a valid item name and select a project.");
-      return;
-    }
-
-    try {
-      const response = await axios.post(`/api/pods/items`, {
-        data: { name: newItemName, projectCode: newItemProject },
-      });
-
-      if (response.status === 200) {
-        setNewItemName("");
-        setNewItemProject("");
-        fetchItems();
-        toast.success("Item added successfully");
-      } else {
-        throw new Error(response.data?.error || "An error occurred");
-      }
-    } catch (error: any) {
-      toast.error(error.message || "An error occurred");
-    }
-  };
-
   const connectItemToBox = async (itemId: string) => {
     try {
       const response = await axios.patch(`/api/pods/items/connect/${itemId}`, {
@@ -169,6 +165,7 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
 
       if (response.status === 200) {
         fetchItems();
+        fetchPackedItems();
         toast.success("Item connected to box successfully");
       } else {
         throw new Error(response.data?.error || "An error occurred");
@@ -178,34 +175,16 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
     }
   };
 
-  const deleteItem = async (itemId: string) => {
+  const disconnectItemFromBox = async (itemId: string) => {
     try {
-      const response = await axios.delete(`/api/pods/items/${itemId}`);
+      const response = await axios.patch(
+        `/api/pods/items/disconnect/${itemId}`,
+      );
 
       if (response.status === 200) {
         fetchItems();
-        toast.success("Item deleted successfully");
-      } else {
-        throw new Error(response.data?.error || "An error occurred");
-      }
-    } catch (error: any) {
-      toast.error(error.message || "An error occurred");
-    }
-  };
-
-  const editItem = async (
-    itemId: string,
-    name: string,
-    description: string,
-  ) => {
-    try {
-      const response = await axios.patch(`/api/pods/items/${itemId}`, {
-        data: { name, description },
-      });
-
-      if (response.status === 200) {
-        fetchItems();
-        toast.success("Item updated successfully");
+        fetchPackedItems();
+        toast.success("Item disconnected from box successfully");
       } else {
         throw new Error(response.data?.error || "An error occurred");
       }
@@ -216,13 +195,6 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
 
   const toggleDetails = (itemId: string) => {
     setShowDetails((prevState) => ({
-      ...prevState,
-      [itemId]: !prevState[itemId],
-    }));
-  };
-
-  const toggleEdit = (itemId: string) => {
-    setEditingItem((prevState) => ({
       ...prevState,
       [itemId]: !prevState[itemId],
     }));
@@ -324,7 +296,196 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
           </button>
         </div>
       </form>
-      
+      <div className="mt-6 w-full max-w-2xl rounded-lg bg-white p-6 shadow-md">
+        <h2 className="mb-4 text-xl font-bold">Project Items</h2>
+        <select
+          value={selectedProject}
+          onChange={(e) => setSelectedProject(e.target.value)}
+          className="mb-4 w-full rounded border border-gray-300 p-2"
+        >
+          <option value="">Select Project</option>
+          {projects.map((project) => (
+            <option key={project.id} value={project.code}>
+              {project.code}
+            </option>
+          ))}
+        </select>
+        {items.length > 0 ? (
+          <div className="space-y-4">
+            {items.map((item) => (
+              <div key={item.id} className="rounded bg-white p-4 shadow">
+                <div className="flex justify-between">
+                  <div>
+                    <div className="text-xl font-bold">{item.name}</div>
+                    <p className="text-gray-600">{item.description}</p>
+                    <p className="text-gray-600">{item.projectCode}</p>
+                  </div>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => toggleDetails(item.id)}
+                      className="rounded bg-gray-300 p-2 hover:bg-gray-400"
+                    >
+                      {showDetails[item.id] ? <FaEyeSlash /> : <FaEye />}
+                    </button>
+                    <button
+                      onClick={() => connectItemToBox(item.id)}
+                      className="rounded bg-green-500 p-2 text-white hover:bg-green-600"
+                    >
+                      <FaLink />
+                    </button>
+                    <button
+                      onClick={() => disconnectItemFromBox(item.id)}
+                      className="rounded bg-red-500 p-2 text-white hover:bg-red-600"
+                    >
+                      <FaUnlink />
+                    </button>
+                  </div>
+                </div>
+                {showDetails[item.id] && (
+                  <div className="mt-4">
+                    <p className="text-gray-600">Location: {item.location}</p>
+                    <p className="text-gray-600">Category: {item.category}</p>
+                    <p className="text-gray-600">Notes: {item.notes}</p>
+                    <p className="text-gray-600">Status: {item.packedStatus}</p>
+                    <label className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        name="boxed"
+                        checked={item.boxed}
+                        readOnly
+                        className="rounded border"
+                      />
+                      <span>Boxed</span>
+                    </label>
+                  </div>
+                )}
+              </div>
+            ))}
+            <div className="flex justify-center space-x-2">
+              <button
+                onClick={() => handlePageChange(page - 1)}
+                disabled={page === 1}
+                className={`rounded px-4 py-2 ${page === 1 ? "bg-gray-300" : "bg-blue-500 text-white"}`}
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => handlePageChange(page + 1)}
+                disabled={page === totalPages}
+                className={`rounded px-4 py-2 ${page === totalPages ? "bg-gray-300" : "bg-blue-500 text-white"}`}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p>No items found for the selected project.</p>
+        )}
+      </div>
+      <div className="mt-6 w-full max-w-2xl rounded-lg bg-white p-6 shadow-md">
+        <h2 className="mb-4 text-xl font-bold">Packed In Items</h2>
+        {packedInItems.length > 0 ? (
+          <div className="space-y-4">
+            {packedInItems.map((item) => (
+              <div key={item.id} className="rounded bg-white p-4 shadow">
+                <div className="flex justify-between">
+                  <div>
+                    <div className="text-xl font-bold">{item.name}</div>
+                    <p className="text-gray-600">{item.description}</p>
+                    <p className="text-gray-600">{item.projectCode}</p>
+                  </div>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => toggleDetails(item.id)}
+                      className="rounded bg-gray-300 p-2 hover:bg-gray-400"
+                    >
+                      {showDetails[item.id] ? <FaEyeSlash /> : <FaEye />}
+                    </button>
+                    <button
+                      onClick={() => disconnectItemFromBox(item.id)}
+                      className="rounded bg-red-500 p-2 text-white hover:bg-red-600"
+                    >
+                      <FaUnlink />
+                    </button>
+                  </div>
+                </div>
+                {showDetails[item.id] && (
+                  <div className="mt-4">
+                    <p className="text-gray-600">Location: {item.location}</p>
+                    <p className="text-gray-600">Category: {item.category}</p>
+                    <p className="text-gray-600">Notes: {item.notes}</p>
+                    <p className="text-gray-600">Status: {item.packedStatus}</p>
+                    <label className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        name="boxed"
+                        checked={item.boxed}
+                        readOnly
+                        className="rounded border"
+                      />
+                      <span>Boxed</span>
+                    </label>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p>No items found for this box.</p>
+        )}
+      </div>
+      <div className="mt-6 w-full max-w-2xl rounded-lg bg-white p-6 shadow-md">
+        <h2 className="mb-4 text-xl font-bold">Packed Out Items</h2>
+        {packedOutItems.length > 0 ? (
+          <div className="space-y-4">
+            {packedOutItems.map((item) => (
+              <div key={item.id} className="rounded bg-white p-4 shadow">
+                <div className="flex justify-between">
+                  <div>
+                    <div className="text-xl font-bold">{item.name}</div>
+                    <p className="text-gray-600">{item.description}</p>
+                    <p className="text-gray-600">{item.projectCode}</p>
+                  </div>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => toggleDetails(item.id)}
+                      className="rounded bg-gray-300 p-2 hover:bg-gray-400"
+                    >
+                      {showDetails[item.id] ? <FaEyeSlash /> : <FaEye />}
+                    </button>
+                    <button
+                      onClick={() => connectItemToBox(item.id)}
+                      className="rounded bg-green-500 p-2 text-white hover:bg-green-600"
+                    >
+                      <FaLink />
+                    </button>
+                  </div>
+                </div>
+                {showDetails[item.id] && (
+                  <div className="mt-4">
+                    <p className="text-gray-600">Location: {item.location}</p>
+                    <p className="text-gray-600">Category: {item.category}</p>
+                    <p className="text-gray-600">Notes: {item.notes}</p>
+                    <p className="text-gray-600">Status: {item.packedStatus}</p>
+                    <label className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        name="boxed"
+                        checked={item.boxed}
+                        readOnly
+                        className="rounded border"
+                      />
+                      <span>Boxed</span>
+                    </label>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p>No items found for this box.</p>
+        )}
+      </div>
     </div>
   );
 };
