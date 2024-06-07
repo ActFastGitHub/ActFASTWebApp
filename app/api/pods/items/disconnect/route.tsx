@@ -1,11 +1,11 @@
-// api/pods/items/connect/route.tsx
+// api/pods/items/disconnect/route.tsx
 
 import { NextResponse } from "next/server";
 import prisma from "@/app/libs/prismadb";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/libs/authOption";
 
-// CONNECT ITEM TO BOX
+// DISCONNECT ITEM FROM BOX
 export async function PATCH(
   request: Request,
   { params }: { params: { id: string } },
@@ -21,24 +21,14 @@ export async function PATCH(
 
   try {
     const { id } = params;
-    const body = await request.json();
-    const { boxId } = body.data;
-
-    if (!boxId) {
-      return NextResponse.json({
-        message: "Box ID is required",
-        status: 400,
-      });
-    }
-
     const updatedItem = await prisma.item.update({
       where: { id },
       data: {
         box: {
-          connect: { boxNumber: boxId },
+          disconnect: true,
         },
-        packedStatus: "In",
-        packedInAt: new Date(),
+        packedStatus: "Out",
+        packedOutAt: new Date(),
       },
     });
 

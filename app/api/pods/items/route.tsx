@@ -1,14 +1,14 @@
+// api/pods/item/route.tsx
+
 import { NextResponse } from "next/server";
 import prisma from "@/app/libs/prismadb";
+import { Prisma } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/libs/authOption";
-import { APIErr } from "@/app/libs/interfaces";
-import { Prisma } from "@prisma/client";
 
-// GET ALL ITEMS FOR A BOX WITH PAGINATION, SEARCH, AND PROJECT FILTERING SUPPORT
+// GET ALL ITEMS WITH FILTERS AND PAGINATION
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-//   const boxId = searchParams.get("boxId") ?? undefined;
   const projectCode = searchParams.get("projectCode") ?? undefined;
   const page = parseInt(searchParams.get("page") || "1", 10);
   const limit = parseInt(searchParams.get("limit") || "10", 10);
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
       : {};
 
     const projectFilter: Prisma.ItemWhereInput = projectCode
-      ? { projectCode: projectCode }
+      ? { projectCode }
       : {};
 
     const [items, totalCount] = await Promise.all([
@@ -51,7 +51,6 @@ export async function GET(request: Request) {
       }),
       prisma.item.count({
         where: {
-        //   boxId,
           ...searchFilter,
           ...projectFilter,
         },
@@ -62,10 +61,9 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ items, totalPages }, { status: 200 });
   } catch (error) {
-    const { code = 500, message = "internal server error" } = error as APIErr;
     return NextResponse.json({
-      status: code,
-      error: message,
+      status: 500,
+      error: "Internal server error",
     });
   }
 }
@@ -83,10 +81,16 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { name, description, location, category, projectCode, notes } =
+    const { name, description, boxed, location, category, projectCode, notes } =
       body.data;
 
-    // Retrieve the user's profile using their email from the session
+    if (!projectCode) {
+      return NextResponse.json({
+        message: "Project code is required",
+        status: 400,
+      });
+    }
+
     const profile = await prisma.profile.findUnique({
       where: {
         userEmail: session.user.email,
@@ -114,16 +118,15 @@ export async function POST(request: Request) {
         lastModifiedBy: {
           connect: { nickname: profile.nickname! },
         },
-        boxed: false, // default value as per updated schema
+        boxed: boxed,
       },
     });
 
     return NextResponse.json({ newItem, status: 200 });
   } catch (error) {
-    const { code = 500, message = "Internal server error" } = error as APIErr;
     return NextResponse.json({
-      status: code,
-      error: message,
+      status: 500,
+      error: "Internal server error",
     });
   }
 }

@@ -1,8 +1,9 @@
+// api/pods/items/[id]/route.tsx
+
 import { NextResponse } from "next/server";
 import prisma from "@/app/libs/prismadb";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/libs/authOption";
-import { APIErr } from "@/app/libs/interfaces";
 
 // GET SPECIFIC ITEM
 export async function GET(
@@ -12,13 +13,11 @@ export async function GET(
   try {
     const { id } = params;
     const item = await prisma.item.findUnique({
-      where: {
-        id: id,
-      },
+      where: { id },
       include: {
         lastModifiedBy: true,
-        addedBy: true, // Include addedBy for completeness
-        box: true, // Include box details for completeness
+        addedBy: true,
+        box: true,
       },
     });
 
@@ -52,21 +51,11 @@ export async function PATCH(
   try {
     const { id } = params;
     const body = await request.json();
-    const {
-      name,
-      description,
-      location,
-      boxed,
-      category,
-      projectCode,
-      notes,
-    } = body.data;
+    const { name, description, location, boxed, category, projectCode, notes } =
+      body.data;
 
-    // Retrieve the user's profile using their email from the session
     const profile = await prisma.profile.findUnique({
-      where: {
-        userEmail: session.user.email,
-      },
+      where: { userEmail: session.user.email },
     });
 
     if (!profile) {
@@ -77,7 +66,7 @@ export async function PATCH(
     }
 
     const updatedItem = await prisma.item.update({
-      where: { id: id },
+      where: { id },
       data: {
         name,
         description,
@@ -118,7 +107,7 @@ export async function DELETE(
   try {
     const { id } = params;
     await prisma.item.delete({
-      where: { id: id },
+      where: { id },
     });
 
     return NextResponse.json({ message: "Item deleted", status: 200 });
