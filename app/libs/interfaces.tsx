@@ -76,6 +76,9 @@ export interface ProjectProps {
   code: string;
   insured: string;
   address: string;
+  email: string;
+  phoneNumber: string;
+  insuranceProvider: string;
   claimNo: string;
   adjuster: string;
   typeOfDamage: string;
@@ -95,6 +98,24 @@ export interface EditProfileFormProps {
   setEditProfileData: React.Dispatch<React.SetStateAction<Partial<UserProps>>>;
   editable: boolean;
   setEditable: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
+export interface Project {
+  id: string;
+  code: string;
+  insured?: string;
+  address?: string;
+  email?: string;
+  phoneNumber?: string;
+  insuranceProvider?: string;
+  claimNo?: string;
+  adjuster?: string;
+  typeOfDamage?: string;
+  category?: string;
+  dateOfLoss?: string;
+  dateAttended?: string;
+  lockBoxCode?: string;
+  notes?: string;
 }
 
 export interface ProfileData {

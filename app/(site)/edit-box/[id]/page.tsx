@@ -37,6 +37,7 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
   const [items, setItems] = useState<any[]>([]);
   const [newItemName, setNewItemName] = useState<string>("");
   const [newItemProject, setNewItemProject] = useState<string>("");
+  const [selectedProject, setSelectedProject] = useState<string>("");
   const [projects, setProjects] = useState<ProjectProps[]>([]);
   const [disabled, setDisabled] = useState(false);
   const [showDetails, setShowDetails] = useState<{ [key: string]: boolean }>(
@@ -61,7 +62,7 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
 
   useEffect(() => {
     fetchItems();
-  }, [page, searchTerm]);
+  }, [page, searchTerm, selectedProject]);
 
   const fetchBoxDetails = async () => {
     try {
@@ -81,7 +82,13 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
   const fetchItems = async () => {
     try {
       const response = await axios.get(`/api/pods/items`, {
-        params: { boxId: id, page, limit: ITEMS_PER_PAGE, searchTerm },
+        params: {
+          boxId: id,
+          page,
+          limit: ITEMS_PER_PAGE,
+          searchTerm,
+          projectCode: selectedProject,
+        },
       });
       setItems(response.data.items);
       setTotalPages(response.data.totalPages);
@@ -131,11 +138,14 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
   };
 
   const addItem = async () => {
-    if (!newItemName.trim() || !newItemProject) return;
+    if (!newItemName.trim() || !newItemProject) {
+      toast.error("Please provide a valid item name and select a project.");
+      return;
+    }
 
     try {
       const response = await axios.post(`/api/pods/items`, {
-        data: { boxId: id, name: newItemName, project: newItemProject },
+        data: { name: newItemName, projectCode: newItemProject },
       });
 
       if (response.status === 200) {
@@ -143,6 +153,23 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
         setNewItemProject("");
         fetchItems();
         toast.success("Item added successfully");
+      } else {
+        throw new Error(response.data?.error || "An error occurred");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "An error occurred");
+    }
+  };
+
+  const connectItemToBox = async (itemId: string) => {
+    try {
+      const response = await axios.patch(`/api/pods/items/connect/${itemId}`, {
+        data: { boxId: id },
+      });
+
+      if (response.status === 200) {
+        fetchItems();
+        toast.success("Item connected to box successfully");
       } else {
         throw new Error(response.data?.error || "An error occurred");
       }
@@ -214,7 +241,7 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
   return (
     <div className="relative flex min-h-screen flex-col items-center bg-gray-200 p-4 pt-16">
       <Navbar />
-      <h1 className="mb-4 text-2xl pt-10">Edit Box {id}</h1>
+      <h1 className="mb-4 pt-10 text-2xl">Edit Box {id}</h1>
       <form
         onSubmit={updateBox}
         className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-md"
@@ -300,6 +327,29 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
       <div className="mt-6 w-full max-w-4xl rounded-lg bg-white p-6 shadow-md">
         <h2 className="mb-4 text-xl">Items</h2>
         <div className="mb-4 flex">
+          <select
+            value={selectedProject}
+            onChange={(e) => setSelectedProject(e.target.value)}
+            className="mr-2 rounded border border-gray-300 p-2"
+          >
+            <option value="" disabled>
+              Filter by project
+            </option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.code}>
+                {project.code}
+              </option>
+            ))}
+          </select>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search items"
+            className="flex-1 rounded border border-gray-300 p-2"
+          />
+        </div>
+        <div className="mb-4 flex">
           <input
             type="text"
             value={newItemName}
@@ -327,15 +377,6 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
           >
             Add Item
           </button>
-        </div>
-        <div className="mb-4">
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search items"
-            className="w-full rounded border border-gray-300 p-2"
-          />
         </div>
         <ul className="space-y-2">
           {filteredItems.map((item) => (
@@ -370,6 +411,7 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
                     {showDetails[item.id] && (
                       <div className="mt-2 space-y-1 text-sm text-gray-600">
                         <p>Description: {item.description || "N/A"}</p>
+                        <p>Project: {item.projectCode || "N/A"}</p>
                         <p>Added: {new Date(item.addedAt).toLocaleString()}</p>
                         <p>Added By: {item.addedById || "Unknown"}</p>
                         <p>
@@ -397,6 +439,12 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
                   className="rounded bg-yellow-500 px-4 py-2 text-white"
                 >
                   {editingItem[item.id] ? "Save" : "Edit"}
+                </button>
+                <button
+                  onClick={() => connectItemToBox(item.id)}
+                  className="rounded bg-blue-500 px-4 py-2 text-white"
+                >
+                  Connect to Box
                 </button>
                 <button
                   onClick={() => deleteItem(item.id)}

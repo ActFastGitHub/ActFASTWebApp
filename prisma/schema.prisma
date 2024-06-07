@@ -122,13 +122,13 @@ model Item {
   lastModifiedAt   DateTime @updatedAt
   addedById        String?
   lastModifiedById String?
-  boxId            String
+  boxId            String?
   projectCode      String?
   notes            String?
 
   addedBy        Profile? @relation("AddedByProfile", fields: [addedById], references: [nickname])
   lastModifiedBy Profile? @relation("ModifiedByProfile", fields: [lastModifiedById], references: [nickname])
-  box            Box      @relation("BoxItems", fields: [boxId], references: [boxNumber])
+  box            Box?     @relation("BoxItems", fields: [boxId], references: [boxNumber])
 
   @@index([name])
   @@index([description])
@@ -138,16 +138,19 @@ model Item {
 }
 
 model Project {
-  id           String  @id @default(auto()) @map("_id") @db.ObjectId
-  code         String  @unique
-  insured      String?
-  address      String?
-  claimNo      String?
-  adjuster     String?
-  typeOfDamage String?
-  category     String?
-  dateOfLoss   String?
-  dateAttended String?
-  lockBoxCode  String?
-  notes        String?
+  id                String  @id @default(auto()) @map("_id") @db.ObjectId
+  code              String  @unique
+  insured           String?
+  address           String?
+  email             String?
+  phoneNumber       String?
+  insuranceProvider String?
+  claimNo           String?
+  adjuster          String?
+  typeOfDamage      String?
+  category          String?
+  dateOfLoss        String?
+  dateAttended      String?
+  lockBoxCode       String?
+  notes             String?
 }
