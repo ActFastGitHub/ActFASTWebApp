@@ -10,6 +10,8 @@ import { authOptions } from "@/app/libs/authOption";
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const projectCode = searchParams.get("projectCode") ?? undefined;
+  const boxId = searchParams.get("boxId") ?? undefined;
+  const category = searchParams.get("category") ?? undefined;
   const page = parseInt(searchParams.get("page") || "1", 10);
   const limit = parseInt(searchParams.get("limit") || "10", 10);
   const searchTerm = searchParams.get("searchTerm") || "";
@@ -39,11 +41,17 @@ export async function GET(request: Request) {
       ? { projectCode }
       : {};
 
+    const boxFilter: Prisma.ItemWhereInput = boxId ? { boxId } : {};
+
+    const categoryFilter: Prisma.ItemWhereInput = category ? { category } : {};
+
     const [items, totalCount] = await Promise.all([
       prisma.item.findMany({
         where: {
           ...searchFilter,
           ...projectFilter,
+          ...boxFilter,
+          ...categoryFilter,
         },
         skip,
         take: limit,
@@ -53,6 +61,8 @@ export async function GET(request: Request) {
         where: {
           ...searchFilter,
           ...projectFilter,
+          ...boxFilter,
+          ...categoryFilter,
         },
       }),
     ]);
@@ -104,9 +114,27 @@ export async function POST(request: Request) {
       });
     }
 
+    // Trim leading and trailing spaces from the name
+    const trimmedName = name.trim();
+
+    // Check if an item with the same name and projectCode already exists
+    const existingItem = await prisma.item.findFirst({
+      where: {
+        name: trimmedName,
+        projectCode: projectCode,
+      },
+    });
+
+    if (existingItem) {
+      return NextResponse.json({
+        message: "This item name already exists in this project.",
+        status: 400,
+      });
+    }
+
     const newItem = await prisma.item.create({
       data: {
-        name,
+        name: trimmedName,
         description,
         location,
         category,

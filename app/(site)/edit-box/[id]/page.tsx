@@ -2,7 +2,7 @@
 
 import axios from "axios";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect, FormEvent } from "react";
+import { useState, useEffect, FormEvent, useMemo } from "react";
 import Navbar from "@/app/components/navBar";
 import toast from "react-hot-toast";
 import {
@@ -13,6 +13,7 @@ import {
   FaLink,
   FaUnlink,
 } from "react-icons/fa";
+import { useSession } from "next-auth/react";
 
 const colorOptions = [
   { value: "bg-blue-500", label: "Company Assets (Blue)" },
@@ -27,7 +28,13 @@ interface EditBoxProps {
   };
 }
 
+type Project = {
+  id: string;
+  code: string;
+};
+
 const EditBox: React.FC<EditBoxProps> = ({ params }) => {
+  const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
   const id = params.id;
@@ -43,9 +50,7 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
   const [items, setItems] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>("");
-  const [showDetails, setShowDetails] = useState<{ [key: string]: boolean }>(
-    {},
-  );
+  const [showDetails, setShowDetails] = useState<{ [key: string]: boolean }>({});
   const [disabled, setDisabled] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -56,6 +61,12 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
   const [searchTermProject, setSearchTermProject] = useState<string>("");
 
   const ITEMS_PER_PAGE = 10;
+
+  useEffect(() => {
+    if (status !== "loading" && !session) {
+      router.push("/login");
+    }
+  }, [session, status, router]);
 
   useEffect(() => {
     setName(initialName);
@@ -94,6 +105,7 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
           projectCode: selectedProject,
           page,
           limit: ITEMS_PER_PAGE,
+          searchTerm: searchTermProject,
         },
       });
 
@@ -107,7 +119,15 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
   const fetchProjects = async () => {
     try {
       const response = await axios.get(`/api/projects`);
-      setProjects(response.data.projects);
+      const sortedProjects = response.data.projects.sort(
+        (a: Partial<Project>, b: Partial<Project>) => {
+          if (a.code && b.code) {
+            return b.code.localeCompare(a.code);
+          }
+          return 0;
+        },
+      );
+      setProjects(sortedProjects);
     } catch (error) {
       console.error("Error fetching projects:", error);
     }
@@ -221,22 +241,34 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
     setSearchTermOut(e.target.value);
   };
 
-  const handleSearchProjectChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSearchProjectChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     setSearchTermProject(e.target.value);
   };
 
-  const filteredPackedInItems = packedInItems.filter((item) =>
-    item.name.toLowerCase().includes(searchTermIn.toLowerCase()),
-  );
+  const filteredPackedInItems = useMemo(() => 
+    packedInItems.filter((item) =>
+      `${item.name} ${item.description}`
+        .toLowerCase()
+        .includes(searchTermIn.toLowerCase())
+  ), [packedInItems, searchTermIn]);
 
-  const filteredPackedOutItems = packedOutItems.filter((item) =>
-    item.name.toLowerCase().includes(searchTermOut.toLowerCase()),
-  );
+  const filteredPackedOutItems = useMemo(() => 
+    packedOutItems.filter((item) =>
+      `${item.name} ${item.description}`
+        .toLowerCase()
+        .includes(searchTermOut.toLowerCase())
+  ), [packedOutItems, searchTermOut]);
 
-  const filteredItems = items.filter(
-    (item) => !packedInItems.some((inItem) => inItem.id === item.id) && 
-              item.name.toLowerCase().includes(searchTermProject.toLowerCase())
-  );
+  const filteredItems = useMemo(() => 
+    items.filter(
+      (item) =>
+        !packedInItems.some((inItem) => inItem.id === item.id) &&
+        `${item.name} ${item.description}`
+          .toLowerCase()
+          .includes(searchTermProject.toLowerCase())
+  ), [items, packedInItems, searchTermProject]);
 
   return (
     <div className="relative flex min-h-screen flex-col items-center bg-gray-200 p-4 pt-16">
@@ -368,12 +400,6 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
                     >
                       <FaLink />
                     </button>
-                    <button
-                      onClick={() => disconnectItemFromBox(item.id)}
-                      className="rounded bg-red-500 p-2 text-white hover:bg-red-600"
-                    >
-                      <FaUnlink />
-                    </button>
                   </div>
                 </div>
                 {showDetails[item.id] && (
@@ -382,6 +408,30 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
                     <p className="text-gray-600">Category: {item.category}</p>
                     <p className="text-gray-600">Notes: {item.notes}</p>
                     <p className="text-gray-600">Status: {item.packedStatus}</p>
+                    {item.packedInAt && (
+                      <p className="text-gray-600">
+                        Packed In: {new Date(item.packedInAt).toLocaleString()}
+                      </p>
+                    )}
+                    {item.packedOutAt && (
+                      <p className="text-gray-600">
+                        Packed Out:{" "}
+                        {new Date(item.packedOutAt).toLocaleString()}
+                      </p>
+                    )}
+                    <p className="text-gray-600">
+                      Added At: {new Date(item.addedAt).toLocaleString()}
+                    </p>
+                    <p className="text-gray-600">
+                      Last Modified At:{" "}
+                      {new Date(item.lastModifiedAt).toLocaleString()}
+                    </p>
+                    <p className="text-gray-600">
+                      Added By: {item.addedById || "Unknown"}
+                    </p>
+                    <p className="text-gray-600">
+                      Last Modified By: {item.lastModifiedById || "Unknown"}
+                    </p>
                     <label className="flex items-center space-x-2">
                       <input
                         type="checkbox"
@@ -457,6 +507,30 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
                     <p className="text-gray-600">Category: {item.category}</p>
                     <p className="text-gray-600">Notes: {item.notes}</p>
                     <p className="text-gray-600">Status: {item.packedStatus}</p>
+                    {item.packedInAt && (
+                      <p className="text-gray-600">
+                        Packed In: {new Date(item.packedInAt).toLocaleString()}
+                      </p>
+                    )}
+                    {item.packedOutAt && (
+                      <p className="text-gray-600">
+                        Packed Out:{" "}
+                        {new Date(item.packedOutAt).toLocaleString()}
+                      </p>
+                    )}
+                    <p className="text-gray-600">
+                      Added At: {new Date(item.addedAt).toLocaleString()}
+                    </p>
+                    <p className="text-gray-600">
+                      Last Modified At:{" "}
+                      {new Date(item.lastModifiedAt).toLocaleString()}
+                    </p>
+                    <p className="text-gray-600">
+                      Added By: {item.addedById || "Unknown"}
+                    </p>
+                    <p className="text-gray-600">
+                      Last Modified By: {item.lastModifiedById || "Unknown"}
+                    </p>
                     <label className="flex items-center space-x-2">
                       <input
                         type="checkbox"
@@ -516,6 +590,30 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
                     <p className="text-gray-600">Category: {item.category}</p>
                     <p className="text-gray-600">Notes: {item.notes}</p>
                     <p className="text-gray-600">Status: {item.packedStatus}</p>
+                    {item.packedInAt && (
+                      <p className="text-gray-600">
+                        Packed In: {new Date(item.packedInAt).toLocaleString()}
+                      </p>
+                    )}
+                    {item.packedOutAt && (
+                      <p className="text-gray-600">
+                        Packed Out:{" "}
+                        {new Date(item.packedOutAt).toLocaleString()}
+                      </p>
+                    )}
+                    <p className="text-gray-600">
+                      Added At: {new Date(item.addedAt).toLocaleString()}
+                    </p>
+                    <p className="text-gray-600">
+                      Last Modified At:{" "}
+                      {new Date(item.lastModifiedAt).toLocaleString()}
+                    </p>
+                    <p className="text-gray-600">
+                      Added By: {item.addedById || "Unknown"}
+                    </p>
+                    <p className="text-gray-600">
+                      Last Modified By: {item.lastModifiedById || "Unknown"}
+                    </p>
                     <label className="flex items-center space-x-2">
                       <input
                         type="checkbox"

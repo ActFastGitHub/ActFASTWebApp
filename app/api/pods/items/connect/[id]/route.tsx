@@ -1,3 +1,5 @@
+// api/pods/items/connect/[id]/route.tsx
+
 import { NextResponse } from "next/server";
 import prisma from "@/app/libs/prismadb";
 import { getServerSession } from "next-auth";
@@ -29,6 +31,18 @@ export async function PATCH(
       });
     }
 
+    // Verify that the box exists
+    const boxExists = await prisma.box.findUnique({
+      where: { boxNumber: boxId },
+    });
+
+    if (!boxExists) {
+      return NextResponse.json({
+        message: "Box not found",
+        status: 404,
+      });
+    }
+
     const updatedItem = await prisma.item.update({
       where: { id },
       data: {
@@ -42,6 +56,7 @@ export async function PATCH(
 
     return NextResponse.json({ updatedItem, status: 200 });
   } catch (error) {
+    console.error("Error connecting item to box:", error);
     return NextResponse.json({
       status: 500,
       error: "Internal server error",

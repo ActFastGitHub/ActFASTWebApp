@@ -83,7 +83,7 @@ const ViewAllProjects = () => {
         toast.success("Project created successfully!");
       } else {
         toast.error(
-          response.data.error ||
+          response.data.message ||
             "An error occurred while creating the project.",
         );
       }
@@ -150,7 +150,7 @@ const ViewAllProjects = () => {
         editProjectData[projectId],
       );
       if (response.data.status !== 200) {
-        const errorMessage = response.data?.error || "An error occurred";
+        const errorMessage = response.data?.message || "An error occurred";
         toast.error(errorMessage);
         setTimeout(() => setDisabled(false), 2000);
       } else {

@@ -1,3 +1,5 @@
+// api/pods/items/disconnect/[id]/route.tsx
+
 import { NextResponse } from "next/server";
 import prisma from "@/app/libs/prismadb";
 import { getServerSession } from "next-auth";
@@ -22,9 +24,6 @@ export async function PATCH(
     const updatedItem = await prisma.item.update({
       where: { id },
       data: {
-        box: {
-          disconnect: true,
-        },
         packedStatus: "Out",
         packedOutAt: new Date(),
       },

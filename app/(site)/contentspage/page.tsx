@@ -18,6 +18,13 @@ type Item = {
   notes: string;
   packedStatus: string;
   boxed: boolean;
+  packedInAt?: string;
+  packedOutAt?: string;
+  addedAt: string;
+  lastModifiedAt: string;
+  addedById?: string;
+  lastModifiedById?: string;
+  boxId?: string;
 };
 
 type Project = {
@@ -28,6 +35,20 @@ type Project = {
 type EditItemData = {
   [key: string]: Partial<Item>;
 };
+
+const categoryOptions = [
+  { value: "GLASS/FRAGILE MATERIAL", label: "GLASS/FRAGILE MATERIAL" },
+  { value: "CLOTHES/TOWELS", label: "CLOTHES/TOWELS" },
+  { value: "ELECTRONICS", label: "ELECTRONICS" },
+  { value: "RUGS", label: "RUGS" },
+  { value: "HARD FURNITURE", label: "HARD FURNITURE" },
+  { value: "BOOKS/PICTURES/PHOTO", label: "BOOKS/PICTURES/PHOTO" },
+  { value: "CDS/DVD/CAMERA/PHONE", label: "CDS/DVD/CAMERA/PHONE" },
+  { value: "BED/BED SHEETS", label: "BED/BED SHEETS" },
+  { value: "KITCHEN WARES", label: "KITCHEN WARES" },
+  { value: "PICTURE FRAME/PAINTING", label: "PICTURE FRAME/PAINTING" },
+  { value: "OTHERS", label: "OTHERS" },
+];
 
 const ItemsManagement = () => {
   const { data: session, status } = useSession();
@@ -42,7 +63,9 @@ const ItemsManagement = () => {
   const [editItemData, setEditItemData] = useState<EditItemData>({});
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [showDetails, setShowDetails] = useState<{ [key: string]: boolean }>({});
+  const [showDetails, setShowDetails] = useState<{ [key: string]: boolean }>(
+    {},
+  );
 
   const fetchItems = async (page: number = 1) => {
     try {
@@ -72,7 +95,15 @@ const ItemsManagement = () => {
   const fetchProjects = async () => {
     try {
       const response = await axios.get("/api/projects");
-      setProjects(response.data.projects);
+      const sortedProjects = response.data.projects.sort(
+        (a: Partial<Project>, b: Partial<Project>) => {
+          if (a.code && b.code) {
+            return b.code.localeCompare(a.code);
+          }
+          return 0;
+        },
+      );
+      setProjects(sortedProjects);
     } catch (error) {
       console.error("Error fetching projects:", error);
       toast.error("Failed to fetch projects");
@@ -106,7 +137,7 @@ const ItemsManagement = () => {
         setNewItem({});
       } else {
         toast.error(
-          response.data.error || "An error occurred while creating the item."
+          response.data.message || "An error occurred while creating the item.",
         );
       }
     } catch (error) {
@@ -127,7 +158,7 @@ const ItemsManagement = () => {
 
   const handleChange = (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
-    itemId: string
+    itemId: string,
   ) => {
     const { name, type, checked, value } = e.target as HTMLInputElement;
     const newValue = type === "checkbox" ? checked : value;
@@ -152,7 +183,7 @@ const ItemsManagement = () => {
         setEditableItemId(null);
       } else {
         toast.error(
-          response.data.error || "An error occurred while updating the item."
+          response.data.message || "An error occurred while updating the item.",
         );
       }
     } catch (error) {
@@ -169,7 +200,7 @@ const ItemsManagement = () => {
         fetchItems();
       } else {
         toast.error(
-          response.data.error || "An error occurred while deleting the item."
+          response.data.message || "An error occurred while deleting the item.",
         );
       }
     } catch (error) {
@@ -203,22 +234,24 @@ const ItemsManagement = () => {
               value={searchQuery}
               onChange={handleSearch}
               placeholder="Search by name or description"
-              className="w-full rounded border px-4 py-2 sm:w-auto"
+              className="w-auto w-full rounded border px-4 py-2 lg:w-72 xl:w-96"
             />
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-full rounded border px-4 py-2 sm:w-auto"
+              className="w-auto w-full rounded border px-4 py-2 lg:w-72 xl:w-96"
             >
               <option value="">All Categories</option>
-              <option value="Category A">Category A</option>
-              <option value="Category B">Category B</option>
-              <option value="Category C">Category C</option>
+              {categoryOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
             <select
               value={projectFilter}
               onChange={(e) => setProjectFilter(e.target.value)}
-              className="w-full rounded border px-4 py-2 sm:w-auto"
+              className="w-auto w-full rounded border px-4 py-2 lg:w-72 xl:w-96"
             >
               <option value="">All Projects</option>
               {projects.map((project) => (
@@ -269,9 +302,11 @@ const ItemsManagement = () => {
             required
           >
             <option value="">Select Category</option>
-            <option value="Category A">Category A</option>
-            <option value="Category B">Category B</option>
-            <option value="Category C">Category C</option>
+            {categoryOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
           <select
             name="projectCode"
@@ -332,28 +367,72 @@ const ItemsManagement = () => {
                     >
                       {showDetails[item.id] ? <FaEyeSlash /> : <FaEye />}
                     </button>
-                    <button
-                      onClick={() => handleEditToggle(item.id)}
-                      className="rounded bg-blue-500 p-2 text-white hover:bg-blue-600"
-                    >
-                      <FaEdit />
-                    </button>
-                    {["admin", "lead", "owner"].includes(session?.user.role) && (
+                    {["admin", "lead", "owner"].includes(
+                      session?.user.role,
+                    ) && (
                       <button
-                        onClick={() => deleteItem(item.id)}
-                        className="rounded bg-red-500 p-2 text-white hover:bg-red-600"
+                        onClick={() => handleEditToggle(item.id)}
+                        className="rounded bg-blue-500 p-2 text-white hover:bg-blue-600"
                       >
-                        <FaTrashAlt />
+                        <FaEdit />
                       </button>
                     )}
+                    {["admin", "lead", "owner"].includes(session?.user.role) &&
+                      !item.packedStatus && (
+                        <button
+                          onClick={() => deleteItem(item.id)}
+                          className="rounded bg-red-500 p-2 text-white hover:bg-red-600"
+                        >
+                          <FaTrashAlt />
+                        </button>
+                      )}
                   </div>
                 </div>
                 {showDetails[item.id] && (
-                  <div className="mt-4">
+                  <div className="mt-4 space-y-2">
                     <p className="text-gray-600">Location: {item.location}</p>
                     <p className="text-gray-600">Category: {item.category}</p>
-                    <p className="text-gray-600">Notes: {item.notes}</p>
-                    <p className="text-gray-600">Status: {item.packedStatus}</p>
+                    {item.notes && (
+                      <p className="text-gray-600">Notes: {item.notes}</p>
+                    )}
+                    {item.packedStatus && (
+                      <p className="text-gray-600">
+                        Status: {item.packedStatus}
+                      </p>
+                    )}
+                    {item.boxId && (
+                      <p className="text-gray-600">
+                        Packed In/Out last at Pod: {item.boxId}
+                      </p>
+                    )}
+                    {item.packedInAt && (
+                      <p className="text-gray-600">
+                        Packed In: {new Date(item.packedInAt).toLocaleString()}
+                      </p>
+                    )}
+                    {item.packedOutAt && (
+                      <p className="text-gray-600">
+                        Packed Out:{" "}
+                        {new Date(item.packedOutAt).toLocaleString()}
+                      </p>
+                    )}
+                    <p className="text-gray-600">
+                      Added At: {new Date(item.addedAt).toLocaleString()}
+                    </p>
+                    <p className="text-gray-600">
+                      Last Modified At:{" "}
+                      {new Date(item.lastModifiedAt).toLocaleString()}
+                    </p>
+                    {item.addedById && (
+                      <p className="text-gray-600">
+                        Added By: {item.addedById}
+                      </p>
+                    )}
+                    {item.lastModifiedById && (
+                      <p className="text-gray-600">
+                        Last Modified By: {item.lastModifiedById}
+                      </p>
+                    )}
                     <label className="flex items-center space-x-2">
                       <input
                         type="checkbox"
@@ -403,9 +482,11 @@ const ItemsManagement = () => {
                       required
                     >
                       <option value="">Select Category</option>
-                      <option value="Category A">Category A</option>
-                      <option value="Category B">Category B</option>
-                      <option value="Category C">Category C</option>
+                      {categoryOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
                     </select>
                     <select
                       name="projectCode"

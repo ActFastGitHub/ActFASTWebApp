@@ -65,10 +65,31 @@ export async function PATCH(
       });
     }
 
+    // Trim leading and trailing spaces from the name
+    const trimmedName = name.trim();
+
+    // Check if an item with the same name and projectCode already exists
+    const existingItem = await prisma.item.findFirst({
+      where: {
+        name: trimmedName,
+        projectCode: projectCode,
+        NOT: {
+          id: id,
+        },
+      },
+    });
+
+    if (existingItem) {
+      return NextResponse.json({
+        message: "This item name already exists in this project.",
+        status: 400,
+      });
+    }
+
     const updatedItem = await prisma.item.update({
       where: { id },
       data: {
-        name,
+        name: trimmedName,
         description,
         location,
         boxed,
