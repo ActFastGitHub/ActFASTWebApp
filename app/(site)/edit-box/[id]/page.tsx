@@ -189,7 +189,7 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
       if (response.status === 200) {
         fetchItems();
         fetchPackedItems();
-        toast.success("Item connected to box successfully");
+        toast.success("Item has been packed in successfully");
       } else {
         throw new Error(response.data?.error || "An error occurred");
       }
@@ -207,7 +207,7 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
       if (response.status === 200) {
         fetchItems();
         fetchPackedItems();
-        toast.success("Item disconnected from box successfully");
+        toast.success("Item has been packed out successfully");
       } else {
         throw new Error(response.data?.error || "An error occurred");
       }
@@ -273,7 +273,7 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
   return (
     <div className="relative flex min-h-screen flex-col items-center bg-gray-200 p-4 pt-16">
       <Navbar />
-      <h1 className="mb-4 pt-10 text-2xl">Edit Box {id}</h1>
+      <h1 className="mb-4 pt-10 text-2xl">Edit Pod {id}</h1>
       <form
         onSubmit={updateBox}
         className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-md"
