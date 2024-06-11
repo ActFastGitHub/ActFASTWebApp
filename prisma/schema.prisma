@@ -110,16 +110,16 @@ model Box {
 }
 
 model Item {
-  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
   name             String
   description      String?
   location         String?
-  boxed            Boolean? @default(false)
+  boxed            Boolean?  @default(false)
   category         String?
   packedInAt       DateTime?
   packedOutAt      DateTime?
-  addedAt          DateTime @default(now())
-  lastModifiedAt   DateTime @updatedAt
+  addedAt          DateTime  @default(now())
+  lastModifiedAt   DateTime  @updatedAt
   addedById        String?
   lastModifiedById String?
   boxId            String?
@@ -139,8 +139,8 @@ model Item {
 }
 
 model Project {
-  id                String  @id @default(auto()) @map("_id") @db.ObjectId
-  code              String  @unique
+  id                String     @id @default(auto()) @map("_id") @db.ObjectId
+  code              String     @unique
   insured           String?
   address           String?
   email             String?
@@ -154,4 +154,26 @@ model Project {
   dateAttended      String?
   lockBoxCode       String?
   notes             String?
+  materials         Material[] @relation("ProjectMaterials")
+}
+
+model Material {
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  type              String
+  description       String?
+  brand             String?
+  unitOfMeasurement String?
+  selectedQuantity  Int?
+  usedQuantity      Int?
+  costPerUnit       Float?
+  supplierName      String?
+  supplierContact   String?
+  status            String? // e.g., "ordered", "received", "in use"
+  selectedAt        DateTime  @default(now())
+  usedAt            DateTime?
+  projectCode       String
+  project           Project   @relation("ProjectMaterials", fields: [projectCode], references: [code])
+
+  @@index([type])
+  @@index([projectCode])
 }
