@@ -1,9 +1,10 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import Navbar from "@/app/components/siteNavBar";
 import FeaturedProject from "@/app/components/featured";
-import { motion } from "framer-motion";
+import { motion, useAnimation } from "framer-motion";
+import { useInView } from "react-intersection-observer";
 
 const projects = [
   {
@@ -33,27 +34,42 @@ const projects = [
 ];
 
 const FeaturedPage: React.FC = () => {
+  const { ref, inView } = useInView({
+    triggerOnce: false,
+    threshold: 0.2,
+  });
+
+  const controls = useAnimation();
+
+  useEffect(() => {
+    if (inView) {
+      controls.start("visible");
+    } else {
+      controls.start("hidden");
+    }
+  }, [controls, inView]);
+
   const handlePortalClick = () => {
     // Define the logic for the Employee Portal click here
   };
 
   return (
-    <motion.div
-      className="bg-gray-800 py-12"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.5 }}
-    >
+    <div className="bg-gray-800 py-12">
       <Navbar onPortalClick={handlePortalClick} />
-      <motion.div
-        className="container mx-auto px-4 pt-16"
-        initial={{ opacity: 0, y: 50 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8 }}
-      >
-        <h1 className="mb-12 text-center text-5xl font-bold text-white">
+      <div className="container mx-auto px-4 pt-16">
+        <motion.h1
+          className="mb-12 text-center text-5xl font-bold text-white"
+          initial="hidden"
+          animate={controls}
+          variants={{
+            visible: { opacity: 1, y: 0 },
+            hidden: { opacity: 0, y: 50 },
+          }}
+          transition={{ duration: 0.5 }}
+          ref={ref}
+        >
           Featured Projects
-        </h1>
+        </motion.h1>
         {projects.map((project, index) => (
           <FeaturedProject
             key={index}
@@ -63,8 +79,8 @@ const FeaturedPage: React.FC = () => {
             afterImages={project.afterImages}
           />
         ))}
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 };
 
