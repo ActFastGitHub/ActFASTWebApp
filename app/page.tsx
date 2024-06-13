@@ -14,40 +14,42 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
 export default function Home() {
-	const { data: session, status } = useSession();
-	const router = useRouter();
+  const { data: session, status } = useSession();
+  const router = useRouter();
 
-	const [showModal, setShowModal] = useState(false);
-	const [isMounted, setisMounted] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
-	useEffect(() => {
-		if (status !== "loading" && !session) {
-			router.push("/");
-		}
-		if (session?.user.isNewUser) {
-			router.push("/create-profile");
-		}
-		setisMounted(true);
-	}, [session, status, router]);
+  useEffect(() => {
+    if (status === "loading") return;
 
-	const handlePortalClick = () => {
-		setShowModal(true);
-	};
+    if (!session) {
+      router.push("/");
+    } else if (session.user.isNewUser) {
+      router.push("/create-profile");
+    }
 
-	const handleCloseModal = () => {
-		setShowModal(false);
-	};
+    setIsMounted(true);
+  }, [session, status, router]);
 
-	return (
-		<div className='relative'>
-			<div className={`${showModal ? "blur-sm" : ""}`}>
-				<HeroSection onPortalClick={handlePortalClick} />
-				<ServicesSection />
-				<AboutSection />
-				<TestimonialsSection />
-				<Footer />
-			</div>
-			<Modal showModal={showModal} onClose={handleCloseModal} />
-		</div>
-	);
+  const handlePortalClick = () => {
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+  };
+
+  return (
+    <div className="relative">
+      <div className={`${showModal ? "blur-sm" : ""}`}>
+        <HeroSection onPortalClick={handlePortalClick} />
+        <ServicesSection />
+        <AboutSection />
+        <TestimonialsSection />
+        <Footer />
+      </div>
+      {isMounted && <Modal showModal={showModal} onClose={handleCloseModal} />}
+    </div>
+  );
 }
