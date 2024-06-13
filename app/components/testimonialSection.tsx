@@ -7,6 +7,8 @@ import "swiper/css/effect-coverflow";
 import "swiper/css/pagination";
 import { EffectCoverflow, Pagination, Autoplay } from "swiper/modules";
 import axios from "axios";
+import { motion, useAnimation } from "framer-motion";
+import { useInView } from "react-intersection-observer";
 
 interface Testimonial {
 	name: string;
@@ -25,21 +27,22 @@ const StarRating: React.FC<StarRatingProps> = ({ rating }) => {
 	const emptyStars = 5 - fullStars - (halfStar ? 1 : 0);
 
 	return (
-		<div className='flex justify-center mb-4'>
+		<div className="flex justify-center mb-4">
 			{Array(fullStars)
 				.fill(0)
 				.map((_, index) => (
 					<svg
 						key={`full-${index}`}
-						className='w-4 h-4 text-yellow-400'
-						fill='currentColor'
-						viewBox='0 0 20 20'>
-						<path d='M9.049 2.927C9.3 2.386 9.97 2.386 10.221 2.927l1.91 3.865 4.292.623c.602.087.842.828.406 1.26l-3.1 3.018.731 4.257c.103.6-.526 1.058-1.05.776L10 15.347l-3.82 2.007c-.523.282-1.153-.176-1.05-.776l.731-4.257-3.1-3.018c-.436-.432-.196-1.173.406-1.26l4.292-.623 1.91-3.865z' />
+						className="w-4 h-4 text-yellow-400"
+						fill="currentColor"
+						viewBox="0 0 20 20"
+					>
+						<path d="M9.049 2.927C9.3 2.386 9.97 2.386 10.221 2.927l1.91 3.865 4.292.623c.602.087.842.828.406 1.26l-3.1 3.018.731 4.257c.103.6-.526 1.058-1.05.776L10 15.347l-3.82 2.007c-.523.282-1.153-.176-1.05-.776l.731-4.257-3.1-3.018c-.436-.432-.196-1.173.406-1.26l4.292-.623 1.91-3.865z" />
 					</svg>
 				))}
 			{halfStar && (
-				<svg className='w-4 h-4 text-yellow-400' fill='currentColor' viewBox='0 0 20 20'>
-					<path d='M9.049 2.927C9.3 2.386 9.97 2.386 10.221 2.927l1.91 3.865 4.292.623c.602.087.842.828.406 1.26l-3.1 3.018.731 4.257c.103.6-.526 1.058-1.05.776L10 15.347l-3.82 2.007c-.523.282-1.153-.176-1.05-.776l.731-4.257-3.1-3.018c-.436-.432-.196-1.173.406-1.26l4.292-.623 1.91-3.865z' />
+				<svg className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+					<path d="M9.049 2.927C9.3 2.386 9.97 2.386 10.221 2.927l1.91 3.865 4.292.623c.602.087.842.828.406 1.26l-3.1 3.018.731 4.257c.103.6-.526 1.058-1.05.776L10 15.347l-3.82 2.007c-.523.282-1.153-.176-1.05-.776l.731-4.257-3.1-3.018c-.436-.432-.196-1.173.406-1.26l4.292-.623 1.91-3.865z" />
 				</svg>
 			)}
 			{Array(emptyStars)
@@ -47,10 +50,11 @@ const StarRating: React.FC<StarRatingProps> = ({ rating }) => {
 				.map((_, index) => (
 					<svg
 						key={`empty-${index}`}
-						className='w-4 h-4 text-gray-400'
-						fill='currentColor'
-						viewBox='0 0 20 20'>
-						<path d='M9.049 2.927C9.3 2.386 9.97 2.386 10.221 2.927l1.91 3.865 4.292.623c.602.087.842.828.406 1.26l-3.1 3.018.731 4.257c.103.6-.526 1.058-1.05.776L10 15.347l-3.82 2.007c-.523.282-1.153-.176-1.05-.776l.731-4.257-3.1-3.018c-.436-.432-.196-1.173.406-1.26l4.292-.623 1.91-3.865z' />
+						className="w-4 h-4 text-gray-400"
+						fill="currentColor"
+						viewBox="0 0 20 20"
+					>
+						<path d="M9.049 2.927C9.3 2.386 9.97 2.386 10.221 2.927l1.91 3.865 4.292.623c.602.087.842.828.406 1.26l-3.1 3.018.731 4.257c.103.6-.526 1.058-1.05.776L10 15.347l-3.82 2.007c-.523.282-1.153-.176-1.05-.776l.731-4.257-3.1-3.018c-.436-.432-.196-1.173.406-1.26l4.292-.623 1.91-3.865z" />
 					</svg>
 				))}
 		</div>
@@ -70,18 +74,18 @@ const TruncatedText: React.FC<TruncatedTextProps> = ({ text, maxLength }) => {
 	};
 
 	return (
-		<div className='text-xl font-semibold mb-4 overflow-auto break-words'>
+		<div className="text-xl font-semibold mb-4 overflow-auto break-words">
 			{isTruncated ? (
 				<>
 					{text.slice(0, maxLength)}...
-					<span className='text-blue-500 cursor-pointer ml-1' onClick={toggleTruncate}>
+					<span className="text-blue-500 cursor-pointer ml-1" onClick={toggleTruncate}>
 						Read more
 					</span>
 				</>
 			) : (
 				<>
 					{text}
-					<span className='text-blue-500 cursor-pointer ml-1' onClick={toggleTruncate}>
+					<span className="text-blue-500 cursor-pointer ml-1" onClick={toggleTruncate}>
 						Show less
 					</span>
 				</>
@@ -92,6 +96,13 @@ const TruncatedText: React.FC<TruncatedTextProps> = ({ text, maxLength }) => {
 
 const TestimonialsSection: React.FC = () => {
 	const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+
+	const { ref, inView } = useInView({
+		triggerOnce: false,
+		threshold: 0.2,
+	});
+
+	const controls = useAnimation();
 
 	useEffect(() => {
 		const fetchReviews = async () => {
@@ -106,10 +117,29 @@ const TestimonialsSection: React.FC = () => {
 		fetchReviews();
 	}, []);
 
+	useEffect(() => {
+		if (inView) {
+			controls.start("visible");
+		} else {
+			controls.start("hidden");
+		}
+	}, [controls, inView]);
+
 	return (
-		<section className='py-12 bg-gray-800'>
-			<div className='container mx-auto px-4'>
-				<h2 className='text-5xl font-bold text-center text-white mb-8'>Testimonials</h2>
+		<section className="py-12 bg-gray-800" ref={ref}>
+			<div className="container mx-auto px-4">
+				<motion.h2
+					className="text-5xl font-bold text-center text-white mb-8"
+					initial="hidden"
+					animate={controls}
+					variants={{
+						visible: { opacity: 1, y: 0 },
+						hidden: { opacity: 0, y: -50 },
+					}}
+					transition={{ duration: 0.5 }}
+				>
+					Testimonials
+				</motion.h2>
 				<Swiper
 					effect={"coverflow"}
 					grabCursor={true}
@@ -118,41 +148,51 @@ const TestimonialsSection: React.FC = () => {
 					loop={true}
 					breakpoints={{
 						640: {
-							slidesPerView: 1
+							slidesPerView: 1,
 						},
 						768: {
-							slidesPerView: 2
+							slidesPerView: 2,
 						},
 						1024: {
-							slidesPerView: 3
-						}
+							slidesPerView: 3,
+						},
 					}}
 					coverflowEffect={{
 						rotate: 50,
 						stretch: 0,
 						depth: 100,
 						modifier: 1,
-						slideShadows: false
+						slideShadows: false,
 					}}
 					autoplay={{
 						delay: 2500,
-						disableOnInteraction: true
+						disableOnInteraction: true,
 					}}
 					pagination={false}
 					modules={[EffectCoverflow, Pagination, Autoplay]}
-					className='mySwiper'>
+					className="mySwiper"
+				>
 					{testimonials.map((testimonial, index) => (
 						<SwiperSlide key={index}>
-							<div className='bg-white p-6 shadow-2xl rounded text-center max-w-md mx-auto overflow-auto'>
+							<motion.div
+								className="bg-white p-6 shadow-2xl rounded text-center max-w-md mx-auto overflow-auto"
+								initial="hidden"
+								animate={controls}
+								variants={{
+									visible: { opacity: 1, y: 0 },
+									hidden: { opacity: 0, y: 50 },
+								}}
+								transition={{ duration: 0.5, delay: index * 0.2 }}
+							>
 								<img
 									src={testimonial.image}
 									alt={testimonial.name}
-									className='w-16 h-16 rounded-full mx-auto mb-4'
+									className="w-16 h-16 rounded-full mx-auto mb-4"
 								/>
 								<StarRating rating={testimonial.rating} />
 								<TruncatedText text={testimonial.feedback} maxLength={100} />
-								<p className='text-gray-600'>- {testimonial.name}</p>
-							</div>
+								<p className="text-gray-600">- {testimonial.name}</p>
+							</motion.div>
 						</SwiperSlide>
 					))}
 				</Swiper>
