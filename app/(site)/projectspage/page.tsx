@@ -140,15 +140,13 @@ const ViewAllProjects = () => {
   const updateProject = async (projectId: string, e: FormEvent) => {
     e.preventDefault();
     setDisabled(true);
-    toast.loading("Updating project...", {
-      duration: 4000,
-    });
-
+    const loadingToastId = toast.loading("Updating project...");
+  
     try {
-      const response = await axios.patch(
-        "/api/projects",
-        editProjectData[projectId],
-      );
+      const response = await axios.patch("/api/projects", editProjectData[projectId]);
+  
+      toast.dismiss(loadingToastId);
+  
       if (response.data.status !== 200) {
         const errorMessage = response.data?.message || "An error occurred";
         toast.error(errorMessage);
@@ -156,13 +154,44 @@ const ViewAllProjects = () => {
       } else {
         toast.success("Project successfully updated");
         setTimeout(() => {
-          toast.dismiss();
           window.location.reload();
         }, 2000);
       }
     } catch (error) {
       console.error("Error updating project:", error);
+      toast.dismiss(loadingToastId);
       toast.error("An error occurred while updating the project.");
+      setTimeout(() => setDisabled(false), 2000);
+    }
+  };  
+
+  const deleteProject = async (projectId: string) => {
+    setDisabled(true);
+    const loadingToastId = toast.loading("Deleting project...");
+
+    try {
+      const response = await axios.delete("/api/projects", {
+        data: { id: projectId },
+      });
+
+      toast.dismiss(loadingToastId);
+
+      if (response.data.status === 200) {
+        toast.success("Project deleted successfully");
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      } else {
+        toast.error(
+          response.data.message ||
+            "An error occurred while deleting the project.",
+        );
+        setTimeout(() => setDisabled(false), 2000);
+      }
+    } catch (error) {
+      console.error("Error deleting project:", error);
+      toast.dismiss(loadingToastId);
+      toast.error("An error occurred while deleting the project.");
       setTimeout(() => setDisabled(false), 2000);
     }
   };
@@ -216,7 +245,23 @@ const ViewAllProjects = () => {
                 <div className="mx-auto w-full max-w-lg rounded-lg bg-white p-6 shadow-lg">
                   <div className="flex flex-col items-center">
                     <div className="mt-4 text-center">
-                      <div className="text-2xl font-bold">{project?.code}</div>
+                      <div className="text-2xl font-bold">
+                        {editableProjectId === project?.id ? (
+                          <input
+                            type="text"
+                            name="code"
+                            value={
+                              editProjectData[project?.id]?.code ||
+                              project?.code ||
+                              ""
+                            }
+                            onChange={(e) => handleChange(e, project?.id!)}
+                            className="ml-2 w-full rounded border px-2 py-1"
+                          />
+                        ) : (
+                          project?.code
+                        )}
+                      </div>
                       <p className="text-gray-600">{project?.address}</p>
                     </div>
                     <div className="mt-6 w-full space-y-4">
@@ -476,6 +521,13 @@ const ViewAllProjects = () => {
                           {editableProjectId === project?.id
                             ? "Cancel Editing"
                             : "Edit Project"}
+                        </button>
+                        <button
+                          className="w-full rounded bg-red-500 py-2 font-bold text-white hover:bg-red-600"
+                          onClick={() => deleteProject(project?.id!)}
+                          disabled={disabled}
+                        >
+                          Delete Project
                         </button>
                       </div>
                     )}

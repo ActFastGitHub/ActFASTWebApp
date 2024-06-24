@@ -80,9 +80,7 @@ const EditProfile: React.FC<EditProfileFormProps> = ({
   const updateProfile = async (e: FormEvent) => {
     e.preventDefault();
     setDisabled(true);
-    toast.loading("Updating your profile...", {
-      duration: 4000,
-    });
+    const loadingToastId = toast.loading("Updating your profile...");
 
     const selectedFeature = location?.features[0];
 
@@ -101,17 +99,26 @@ const EditProfile: React.FC<EditProfileFormProps> = ({
       image: imageBase64,
     };
 
-    const response = await axios.patch(`api/user/profile`, requestBody);
-    if (response.data.status !== 200) {
-      const errorMessage = response.data?.error || "An error occurred";
-      toast.error(errorMessage);
+    try {
+      const response = await axios.patch(`api/user/profile`, requestBody);
+
+      toast.dismiss(loadingToastId);
+
+      if (response.data.status !== 200) {
+        const errorMessage = response.data?.error || "An error occurred";
+        toast.error(errorMessage);
+        setTimeout(() => setDisabled(false), 2000);
+      } else {
+        toast.success("Profile successfully updated");
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      }
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      toast.dismiss(loadingToastId);
+      toast.error("An error occurred while updating your profile.");
       setTimeout(() => setDisabled(false), 2000);
-    } else {
-      toast.success("Profile successfully updated");
-      setTimeout(() => {
-        toast.dismiss();
-        window.location.reload();
-      }, 2000);
     }
   };
 

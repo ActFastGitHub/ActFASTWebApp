@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     if (!code) {
       return NextResponse.json({
         status: 400,
-        error: "Project code is required",
+        message: "Project code is required",
       });
     }
 
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     if (await isProjectCodeExist(normalizedCode)) {
       return NextResponse.json({
         status: 409,
-        error: "Project code already exists",
+        message: "Project code already exists",
       });
     }
 
@@ -82,25 +82,23 @@ export async function PATCH(request: Request) {
 
     const { id, code, ...data } = await request.json();
 
-    if (!id) {
+    if (!code) {
       return NextResponse.json({
         status: 400,
-        error: "Project ID is required",
+        message: "Project code is required",
       });
     }
 
-    if (code) {
-      const normalizedCode = code.trim().toUpperCase();
+    const normalizedCode = code.trim().toUpperCase();
 
-      if (await isProjectCodeExist(normalizedCode, id)) {
-        return NextResponse.json({
-          status: 409,
-          error: "Project code already exists",
-        });
-      }
-
-      data.code = normalizedCode;
+    if (await isProjectCodeExist(normalizedCode, id)) {
+      return NextResponse.json({
+        status: 409,
+        message: "Project code already exists",
+      });
     }
+
+    data.code = normalizedCode;
 
     const updatedProject = await prisma.project.update({
       where: { id },
@@ -112,7 +110,38 @@ export async function PATCH(request: Request) {
     const { code = 500, message = "internal server error" } = error as APIErr;
     return NextResponse.json({
       status: code,
-      error: message,
+      message: message,
+    });
+  }
+}
+
+// DELETE
+export async function DELETE(request: Request) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ status: 401, error: "Unauthorized" });
+    }
+
+    const { id } = await request.json();
+
+    if (!id) {
+      return NextResponse.json({
+        status: 400,
+        message: "Project ID is required",
+      });
+    }
+
+    await prisma.project.delete({
+      where: { id },
+    });
+
+    return NextResponse.json({ status: 200, message: "Project deleted successfully" });
+  } catch (error) {
+    const { code = 500, message = "internal server error" } = error as APIErr;
+    return NextResponse.json({
+      status: code,
+      message: message,
     });
   }
 }
