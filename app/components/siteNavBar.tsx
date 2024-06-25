@@ -40,9 +40,9 @@ const Navbar: React.FC<NavbarProps> = ({ onPortalClick }) => {
 
   return (
     <nav className="fixed left-0 right-0 top-0 z-10 bg-black bg-opacity-50">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-2 sm:px-4 lg:px-6">
         <div className="flex h-16 items-center justify-between">
-          <div className="flex items-center">
+          <div className="flex items-center space-x-4">
             <div className="flex-shrink-0">
               <Link href="/">
                 <img
@@ -93,28 +93,34 @@ const Navbar: React.FC<NavbarProps> = ({ onPortalClick }) => {
             </button>
           </div>
           <div className="hidden md:block">
-            <div className="ml-10 flex items-baseline space-x-4">
+            <div className="ml-6 flex items-baseline space-x-4">
               <Link
                 href="/"
-                className="rounded-md px-3 py-2 text-sm font-medium text-gray-300 hover:text-white"
+                className="rounded-md px-2 py-2 text-sm font-medium text-gray-300 hover:text-white"
               >
                 Home
               </Link>
               <Link
                 href="/under-construction"
-                className="rounded-md px-3 py-2 text-sm font-medium text-gray-300 hover:text-white"
+                className="rounded-md px-2 py-2 text-sm font-medium text-gray-300 hover:text-white"
               >
                 Services
               </Link>
               <Link
                 href="/featured"
-                className="rounded-md px-3 py-2 text-sm font-medium text-gray-300 hover:text-white"
+                className="rounded-md px-2 py-2 text-sm font-medium text-gray-300 hover:text-white"
               >
                 Featured
               </Link>
+              <Link
+                href="/teampage"
+                className="rounded-md px-2 py-2 text-sm font-medium text-gray-300 hover:text-white"
+              >
+                Meet Our Team
+              </Link>
               <button
                 onClick={handlePortalClick}
-                className="rounded-md px-3 py-2 text-sm font-medium text-gray-300 hover:text-white"
+                className="rounded-md px-2 py-2 text-sm font-medium text-gray-300 hover:text-white"
               >
                 Employee Portal
               </button>
@@ -143,6 +149,12 @@ const Navbar: React.FC<NavbarProps> = ({ onPortalClick }) => {
               className="block rounded-md px-3 py-2 text-base font-medium text-gray-300 hover:text-white"
             >
               Featured
+            </Link>
+            <Link
+              href="/teampage"
+              className="block rounded-md px-3 py-2 text-base font-medium text-gray-300 hover:text-white"
+            >
+              Meet Our Team
             </Link>
             <button
               onClick={handlePortalClick}
