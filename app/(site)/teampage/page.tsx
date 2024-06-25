@@ -20,7 +20,7 @@ interface TeamSection {
 const upperManagement: TeamMember[] = [
   {
     name: "Carlo Bernabe",
-    role: "General Manager",
+    role: "Project Manager",
     description: "Visionary leader with over 20 years of experience.",
   },
   {
@@ -34,7 +34,7 @@ const upperManagement: TeamMember[] = [
     description: "Focused on delivering projects on time and within budget.",
   },
   {
-    name: "DJ",
+    name: "DJ Lopez",
     role: "Construction Manager",
     description: "Oversees all on-site operations ensuring safety and quality.",
   },
@@ -45,7 +45,7 @@ const upperManagement: TeamMember[] = [
   },
   {
     name: "Mac De Guzman",
-    role: "Purchasing / Project Manager",
+    role: "Project Coordinator",
     description: "Manages procurement and project schedules effectively.",
   },
   {
@@ -55,44 +55,43 @@ const upperManagement: TeamMember[] = [
   },
   {
     name: "Girlie Atienza",
-    role: "Accounting / Payroll Manager",
+    role: "Controller",
     description: "Ensures accurate and timely financial operations.",
   },
   {
-    name: "Jerry",
-    role: "Accounting Assistant",
+    name: "Jerry Sumagui",
+    role: "Controller Assistant",
     description: "Supports the accounting team with daily financial tasks.",
   },
   {
-    name: "Angelo",
+    name: "Angelo Guerra",
     role: "NR Specialist / IT Support Analyst / Web Developer",
-    description:
-      "Versatile professional handling IT and web development needs.",
+    description: "Versatile professional handling IT and web development needs.",
   },
 ];
 
 const teamMembers: TeamSection[] = [
   {
-    role: "Contents Team",
+    role: "Team Members",
     members: [
       {
-        name: "Lyn",
+        name: "Lyn De La Torre",
         description: "Skilled in content creation and management.",
       },
       {
-        name: "Beth",
+        name: "Elizabeth Jose",
         description: "Expert in crafting engaging and informative content.",
       },
       {
-        name: "Julia",
+        name: "Julia Pascua",
         description: "Specializes in multimedia content production.",
       },
       {
-        name: "Lisa",
+        name: "Lisa Dizon",
         description: "Focuses on content strategy and implementation.",
       },
       {
-        name: "Lorena",
+        name: "Lorena ",
         description: "Ensures content quality and consistency.",
       },
       {
@@ -100,52 +99,27 @@ const teamMembers: TeamSection[] = [
         description: "Dedicated team member ensuring excellence in all tasks.",
       },
     ],
-    description:
-      "The Contents Team is responsible for creating and managing all content.",
+    description: "The Contents Team is responsible for creating and managing all content.",
   },
-//   {
-//     role: "Mustang",
-//     members: [
-//       {
-//         name: "Vivian",
-//         description: "Dedicated team member ensuring excellence in all tasks.",
-//       },
-//     ],
-//     description: "Mustang team handles special projects with high priority.",
-//   },
   {
     role: "Emergency Team",
     members: [
       { name: "CK", description: "Quick to respond to any emergencies." },
       { name: "Theo", description: "Expert in handling critical situations." },
       { name: "Ricco", description: "Ensures safety and prompt response." },
-      {
-        name: "Julius",
-        description: "Reliable and efficient in emergency responses.",
-      },
+      { name: "Julius", description: "Reliable and efficient in emergency responses." },
     ],
-    description:
-      "The Emergency Team is always ready to handle urgent situations.",
+    description: "The Emergency Team is always ready to handle urgent situations.",
   },
   {
     role: "Logistics Team",
     members: [
       { name: "George", description: "Coordinates logistics with precision." },
-      {
-        name: "Keenan",
-        description: "Ensures smooth transportation and delivery.",
-      },
-      {
-        name: "Lito",
-        description: "Manages logistics operations effectively.",
-      },
-      {
-        name: "Jhon",
-        description: "Supports the team with logistics planning.",
-      },
+      { name: "Keenan", description: "Ensures smooth transportation and delivery." },
+      { name: "Lito", description: "Manages logistics operations effectively." },
+      { name: "Jhon", description: "Supports the team with logistics planning." },
     ],
-    description:
-      "The Logistics Team handles all transportation and delivery needs.",
+    description: "The Logistics Team handles all transportation and delivery needs.",
   },
   {
     role: "Final Repairs Team",
@@ -153,24 +127,16 @@ const teamMembers: TeamSection[] = [
       { name: "Fred", description: "Expert in final touch-ups and repairs." },
       { name: "Jes", description: "Ensures high-quality final repairs." },
       { name: "Jomel", description: "Specializes in detailed repair work." },
-      {
-        name: "Kenneth",
-        description: "Focused on delivering flawless final repairs.",
-      },
+      { name: "Kenneth", description: "Focused on delivering flawless final repairs." },
     ],
-    description:
-      "The Final Repairs Team ensures that everything is perfect before project completion.",
+    description: "The Final Repairs Team ensures that everything is perfect before project completion.",
   },
   {
     role: "Automotive Specialist",
     members: [
-      {
-        name: "JunC",
-        description: "Expert in automotive repair and maintenance.",
-      },
+      { name: "JunC", description: "Expert in automotive repair and maintenance." },
     ],
-    description:
-      "Our Automotive Specialist takes care of all vehicle-related issues.",
+    description: "Our Automotive Specialist takes care of all vehicle-related issues.",
   },
 ];
 
@@ -179,10 +145,10 @@ const roleColors: { [key: string]: string } = {
   "Project Manager": "bg-green-500",
   "Project Coordinator": "bg-yellow-500",
   "Purchasing / Project Manager": "bg-indigo-500",
-  "Accounting / Payroll Manager": "bg-pink-500",
-  "Purchasing Officer": "bg-purple-500",
+  "Controller": "bg-pink-500",
+  "Purchasing Officer": "bg-indigo-500",
   "Construction Manager": "bg-red-500",
-  "Accounting Assistant": "bg-teal-500",
+  "Controller Assistant": "bg-teal-500",
   "NR Specialist / IT Support Analyst / Web Developer": "bg-pink-700",
   "Contents Team": "bg-orange-500",
   "Mustang": "bg-gray-500",
@@ -190,6 +156,7 @@ const roleColors: { [key: string]: string } = {
   "Logistics Team": "bg-green-700",
   "Final Repairs Team": "bg-yellow-700",
   "Automotive Specialist": "bg-indigo-700",
+  "Team Members": "bg-red-500"
 };
 
 const useDoubleTapToTop = () => {
@@ -249,7 +216,7 @@ const MeetTheTeamPage: React.FC = () => {
 
   const getGridClasses = (length: number) => {
     if (length === 1) return "justify-center";
-    if (length === 2) return "justify-center sm:grid-cols-2";
+    if (length === 10) return "justify-center sm:grid-cols-5";
     return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3";
   };
 
@@ -259,6 +226,8 @@ const MeetTheTeamPage: React.FC = () => {
   const nonOwnerManagement = upperManagement.filter(
     (member) => member.role !== "General Manager",
   );
+
+  const getImagePath = (name: string) => `/images/team/${name.toLowerCase().replace(/ /g, '_')}.jpg`;
 
   return (
     <div className="bg-gray-900 py-16">
@@ -319,7 +288,8 @@ const MeetTheTeamPage: React.FC = () => {
               <div className="flex flex-col items-center">
                 <div className="mb-4 h-32 w-32 overflow-hidden rounded-full bg-gray-200 shadow-2xl">
                   <img
-                    src="/path/to/image.jpg"
+                    src={getImagePath(owner.name)}
+                    alt={owner.name}
                     className="h-full w-full object-cover"
                   />
                 </div>
@@ -367,7 +337,8 @@ const MeetTheTeamPage: React.FC = () => {
                   <div className="flex flex-col items-center">
                     <div className="mb-4 h-24 w-24 overflow-hidden rounded-full bg-gray-200 shadow-2xl">
                       <img
-                        src="/path/to/image.jpg"
+                        src={getImagePath(member.name)}
+                        alt={member.name}
                         className="h-full w-full object-cover"
                       />
                     </div>
@@ -443,16 +414,17 @@ const MeetTheTeamPage: React.FC = () => {
                     >
                       <div className="mb-4 h-24 w-24 overflow-hidden rounded-full bg-gray-200 shadow-xl">
                         <img
-                          src="/path/to/image.jpg"
+                          src={getImagePath(member.name)}
+                          alt={member.name}
                           className="h-full w-full object-cover"
                         />
                       </div>
                       <p className="text-lg font-semibold text-white">
                         {member.name}
                       </p>
-                      <div className="mt-2 rounded-lg bg-white px-3 py-2 text-sm text-gray-800 shadow-md">
+                      {/* <div className="mt-2 rounded-lg bg-white px-3 py-2 text-sm text-gray-800 shadow-md">
                         {member.description}
-                      </div>
+                      </div> */}
                     </motion.div>
                   );
                 })}
