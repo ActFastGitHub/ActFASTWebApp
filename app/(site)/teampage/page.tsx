@@ -11,12 +11,6 @@ interface TeamMember {
   description: string;
 }
 
-interface TeamSection {
-  role: string;
-  members: { name: string; description: string }[];
-  description: string;
-}
-
 const upperManagement: TeamMember[] = [
   {
     name: "Carlo Bernabe",
@@ -70,93 +64,125 @@ const upperManagement: TeamMember[] = [
   },
 ];
 
-const teamMembers: TeamSection[] = [
+const teamMembers: TeamMember[] = [
   {
-    role: "Team Members",
-    members: [
-      {
-        name: "Lyn De La Torre",
-        description: "Skilled in content creation and management.",
-      },
-      {
-        name: "Elizabeth Jose",
-        description: "Expert in crafting engaging and informative content.",
-      },
-      {
-        name: "Julia Pascua",
-        description: "Specializes in multimedia content production.",
-      },
-      {
-        name: "Lisa Dizon",
-        description: "Focuses on content strategy and implementation.",
-      },
-      {
-        name: "Lorena ",
-        description: "Ensures content quality and consistency.",
-      },
-      {
-        name: "Vivian",
-        description: "Dedicated team member ensuring excellence in all tasks.",
-      },
-    ],
-    description: "The Contents Team is responsible for creating and managing all content.",
+    name: "Ricco",
+    role: "Team Member",
+    description: "",
   },
   {
-    role: "Emergency Team",
-    members: [
-      { name: "CK", description: "Quick to respond to any emergencies." },
-      { name: "Theo", description: "Expert in handling critical situations." },
-      { name: "Ricco", description: "Ensures safety and prompt response." },
-      { name: "Julius", description: "Reliable and efficient in emergency responses." },
-    ],
-    description: "The Emergency Team is always ready to handle urgent situations.",
+    name: "Fred",
+    role: "Team Member",
+    description: "",
   },
   {
-    role: "Logistics Team",
-    members: [
-      { name: "George", description: "Coordinates logistics with precision." },
-      { name: "Keenan", description: "Ensures smooth transportation and delivery." },
-      { name: "Lito", description: "Manages logistics operations effectively." },
-      { name: "Jhon", description: "Supports the team with logistics planning." },
-    ],
-    description: "The Logistics Team handles all transportation and delivery needs.",
+    name: "Jes",
+    role: "Team Member",
+    description: "",
   },
   {
-    role: "Final Repairs Team",
-    members: [
-      { name: "Fred", description: "Expert in final touch-ups and repairs." },
-      { name: "Jes", description: "Ensures high-quality final repairs." },
-      { name: "Jomel", description: "Specializes in detailed repair work." },
-      { name: "Kenneth", description: "Focused on delivering flawless final repairs." },
-    ],
-    description: "The Final Repairs Team ensures that everything is perfect before project completion.",
+    name: "Kenneth",
+    role: "Team Member",
+    description: "",
   },
   {
-    role: "Automotive Specialist",
-    members: [
-      { name: "JunC", description: "Expert in automotive repair and maintenance." },
-    ],
-    description: "Our Automotive Specialist takes care of all vehicle-related issues.",
+    name: "Theo",
+    role: "Team Member",
+    description: "",
+  },
+  {
+    name: "Julia",
+    role: "Team Member",
+    description: "",
+  },
+  {
+    name: "Beth",
+    role: "Team Member",
+    description: "",
+  },
+  {
+    name: "Lyn",
+    role: "Team Member",
+    description: "",
+  },
+  {
+    name: "George",
+    role: "Team Member",
+    description: "",
+  },
+  {
+    name: "Chriskie",
+    role: "Team Member",
+    description: "",
+  },
+  {
+    name: "Keenan",
+    role: "Team Member",
+    description: "",
+  },
+  {
+    name: "Jun C",
+    role: "Team Member",
+    description: "",
+  },
+  {
+    name: "Julius",
+    role: "Team Member",
+    description: "",
+  },
+  {
+    name: "Lisa",
+    role: "Team Member",
+    description: "",
+  },
+  {
+    name: "Lito",
+    role: "Team Member",
+    description: "",
+  },
+  {
+    name: "Lorena",
+    role: "Team Member",
+    description: "",
+  },
+  {
+    name: "Vivian",
+    role: "Team Member",
+    description: "",
+  },
+  {
+    name: "Jomil",
+    role: "Team Member",
+    description: "",
+  },
+  {
+    name: "Ben",
+    role: "Team Member",
+    description: "",
+  },
+  {
+    name: "Kennedy",
+    role: "Team Member",
+    description: "",
+  },
+  {
+    name: "Jhoanasses",
+    role: "Team Member",
+    description: "",
   },
 ];
 
 const roleColors: { [key: string]: string } = {
   "General Manager": "bg-blue-500",
-  "Project Manager": "bg-green-500",
+  "Project Manager": "bg-cyan-500",
   "Project Coordinator": "bg-yellow-500",
   "Purchasing / Project Manager": "bg-indigo-500",
   "Controller": "bg-pink-500",
-  "Purchasing Officer": "bg-indigo-500",
-  "Construction Manager": "bg-red-500",
+  "Purchasing Officer": "bg-purple-500",
+  "Construction Manager": "bg-blue-500",
   "Controller Assistant": "bg-teal-500",
-  "NR Specialist / IT Support Analyst / Web Developer": "bg-pink-700",
-  "Contents Team": "bg-orange-500",
-  "Mustang": "bg-gray-500",
-  "Emergency Team": "bg-blue-700",
-  "Logistics Team": "bg-green-700",
-  "Final Repairs Team": "bg-yellow-700",
-  "Automotive Specialist": "bg-indigo-700",
-  "Team Members": "bg-red-500"
+  "NR Specialist / IT Support Analyst / Web Developer": "bg-lime-500",
+  "Team Member": "bg-orange-500",
 };
 
 const useDoubleTapToTop = () => {
@@ -257,15 +283,12 @@ const MeetTheTeamPage: React.FC = () => {
               >
                 Office Team
               </li>
-              {teamMembers.map((section, index) => (
-                <li
-                  key={index}
-                  onClick={() => scrollToSection(section.role)}
-                  className="cursor-pointer"
-                >
-                  {section.role}
-                </li>
-              ))}
+              <li
+                onClick={() => scrollToSection("team-members")}
+                className="cursor-pointer"
+              >
+                Team Members
+              </li>
             </ul>
           </div>
         )}
@@ -357,81 +380,67 @@ const MeetTheTeamPage: React.FC = () => {
             })}
           </div>
         </section>
-        {teamMembers.map((teamSection, sectionIndex) => (
-          <section
-            id={teamSection.role}
-            key={sectionIndex}
-            className="mt-16 space-y-12"
+        <section id="team-members" className="mt-16 space-y-12">
+          <motion.div
+            className="text-center text-3xl font-bold text-white"
+            initial="hidden"
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
           >
-            <motion.div
-              className="text-center text-3xl font-bold text-white"
-              initial="hidden"
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
+            Team Members
+          </motion.div>
+          <motion.div
+            className={`rounded-lg p-6 shadow-lg ${roleColors["Team Member"]}`}
+            initial="hidden"
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
+            <h2 className="mb-4 text-center text-2xl font-bold text-white">
+              Team Members
+            </h2>
+            <div
+              className={`grid gap-4 ${getGridClasses(teamMembers.length)}`}
             >
-              {teamSection.role}
-            </motion.div>
-            <motion.div
-              className={`rounded-lg p-6 shadow-lg ${roleColors[teamSection.role]}`}
-              initial="hidden"
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: sectionIndex * 0.2 }}
-            >
-              <h2 className="mb-4 text-center text-2xl font-bold text-white">
-                {teamSection.role}
-              </h2>
-              <p className="mb-4 text-center text-sm text-white">
-                {teamSection.description}
-              </p>
-              <div
-                className={`grid gap-4 ${getGridClasses(
-                  teamSection.members.length,
-                )}`}
-              >
-                {teamSection.members.map((member, memberIndex) => {
-                  const controls = useAnimation();
-                  const ref = useRef<HTMLDivElement>(null);
-                  const inView = useInView(ref);
+              {teamMembers.map((member, memberIndex) => {
+                const controls = useAnimation();
+                const ref = useRef<HTMLDivElement>(null);
+                const inView = useInView(ref);
 
-                  useEffect(() => {
-                    if (inView) {
-                      controls.start("visible");
-                    } else {
-                      controls.start("hidden");
-                    }
-                  }, [controls, inView]);
+                useEffect(() => {
+                  if (inView) {
+                    controls.start("visible");
+                  } else {
+                    controls.start("hidden");
+                  }
+                }, [controls, inView]);
 
-                  return (
-                    <motion.div
-                      key={memberIndex}
-                      className="flex flex-col items-center text-center"
-                      initial="hidden"
-                      animate={controls}
-                      variants={animationVariants}
-                      transition={{ duration: 0.5, delay: memberIndex * 0.2 }}
-                      whileHover="hover"
-                      ref={ref}
-                    >
-                      <div className="mb-4 h-24 w-24 overflow-hidden rounded-full bg-gray-200 shadow-xl">
-                        <img
-                          src={getImagePath(member.name)}
-                          alt={member.name}
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-                      <p className="text-lg font-semibold text-white">
-                        {member.name}
-                      </p>
-                      {/* <div className="mt-2 rounded-lg bg-white px-3 py-2 text-sm text-gray-800 shadow-md">
-                        {member.description}
-                      </div> */}
-                    </motion.div>
-                  );
-                })}
-              </div>
-            </motion.div>
-          </section>
-        ))}
+                return (
+                  <motion.div
+                    key={memberIndex}
+                    className="flex flex-col items-center text-center"
+                    initial="hidden"
+                    animate={controls}
+                    variants={animationVariants}
+                    transition={{ duration: 0.5, delay: memberIndex * 0.1 }} // Adjusted delay for smoother stagger
+                    whileHover="hover"
+                    ref={ref}
+                  >
+                    <div className="mb-4 h-24 w-24 overflow-hidden rounded-full bg-gray-200 shadow-xl">
+                      <img
+                        src={getImagePath(member.name)}
+                        alt={member.name}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                    <p className="text-lg font-semibold text-white">
+                      {member.name}
+                    </p>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </motion.div>
+        </section>
       </div>
       {isMounted && <Modal showModal={showModal} onClose={handleCloseModal} />}
     </div>
