@@ -95,20 +95,24 @@ const teamMembers: TeamSection[] = [
         name: "Lorena",
         description: "Ensures content quality and consistency.",
       },
-    ],
-    description:
-      "The Contents Team is responsible for creating and managing all content.",
-  },
-  {
-    role: "Mustang",
-    members: [
       {
         name: "Vivian",
         description: "Dedicated team member ensuring excellence in all tasks.",
       },
     ],
-    description: "Mustang team handles special projects with high priority.",
+    description:
+      "The Contents Team is responsible for creating and managing all content.",
   },
+//   {
+//     role: "Mustang",
+//     members: [
+//       {
+//         name: "Vivian",
+//         description: "Dedicated team member ensuring excellence in all tasks.",
+//       },
+//     ],
+//     description: "Mustang team handles special projects with high priority.",
+//   },
   {
     role: "Emergency Team",
     members: [
@@ -249,8 +253,12 @@ const MeetTheTeamPage: React.FC = () => {
     return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3";
   };
 
-  const owner = upperManagement.find(member => member.role === "General Manager");
-  const nonOwnerManagement = upperManagement.filter(member => member.role !== "General Manager");
+  const owner = upperManagement.find(
+    (member) => member.role === "General Manager",
+  );
+  const nonOwnerManagement = upperManagement.filter(
+    (member) => member.role !== "General Manager",
+  );
 
   return (
     <div className="bg-gray-900 py-16">
@@ -329,7 +337,7 @@ const MeetTheTeamPage: React.FC = () => {
           )}
           <div
             className={`flex flex-wrap justify-center gap-8 ${getGridClasses(
-              nonOwnerManagement.length
+              nonOwnerManagement.length,
             )}`}
           >
             {nonOwnerManagement.map((member, index) => {
@@ -406,7 +414,7 @@ const MeetTheTeamPage: React.FC = () => {
               </p>
               <div
                 className={`grid gap-4 ${getGridClasses(
-                  teamSection.members.length
+                  teamSection.members.length,
                 )}`}
               >
                 {teamSection.members.map((member, memberIndex) => {
