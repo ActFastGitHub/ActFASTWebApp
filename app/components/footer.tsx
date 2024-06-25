@@ -48,7 +48,7 @@ const Footer: React.FC = () => {
           <Link href="/under-construction" className="hover:underline">
             Featured
           </Link>
-          <Link href="#" className="hover:underline">
+          <Link href="/teampage" className="hover:underline">
             Team
           </Link>
         </motion.div>
