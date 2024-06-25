@@ -27,6 +27,7 @@ const upperManagement: TeamMember[] = [
   { name: "April Adasa", role: "Purchasing Officer", description: "Handles all purchasing activities with precision." },
   { name: "Girlie Atienza", role: "Accounting / Payroll Manager", description: "Ensures accurate and timely financial operations." },
   { name: "Jerry", role: "Accounting Assistant", description: "Supports the accounting team with daily financial tasks." },
+  { name: "Angelo", role: "NR Specialist / IT Support Analyst / Web Developer", description: "Versatile professional handling IT and web development needs." },
 ];
 
 const teamMembers: TeamSection[] = [
@@ -84,14 +85,7 @@ const teamMembers: TeamSection[] = [
       { name: "JunC", description: "Expert in automotive repair and maintenance." }
     ],
     description: "Our Automotive Specialist takes care of all vehicle-related issues."
-  },
-  {
-    role: "NR Specialist / IT Support Analyst / Web Developer",
-    members: [
-      { name: "Angelo", description: "Versatile professional handling IT and web development needs." }
-    ],
-    description: "This role covers IT support and web development for the organization."
-  },
+  }
 ];
 
 const roleColors: { [key: string]: string } = {
@@ -103,13 +97,13 @@ const roleColors: { [key: string]: string } = {
   "Purchasing Officer": "bg-purple-500",
   "Construction Manager": "bg-red-500",
   "Accounting Assistant": "bg-teal-500",
+  "NR Specialist / IT Support Analyst / Web Developer": "bg-pink-700",
   "Contents Team": "bg-orange-500",
   "Mustang": "bg-gray-500",
   "Emergency Team": "bg-blue-700",
   "Logistics Team": "bg-green-700",
   "Final Repairs Team": "bg-yellow-700",
-  "Automotive Specialist": "bg-indigo-700",
-  "NR Specialist / IT Support Analyst / Web Developer": "bg-pink-700",
+  "Automotive Specialist": "bg-indigo-700"
 };
 
 const MeetTheTeamPage: React.FC = () => {
