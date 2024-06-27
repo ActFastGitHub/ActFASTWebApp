@@ -116,7 +116,46 @@ export interface Project {
   dateAttended?: string;
   lockBoxCode?: string;
   notes?: string;
+
+  // Overview
+  nrList?: string;
+  projectStatus?: string; // Not Started, Emergency, Final Repairs, Overdue, Completed
+
+  // Emergency
+  siteReport?: string;
+  icc?: string;
+  emergencyEstimate?: string;
+  contentsEstimate?: string;
+  frEstimate?: string;
+  acmSample?: string;
+  urgent?: string;
+
+  // Final Repairs
+  dateApproved?: string;
+  lengthWeek?: string;
+  frStartDate?: string;
+  packBackDate?: string;
+  actualPackBackDate?: string;
+  completionDate?: string;
+  actualCompletionDate?: string;
+  insulation?: string;
+  drywall?: string;
+  painting?: string;
+  flooring?: string;
+  tiles?: string;
+  cabinetries?: string;
+  electrical?: string;
+  plumbing?: string;
+  issues?: string;
+
+  // Strata Details
+  strataClaimNo?: string;
+  strataAdjuster?: string;
+  strataEmergencyEstimate?: string;
+  strataContentsEstimate?: string;
+  strataFREstimate?: string;
 }
+
 
 export interface ProfileData {
   id: string;
