@@ -156,7 +156,45 @@ model Project {
   notes             String?
   materials         Material[] @relation("ProjectMaterials")
 
+  // Overview
+  nrList String? 
+  projectStatus String? // Not Started, Emergency, Final Repairs, Overdue, Completed
   
+  // Emergency 
+  siteReport String?
+  icc String?
+  emergencyEstimate String?
+  contentsEstimate String?
+  frEstimate String?
+  acmSample String? 
+  urgent String? 
+
+  // Final Repairs
+  dateApproved String?
+  lengthWeek String? 
+  frStartDate String?
+  packBackDate String?
+  actualPackBackDate String?
+  completionDate String?
+  actualCompletionDate String? 
+
+  insulation String? 
+  drywall String? 
+  painting String?
+  flooring String?
+  tiles String? 
+  cabinetries String? 
+  electrical String? 
+  plumbing String? 
+  issues String? 
+
+  // Strata Details
+  strataClaimNo String?
+  strataAdjuster String?
+  strataEmergencyEstimate String? 
+  strataContentsEstimate String?
+  strataFREstimate String? 
+
 }
 
 model Material {
