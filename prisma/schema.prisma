@@ -54,7 +54,7 @@ model Profile {
 
   // Hidden Details
   employeeID     String?
-  role           String? // Admin, Member, Lead
+  role           String? // Admin, Member, Lead, Owner
   driversLicense String?
   active         Boolean?
 
@@ -158,7 +158,7 @@ model Project {
 
   // Overview
   nrList String? 
-  projectStatus String? // Not Started, Emergency, Final Repairs, Overdue, Completed
+  projectStatus String? // Not Started, Emergency, Final Repairs, Overdue, Completed, (Special Cases: Waiting)
   
   // Emergency 
   siteReport String?

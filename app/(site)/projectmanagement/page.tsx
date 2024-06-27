@@ -1,444 +1,5 @@
 'use client'
 
-// import React, { useEffect, useState } from "react";
-// import { useSession } from "next-auth/react";
-// import { useRouter } from "next/navigation";
-// import Navbar from "@/app/components/navBar";
-// import { Project } from "@/app/libs/interfaces";
-// import axios from "axios";
-// import toast from "react-hot-toast";
-
-// const ViewProjects = () => {
-//   const { data: session, status } = useSession();
-//   const router = useRouter();
-//   const [projects, setProjects] = useState<Partial<Project>[]>([]);
-//   const [filteredProjects, setFilteredProjects] = useState<Partial<Project>[]>([]);
-//   const [searchQuery, setSearchQuery] = useState("");
-//   const [filter, setFilter] = useState<"Overview" | "Emergency" | "Final Repairs" | "Completed">("Overview");
-//   const [editProjectData, setEditProjectData] = useState<Record<string, Partial<Project>>>({});
-//   const [editableProjectId, setEditableProjectId] = useState<string | null>(null);
-//   const [disabled, setDisabled] = useState(false);
-
-//   useEffect(() => {
-//     if (status !== "loading" && !session) {
-//       router.push("/login");
-//     }
-//   }, [session, status, router]);
-
-//   const fetchProjects = async () => {
-//     try {
-//       const response = await axios.get("/api/projects");
-//       setProjects(response.data.projects);
-//       setFilteredProjects(response.data.projects);
-//     } catch (error) {
-//       console.error("Error fetching projects:", error);
-//       toast.error("Failed to fetch projects");
-//     }
-//   };
-
-//   useEffect(() => {
-//     if (session?.user.email) fetchProjects();
-//   }, [session?.user.email]);
-
-//   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-//     setSearchQuery(e.target.value);
-//     filterProjects(e.target.value, filter);
-//   };
-
-//   const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-//     setFilter(e.target.value as "Overview" | "Emergency" | "Final Repairs" | "Completed");
-//     filterProjects(searchQuery, e.target.value as "Overview" | "Emergency" | "Final Repairs" | "Completed");
-//   };
-
-//   const filterProjects = (searchQuery: string, filter: "Overview" | "Emergency" | "Final Repairs" | "Completed") => {
-//     let filtered = projects;
-
-//     if (searchQuery) {
-//       filtered = filtered.filter(
-//         (project) =>
-//           project.code?.toUpperCase().includes(searchQuery.toUpperCase()) ||
-//           project.insured?.toUpperCase().includes(searchQuery.toUpperCase())
-//       );
-//     }
-
-//     if (filter !== "Overview") {
-//       if (filter === "Final Repairs") {
-//         filtered = filtered.filter((project) => project.projectStatus === "Final Repairs" || project.projectStatus === "Overdue");
-//       } else {
-//         filtered = filtered.filter((project) => project.projectStatus === filter);
-//       }
-//     } else {
-//       filtered = filtered.filter((project) => project.projectStatus !== "Completed");
-//     }
-
-//     setFilteredProjects(filtered);
-//   };
-
-//   const handleEditToggle = (projectId: string) => {
-//     setEditableProjectId((prevId) => (prevId === projectId ? null : projectId));
-//     if (!editProjectData[projectId]) {
-//       const project = projects.find((proj) => proj.id === projectId);
-//       if (project) {
-//         setEditProjectData((prevData) => ({
-//           ...prevData,
-//           [projectId]: { ...project },
-//         }));
-//       }
-//     }
-//   };
-
-//   const handleChange = (
-//     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
-//     projectId: string,
-//   ) => {
-//     const { name, value } = e.target;
-//     setEditProjectData((prevData) => ({
-//       ...prevData,
-//       [projectId]: {
-//         ...prevData[projectId],
-//         [name]: value,
-//       },
-//     }));
-//   };
-
-//   const updateProject = async (projectId: string, e: React.FormEvent) => {
-//     e.preventDefault();
-//     setDisabled(true);
-//     const loadingToastId = toast.loading("Updating project...");
-  
-//     try {
-//       const response = await axios.patch("/api/projects", editProjectData[projectId]);
-  
-//       toast.dismiss(loadingToastId);
-  
-//       if (response.data.status !== 200) {
-//         const errorMessage = response.data?.message || "An error occurred";
-//         toast.error(errorMessage);
-//         setTimeout(() => setDisabled(false), 2000);
-//       } else {
-//         toast.success("Project successfully updated");
-//         setTimeout(() => {
-//           window.location.reload();
-//         }, 2000);
-//       }
-//     } catch (error) {
-//       console.error("Error updating project:", error);
-//       toast.dismiss(loadingToastId);
-//       toast.error("An error occurred while updating the project.");
-//       setTimeout(() => setDisabled(false), 2000);
-//     }
-//   };
-
-//   const renderEditableField = (field: keyof Project, projectId: string, value: string | undefined) => {
-//     if (editableProjectId === projectId) {
-//       if (field === "nrList" || field === "icc") {
-//         return (
-//           <select
-//             name={field}
-//             value={editProjectData[projectId]?.[field] || value || ""}
-//             onChange={(e) => handleChange(e, projectId)}
-//             className="w-full border rounded px-2 py-1"
-//           >
-//             <option value="">Select</option>
-//             <option value="Sent">Sent</option>
-//             <option value="Pending">Pending</option>
-//           </select>
-//         );
-//       } else {
-//         return (
-//           <input
-//             type="text"
-//             name={field}
-//             value={editProjectData[projectId]?.[field] || value || ""}
-//             onChange={(e) => handleChange(e, projectId)}
-//             className="w-full border rounded px-2 py-1"
-//           />
-//         );
-//       }
-//     }
-//     return value;
-//   };
-
-//   if (status === "loading") return null;
-
-//   return (
-//     <div className="relative min-h-screen bg-gray-100">
-//       <Navbar />
-//       <div className="p-6 pt-24">
-//         <div className="mb-6 flex flex-col items-center justify-between space-y-4 sm:flex-row sm:space-y-0">
-//           <h1 className="text-3xl font-bold">View Projects</h1>
-//           <div className="flex flex-col items-center space-y-4 sm:flex-row sm:space-x-4 sm:space-y-0">
-//             <input
-//               type="text"
-//               value={searchQuery}
-//               onChange={handleSearch}
-//               placeholder="Search by code or insured"
-//               className="w-full rounded border px-4 py-2 sm:w-auto"
-//             />
-//             <select
-//               value={filter}
-//               onChange={handleFilterChange}
-//               className="w-full rounded border px-4 py-2 sm:w-auto"
-//             >
-//               <option value="Overview">Overview</option>
-//               <option value="Emergency">Emergency</option>
-//               <option value="Final Repairs">Final Repairs</option>
-//               <option value="Completed">Completed</option>
-//             </select>
-//           </div>
-//         </div>
-
-//         {filteredProjects.length > 0 ? (
-//           <div className="overflow-auto">
-//             {(filter === "Overview" || filter === "Emergency") && (
-//               <div className="mb-8">
-//                 <h2 className="text-2xl font-bold mb-4">Emergency</h2>
-//                 <table className="min-w-full bg-white">
-//                   <thead>
-//                     <tr>
-//                       <th className="py-2 px-4 border-b">Project Code</th>
-//                       <th className="py-2 px-4 border-b">Claim #</th>
-//                       <th className="py-2 px-4 border-b">Date of Loss</th>
-//                       <th className="py-2 px-4 border-b">Adjuster</th>
-//                       <th className="py-2 px-4 border-b">Site Report</th>
-//                       <th className="py-2 px-4 border-b">ICC</th>
-//                       <th className="py-2 px-4 border-b">Emergency Estimate</th>
-//                       <th className="py-2 px-4 border-b">Contents Estimate</th>
-//                       <th className="py-2 px-4 border-b">FR Estimate</th>
-//                       <th className="py-2 px-4 border-b">ACM Sample</th>
-//                       <th className="py-2 px-4 border-b">Urgent</th>
-//                       <th className="py-2 px-4 border-b">NR List</th>
-//                       <th className="py-2 px-4 border-b">Project Status</th>
-//                       <th className="py-2 px-4 border-b">Strata Claim #</th>
-//                       <th className="py-2 px-4 border-b">Strata Adjuster</th>
-//                       <th className="py-2 px-4 border-b">Strata Emergency Est.</th>
-//                       <th className="py-2 px-4 border-b">Strata Contents Est.</th>
-//                       <th className="py-2 px-4 border-b">Strata FR Est.</th>
-//                       <th className="py-2 px-4 border-b">Actions</th>
-//                     </tr>
-//                   </thead>
-//                   <tbody>
-//                     {filteredProjects
-//                       .filter((project) => project.projectStatus === "Emergency" || project.projectStatus === "Overdue")
-//                       .map((project) => (
-//                         <tr key={project.id}>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("code", project.id!, project.code)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("claimNo", project.id!, project.claimNo)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("dateOfLoss", project.id!, project.dateOfLoss)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("adjuster", project.id!, project.adjuster)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("siteReport", project.id!, project.siteReport)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("icc", project.id!, project.icc)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("emergencyEstimate", project.id!, project.emergencyEstimate)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("contentsEstimate", project.id!, project.contentsEstimate)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("frEstimate", project.id!, project.frEstimate)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("acmSample", project.id!, project.acmSample)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("urgent", project.id!, project.urgent)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("nrList", project.id!, project.nrList)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("projectStatus", project.id!, project.projectStatus)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("strataClaimNo", project.id!, project.strataClaimNo)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("strataAdjuster", project.id!, project.strataAdjuster)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("strataEmergencyEstimate", project.id!, project.strataEmergencyEstimate)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("strataContentsEstimate", project.id!, project.strataContentsEstimate)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("strataFREstimate", project.id!, project.strataFREstimate)}</td>
-//                           <td className="py-2 px-4 border-b">
-//                             <button
-//                               className={`mr-2 ${editableProjectId === project.id ? "bg-green-500 text-white" : "bg-blue-500 text-white"} rounded px-2 py-1`}
-//                               onClick={() => handleEditToggle(project.id!)}
-//                             >
-//                               {editableProjectId === project.id ? "Save" : "Edit"}
-//                             </button>
-//                             {editableProjectId === project.id && (
-//                               <button
-//                                 className="bg-red-500 text-white rounded px-2 py-1"
-//                                 onClick={(e) => updateProject(project.id!, e)}
-//                                 disabled={disabled}
-//                               >
-//                                 Update
-//                               </button>
-//                             )}
-//                           </td>
-//                         </tr>
-//                       ))}
-//                   </tbody>
-//                 </table>
-//               </div>
-//             )}
-
-//             {(filter === "Overview" || filter === "Final Repairs") && (
-//               <div className="mb-8">
-//                 <h2 className="text-2xl font-bold mb-4">Final Repairs</h2>
-//                 <table className="min-w-full bg-white">
-//                   <thead>
-//                     <tr>
-//                       <th className="py-2 px-4 border-b">Project Code</th>
-//                       <th className="py-2 px-4 border-b">Claim #</th>
-//                       <th className="py-2 px-4 border-b">Date of Loss</th>
-//                       <th className="py-2 px-4 border-b">Adjuster</th>
-//                       <th className="py-2 px-4 border-b">Date Approved</th>
-//                       <th className="py-2 px-4 border-b">Length Week</th>
-//                       <th className="py-2 px-4 border-b">FR Start Date</th>
-//                       <th className="py-2 px-4 border-b">Pack Back Date</th>
-//                       <th className="py-2 px-4 border-b">Actual Pack Back Date</th>
-//                       <th className="py-2 px-4 border-b">Completion Date</th>
-//                       <th className="py-2 px-4 border-b">Actual Completion Date</th>
-//                       <th className="py-2 px-4 border-b">Insulation</th>
-//                       <th className="py-2 px-4 border-b">Drywall</th>
-//                       <th className="py-2 px-4 border-b">Painting</th>
-//                       <th className="py-2 px-4 border-b">Flooring</th>
-//                       <th className="py-2 px-4 border-b">Tiles</th>
-//                       <th className="py-2 px-4 border-b">Cabinetries</th>
-//                       <th className="py-2 px-4 border-b">Electrical</th>
-//                       <th className="py-2 px-4 border-b">Plumbing</th>
-//                       <th className="py-2 px-4 border-b">Issues</th>
-//                       <th className="py-2 px-4 border-b">NR List</th>
-//                       <th className="py-2 px-4 border-b">Project Status</th>
-//                       <th className="py-2 px-4 border-b">Actions</th>
-//                     </tr>
-//                   </thead>
-//                   <tbody>
-//                     {filteredProjects
-//                       .filter((project) => project.projectStatus === "Final Repairs" || project.projectStatus === "Overdue")
-//                       .map((project) => (
-//                         <tr key={project.id}>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("code", project.id!, project.code)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("claimNo", project.id!, project.claimNo)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("dateOfLoss", project.id!, project.dateOfLoss)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("adjuster", project.id!, project.adjuster)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("dateApproved", project.id!, project.dateApproved)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("lengthWeek", project.id!, project.lengthWeek)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("frStartDate", project.id!, project.frStartDate)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("packBackDate", project.id!, project.packBackDate)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("actualPackBackDate", project.id!, project.actualPackBackDate)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("completionDate", project.id!, project.completionDate)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("actualCompletionDate", project.id!, project.actualCompletionDate)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("insulation", project.id!, project.insulation)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("drywall", project.id!, project.drywall)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("painting", project.id!, project.painting)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("flooring", project.id!, project.flooring)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("tiles", project.id!, project.tiles)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("cabinetries", project.id!, project.cabinetries)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("electrical", project.id!, project.electrical)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("plumbing", project.id!, project.plumbing)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("issues", project.id!, project.issues)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("nrList", project.id!, project.nrList)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("projectStatus", project.id!, project.projectStatus)}</td>
-//                           <td className="py-2 px-4 border-b">
-//                             <button
-//                               className={`mr-2 ${editableProjectId === project.id ? "bg-green-500 text-white" : "bg-blue-500 text-white"} rounded px-2 py-1`}
-//                               onClick={() => handleEditToggle(project.id!)}
-//                             >
-//                               {editableProjectId === project.id ? "Save" : "Edit"}
-//                             </button>
-//                             {editableProjectId === project.id && (
-//                               <button
-//                                 className="bg-red-500 text-white rounded px-2 py-1"
-//                                 onClick={(e) => updateProject(project.id!, e)}
-//                                 disabled={disabled}
-//                               >
-//                                 Update
-//                               </button>
-//                             )}
-//                           </td>
-//                         </tr>
-//                       ))}
-//                   </tbody>
-//                 </table>
-//               </div>
-//             )}
-
-//             {(filter === "Overview" || filter === "Completed") && (
-//               <div className="mb-8">
-//                 <h2 className="text-2xl font-bold mb-4">Completed</h2>
-//                 <table className="min-w-full bg-white">
-//                   <thead>
-//                     <tr>
-//                       <th className="py-2 px-4 border-b">Project Code</th>
-//                       <th className="py-2 px-4 border-b">Claim #</th>
-//                       <th className="py-2 px-4 border-b">Date of Loss</th>
-//                       <th className="py-2 px-4 border-b">Adjuster</th>
-//                       <th className="py-2 px-4 border-b">Date Approved</th>
-//                       <th className="py-2 px-4 border-b">Length Week</th>
-//                       <th className="py-2 px-4 border-b">FR Start Date</th>
-//                       <th className="py-2 px-4 border-b">Pack Back Date</th>
-//                       <th className="py-2 px-4 border-b">Actual Pack Back Date</th>
-//                       <th className="py-2 px-4 border-b">Completion Date</th>
-//                       <th className="py-2 px-4 border-b">Actual Completion Date</th>
-//                       <th className="py-2 px-4 border-b">Insulation</th>
-//                       <th className="py-2 px-4 border-b">Drywall</th>
-//                       <th className="py-2 px-4 border-b">Painting</th>
-//                       <th className="py-2 px-4 border-b">Flooring</th>
-//                       <th className="py-2 px-4 border-b">Tiles</th>
-//                       <th className="py-2 px-4 border-b">Cabinetries</th>
-//                       <th className="py-2 px-4 border-b">Electrical</th>
-//                       <th className="py-2 px-4 border-b">Plumbing</th>
-//                       <th className="py-2 px-4 border-b">Issues</th>
-//                       <th className="py-2 px-4 border-b">NR List</th>
-//                       <th className="py-2 px-4 border-b">Project Status</th>
-//                       <th className="py-2 px-4 border-b">Actions</th>
-//                     </tr>
-//                   </thead>
-//                   <tbody>
-//                     {filteredProjects
-//                       .filter((project) => project.projectStatus === "Completed")
-//                       .map((project) => (
-//                         <tr key={project.id}>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("code", project.id!, project.code)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("claimNo", project.id!, project.claimNo)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("dateOfLoss", project.id!, project.dateOfLoss)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("adjuster", project.id!, project.adjuster)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("dateApproved", project.id!, project.dateApproved)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("lengthWeek", project.id!, project.lengthWeek)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("frStartDate", project.id!, project.frStartDate)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("packBackDate", project.id!, project.packBackDate)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("actualPackBackDate", project.id!, project.actualPackBackDate)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("completionDate", project.id!, project.completionDate)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("actualCompletionDate", project.id!, project.actualCompletionDate)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("insulation", project.id!, project.insulation)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("drywall", project.id!, project.drywall)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("painting", project.id!, project.painting)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("flooring", project.id!, project.flooring)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("tiles", project.id!, project.tiles)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("cabinetries", project.id!, project.cabinetries)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("electrical", project.id!, project.electrical)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("plumbing", project.id!, project.plumbing)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("issues", project.id!, project.issues)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("nrList", project.id!, project.nrList)}</td>
-//                           <td className="py-2 px-4 border-b">{renderEditableField("projectStatus", project.id!, project.projectStatus)}</td>
-//                           <td className="py-2 px-4 border-b">
-//                             <button
-//                               className={`mr-2 ${editableProjectId === project.id ? "bg-green-500 text-white" : "bg-blue-500 text-white"} rounded px-2 py-1`}
-//                               onClick={() => handleEditToggle(project.id!)}
-//                             >
-//                               {editableProjectId === project.id ? "Save" : "Edit"}
-//                             </button>
-//                             {editableProjectId === project.id && (
-//                               <button
-//                                 className="bg-red-500 text-white rounded px-2 py-1"
-//                                 onClick={(e) => updateProject(project.id!, e)}
-//                                 disabled={disabled}
-//                               >
-//                                 Update
-//                               </button>
-//                             )}
-//                           </td>
-//                         </tr>
-//                       ))}
-//                   </tbody>
-//                 </table>
-//               </div>
-//             )}
-//           </div>
-//         ) : (
-//           <p>No projects found.</p>
-//         )}
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default ViewProjects;
-
-
 import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -453,10 +14,11 @@ const ViewProjects = () => {
   const [projects, setProjects] = useState<Partial<Project>[]>([]);
   const [filteredProjects, setFilteredProjects] = useState<Partial<Project>[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filter, setFilter] = useState<"Overview" | "Emergency" | "Final Repairs" | "Completed">("Overview");
+  const [filter, setFilter] = useState<"Overview" | "Emergency" | "Final Repairs" | "Completed" | "Waiting" | "Not Started" | "Overdue">("Overview");
   const [editProjectData, setEditProjectData] = useState<Record<string, Partial<Project>>>({});
   const [editableProjectId, setEditableProjectId] = useState<string | null>(null);
   const [disabled, setDisabled] = useState(false);
+  const [showStrataDetails, setShowStrataDetails] = useState(false);
 
   useEffect(() => {
     if (status !== "loading" && !session) {
@@ -464,11 +26,19 @@ const ViewProjects = () => {
     }
   }, [session, status, router]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const filterParam = params.get("filter");
+    if (filterParam) {
+      setFilter(filterParam as "Overview" | "Emergency" | "Final Repairs" | "Completed" | "Waiting" | "Not Started" | "Overdue");
+    }
+  }, []);
+
   const fetchProjects = async () => {
     try {
       const response = await axios.get("/api/projects");
       setProjects(response.data.projects);
-      setFilteredProjects(response.data.projects);
+      filterProjects(searchQuery, filter, response.data.projects);
     } catch (error) {
       console.error("Error fetching projects:", error);
       toast.error("Failed to fetch projects");
@@ -481,16 +51,20 @@ const ViewProjects = () => {
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
-    filterProjects(e.target.value, filter);
+    filterProjects(e.target.value, filter, projects);
   };
 
   const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setFilter(e.target.value as "Overview" | "Emergency" | "Final Repairs" | "Completed");
-    filterProjects(searchQuery, e.target.value as "Overview" | "Emergency" | "Final Repairs" | "Completed");
+    const newFilter = e.target.value as "Overview" | "Emergency" | "Final Repairs" | "Completed" | "Waiting" | "Not Started" | "Overdue";
+    setFilter(newFilter);
+    const params = new URLSearchParams(window.location.search);
+    params.set("filter", newFilter);
+    router.push(`${process.env.NEXT_PUBLIC_BASE_URL}/projectmanagement/?${params.toString()}`);
+    filterProjects(searchQuery, newFilter, projects);
   };
 
-  const filterProjects = (searchQuery: string, filter: "Overview" | "Emergency" | "Final Repairs" | "Completed") => {
-    let filtered = projects;
+  const filterProjects = (searchQuery: string, filter: "Overview" | "Emergency" | "Final Repairs" | "Completed" | "Waiting" | "Not Started" | "Overdue", projectsList: Partial<Project>[]) => {
+    let filtered = projectsList;
 
     if (searchQuery) {
       filtered = filtered.filter(
@@ -500,14 +74,20 @@ const ViewProjects = () => {
       );
     }
 
-    if (filter !== "Overview") {
-      if (filter === "Final Repairs") {
-        filtered = filtered.filter((project) => project.projectStatus === "Final Repairs" || project.projectStatus === "Overdue");
-      } else {
-        filtered = filtered.filter((project) => project.projectStatus === filter);
-      }
+    if (filter === "Overview") {
+      filtered = filtered.filter((project) => 
+        project.projectStatus === "Emergency" || 
+        project.projectStatus === "Final Repairs" || 
+        project.projectStatus === "Overdue"
+      );
+    } else if (filter === "Final Repairs" || filter === "Overdue") {
+      filtered = filtered.filter((project) => project.projectStatus === filter);
+    } else if (filter === "Waiting") {
+      filtered = filtered.filter((project) => project.projectStatus === "Waiting");
+    } else if (filter === "Not Started") {
+      filtered = filtered.filter((project) => project.projectStatus === "Not Started");
     } else {
-      filtered = filtered.filter((project) => project.projectStatus !== "Completed");
+      filtered = filtered.filter((project) => project.projectStatus === filter);
     }
 
     setFilteredProjects(filtered);
@@ -569,8 +149,42 @@ const ViewProjects = () => {
   };
 
   const renderEditableField = (field: keyof Project, projectId: string, value: string | undefined) => {
+    const options: { [key: string]: string[] } = {
+      nrList: [
+        'For Review', 'In Progress', 'Follow-Up', 'Queued', 'Sent', 'Need', 'NA'
+      ],
+      icc: [
+        'Sent', 'Received', 'NA'
+      ],
+      acmSample: [
+        'Positive', 'Negative', 'NA'
+      ]
+    };
+
+    const optionColors: { [key: string]: { [value: string]: string } } = {
+      nrList: {
+        'For Review': 'bg-green-500 text-white',
+        'In Progress': 'bg-yellow-400 text-black',
+        'Follow-Up': 'bg-blue-500 text-white',
+        'Queued': 'bg-orange-300 text-black',
+        'Sent': 'bg-purple-500 text-white',
+        'Need': 'bg-red-500 text-white',
+        'NA': 'bg-gray-500 text-white'
+      },
+      icc: {
+        'Sent': 'bg-blue-500 text-white',
+        'Received': 'bg-green-500 text-white',
+        'NA': 'bg-gray-500 text-white'
+      },
+      acmSample: {
+        'Positive': 'bg-red-500 text-white',
+        'Negative': 'bg-green-500 text-white',
+        'NA': 'bg-gray-500 text-white'
+      }
+    };
+
     if (editableProjectId === projectId) {
-      if (field === "nrList" || field === "icc") {
+      if (field === "nrList" || field === "icc" || field === "acmSample") {
         return (
           <select
             name={field}
@@ -579,9 +193,34 @@ const ViewProjects = () => {
             className="w-full border rounded px-2 py-1"
           >
             <option value="">Select</option>
-            <option value="Sent">Sent</option>
-            <option value="Pending">Pending</option>
+            {options[field].map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
           </select>
+        );
+      } else if (field === "siteReport" || field === "emergencyEstimate" || field === "contentsEstimate" || field === "frEstimate" ||
+                 field === "strataEmergencyEstimate" || field === "strataContentsEstimate" || field === "strataFREstimate" || field === "dateOfLoss" ||
+                 field === "dateAttended" || field === "dateApproved" || field === "frStartDate" || field === "packBackDate" || field === "actualPackBackDate" ||
+                 field === "completionDate" || field === "actualCompletionDate") {
+        return (
+          <input
+            type="date"
+            name={field}
+            value={editProjectData[projectId]?.[field] || value || ""}
+            onChange={(e) => handleChange(e, projectId)}
+            className="w-full border rounded px-2 py-1"
+          />
+        );
+      } else if (field === "issues" || field === "urgent") {
+        return (
+          <textarea
+            name={field}
+            value={editProjectData[projectId]?.[field] || value || ""}
+            onChange={(e) => handleChange(e, projectId)}
+            className="w-full border rounded px-2 py-1"
+          />
         );
       } else {
         return (
@@ -595,8 +234,16 @@ const ViewProjects = () => {
         );
       }
     }
+
+    if (field === "nrList" || field === "icc" || field === "acmSample") {
+      const colorClass = optionColors[field][value!] || '';
+      return <span className={`inline-block rounded px-2 py-1 ${colorClass}`}>{value}</span>;
+    }
+
     return value;
   };
+
+  const projectCount = filteredProjects.length;
 
   if (status === "loading") return null;
 
@@ -606,6 +253,7 @@ const ViewProjects = () => {
       <div className="p-6 pt-24">
         <div className="mb-6 flex flex-col items-center justify-between space-y-4 sm:flex-row sm:space-y-0">
           <h1 className="text-3xl font-bold">View Projects</h1>
+          <span className="text-lg">{projectCount} {projectCount === 1 ? 'Project' : 'Projects'}</span>
           <div className="flex flex-col items-center space-y-4 sm:flex-row sm:space-x-4 sm:space-y-0">
             <input
               type="text"
@@ -622,7 +270,10 @@ const ViewProjects = () => {
               <option value="Overview">Overview</option>
               <option value="Emergency">Emergency</option>
               <option value="Final Repairs">Final Repairs</option>
+              <option value="Overdue">Overdue</option>
               <option value="Completed">Completed</option>
+              <option value="Waiting">Waiting</option>
+              <option value="Not Started">Not Started</option>
             </select>
           </div>
         </div>
@@ -667,6 +318,10 @@ const ViewProjects = () => {
                     {renderEditableField("dateOfLoss", project.id!, project.dateOfLoss)}
                   </div>
                   <div>
+                    <label className="block text-gray-700">Date Attended</label>
+                    {renderEditableField("dateAttended", project.id!, project.dateAttended)}
+                  </div>
+                  <div>
                     <label className="block text-gray-700">Adjuster</label>
                     {renderEditableField("adjuster", project.id!, project.adjuster)}
                   </div>
@@ -709,25 +364,37 @@ const ViewProjects = () => {
                         {renderEditableField("projectStatus", project.id!, project.projectStatus)}
                       </div>
                       <div>
-                        <label className="block text-gray-700">Strata Claim #</label>
-                        {renderEditableField("strataClaimNo", project.id!, project.strataClaimNo)}
+                        <button
+                          className="bg-gray-500 text-white rounded px-2 py-1"
+                          onClick={() => setShowStrataDetails(!showStrataDetails)}
+                        >
+                          {showStrataDetails ? "Hide" : "Show"} Strata Details
+                        </button>
                       </div>
-                      <div>
-                        <label className="block text-gray-700">Strata Adjuster</label>
-                        {renderEditableField("strataAdjuster", project.id!, project.strataAdjuster)}
-                      </div>
-                      <div>
-                        <label className="block text-gray-700">Strata Emergency Est.</label>
-                        {renderEditableField("strataEmergencyEstimate", project.id!, project.strataEmergencyEstimate)}
-                      </div>
-                      <div>
-                        <label className="block text-gray-700">Strata Contents Est.</label>
-                        {renderEditableField("strataContentsEstimate", project.id!, project.strataContentsEstimate)}
-                      </div>
-                      <div>
-                        <label className="block text-gray-700">Strata FR Est.</label>
-                        {renderEditableField("strataFREstimate", project.id!, project.strataFREstimate)}
-                      </div>
+                      {showStrataDetails && (
+                        <>
+                          <div>
+                            <label className="block text-gray-700">Strata Claim #</label>
+                            {renderEditableField("strataClaimNo", project.id!, project.strataClaimNo)}
+                          </div>
+                          <div>
+                            <label className="block text-gray-700">Strata Adjuster</label>
+                            {renderEditableField("strataAdjuster", project.id!, project.strataAdjuster)}
+                          </div>
+                          <div>
+                            <label className="block text-gray-700">Strata Emergency Est.</label>
+                            {renderEditableField("strataEmergencyEstimate", project.id!, project.strataEmergencyEstimate)}
+                          </div>
+                          <div>
+                            <label className="block text-gray-700">Strata Contents Est.</label>
+                            {renderEditableField("strataContentsEstimate", project.id!, project.strataContentsEstimate)}
+                          </div>
+                          <div>
+                            <label className="block text-gray-700">Strata FR Est.</label>
+                            {renderEditableField("strataFREstimate", project.id!, project.strataFREstimate)}
+                          </div>
+                        </>
+                      )}
                     </>
                   )}
                   {filter === "Final Repairs" && (
@@ -800,13 +467,9 @@ const ViewProjects = () => {
                         <label className="block text-gray-700">NR List</label>
                         {renderEditableField("nrList", project.id!, project.nrList)}
                       </div>
-                      <div>
-                        <label className="block text-gray-700">Project Status</label>
-                        {renderEditableField("projectStatus", project.id!, project.projectStatus)}
-                      </div>
                     </>
                   )}
-                  {filter === "Completed" && (
+                  {filter === "Overdue" && (
                     <>
                       <div>
                         <label className="block text-gray-700">Date Approved</label>
@@ -876,9 +539,29 @@ const ViewProjects = () => {
                         <label className="block text-gray-700">NR List</label>
                         {renderEditableField("nrList", project.id!, project.nrList)}
                       </div>
+                    </>
+                  )}
+                  {filter === "Not Started" && (
+                    <>
                       <div>
-                        <label className="block text-gray-700">Project Status</label>
-                        {renderEditableField("projectStatus", project.id!, project.projectStatus)}
+                        <label className="block text-gray-700">Insured</label>
+                        {renderEditableField("insured", project.id!, project.insured)}
+                      </div>
+                      <div>
+                        <label className="block text-gray-700">Address</label>
+                        {renderEditableField("address", project.id!, project.address)}
+                      </div>
+                      <div>
+                        <label className="block text-gray-700">Email</label>
+                        {renderEditableField("email", project.id!, project.email)}
+                      </div>
+                      <div>
+                        <label className="block text-gray-700">Phone Number</label>
+                        {renderEditableField("phoneNumber", project.id!, project.phoneNumber)}
+                      </div>
+                      <div>
+                        <label className="block text-gray-700">Date of Loss</label>
+                        {renderEditableField("dateOfLoss", project.id!, project.dateOfLoss)}
                       </div>
                     </>
                   )}
@@ -895,5 +578,3 @@ const ViewProjects = () => {
 };
 
 export default ViewProjects;
-
-

@@ -22,18 +22,15 @@ const ViewAllProjects = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [projects, setProjects] = useState<Partial<Project>[]>([]);
-  const [filteredProjects, setFilteredProjects] = useState<Partial<Project>[]>(
-    [],
-  );
+  const [filteredProjects, setFilteredProjects] = useState<Partial<Project>[]>([]);
   const [editProjectData, setEditProjectData] = useState<EditProjectData>({});
   const [isMounted, setIsMounted] = useState(false);
   const [newProjectCode, setNewProjectCode] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [showMoreDetails, setShowMoreDetails] = useState<string | null>(null);
-  const [editableProjectId, setEditableProjectId] = useState<string | null>(
-    null,
-  );
+  const [editableProjectId, setEditableProjectId] = useState<string | null>(null);
   const [disabled, setDisabled] = useState(false);
+  const [totalProjects, setTotalProjects] = useState(0);
 
   const fetchProjects = async () => {
     try {
@@ -44,10 +41,11 @@ const ViewAllProjects = () => {
             return b.code.localeCompare(a.code);
           }
           return 0;
-        },
+        }
       );
       setProjects(sortedProjects);
       setFilteredProjects(sortedProjects);
+      setTotalProjects(sortedProjects.length); // Update total projects count
     } catch (error) {
       console.error("Error fetching projects:", error);
       toast.error("Failed to fetch projects");
@@ -75,16 +73,16 @@ const ViewAllProjects = () => {
       if (response.data.status === 201) {
         const newProject = response.data.project;
         const updatedProjects = [newProject, ...projects].sort((a, b) =>
-          b.code!.localeCompare(a.code!),
+          b.code!.localeCompare(a.code!)
         );
         setProjects(updatedProjects);
         setFilteredProjects(updatedProjects);
         setNewProjectCode("");
+        setTotalProjects(updatedProjects.length); // Update total projects count
         toast.success("Project created successfully!");
       } else {
         toast.error(
-          response.data.message ||
-            "An error occurred while creating the project.",
+          response.data.message || "An error occurred while creating the project."
         );
       }
     } catch (error) {
@@ -98,7 +96,7 @@ const ViewAllProjects = () => {
     const filtered = projects.filter(
       (project) =>
         project.code?.toUpperCase().includes(e.target.value.toUpperCase()) ||
-        project.insured?.toUpperCase().includes(e.target.value.toUpperCase()),
+        project.insured?.toUpperCase().includes(e.target.value.toUpperCase())
     );
     setFilteredProjects(filtered);
   };
@@ -126,7 +124,7 @@ const ViewAllProjects = () => {
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-    projectId: string,
+    projectId: string
   ) => {
     setEditProjectData((prevData) => ({
       ...prevData,
@@ -141,12 +139,12 @@ const ViewAllProjects = () => {
     e.preventDefault();
     setDisabled(true);
     const loadingToastId = toast.loading("Updating project...");
-  
+
     try {
       const response = await axios.patch("/api/projects", editProjectData[projectId]);
-  
+
       toast.dismiss(loadingToastId);
-  
+
       if (response.data.status !== 200) {
         const errorMessage = response.data?.message || "An error occurred";
         toast.error(errorMessage);
@@ -163,7 +161,7 @@ const ViewAllProjects = () => {
       toast.error("An error occurred while updating the project.");
       setTimeout(() => setDisabled(false), 2000);
     }
-  };  
+  };
 
   const deleteProject = async (projectId: string) => {
     setDisabled(true);
@@ -183,8 +181,7 @@ const ViewAllProjects = () => {
         }, 2000);
       } else {
         toast.error(
-          response.data.message ||
-            "An error occurred while deleting the project.",
+          response.data.message || "An error occurred while deleting the project."
         );
         setTimeout(() => setDisabled(false), 2000);
       }
@@ -204,6 +201,9 @@ const ViewAllProjects = () => {
       <div className="p-6 pt-24">
         <div className="mb-6 flex flex-col items-center justify-between space-y-4 sm:flex-row sm:space-y-0">
           <h1 className="text-3xl font-bold">View All Projects</h1>
+          <div className="text-lg font-semibold">
+            Total Projects: {totalProjects}
+          </div>
           <div className="flex flex-col items-center space-y-4 sm:flex-row sm:space-x-4 sm:space-y-0">
             <input
               type="text"
@@ -545,3 +545,4 @@ const ViewAllProjects = () => {
 };
 
 export default ViewAllProjects;
+

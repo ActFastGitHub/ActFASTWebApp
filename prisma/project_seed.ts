@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 
 const projectCodes = [
   "2024-791-06-BALATBAT",
-  "2024-790-06-ESPANA",
+  "2024-790-06-ESPENA",
   "2024-789-05-GC-RESOURCES-ICBC",
   "2024-788-05-NIEDO-ICBC",
   "2024-787-05-MLIM",

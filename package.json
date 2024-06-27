@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "seed": "ts-node prisma/seed.ts",
-    "project_seed": "ts-node prisma/project_seed.ts"
+    "project_seed": "ts-node prisma/project_seed.ts",
+    "update_project_status": "ts-node prisma/updateProjectStatus.ts"
   },
   "dependencies": {
     "@next-auth/prisma-adapter": "^1.0.7",
