@@ -141,7 +141,7 @@ const teamMembers: TeamMember[] = [
     description: "",
   },
   {
-    name: "Lorena",
+    name: "Lorraine",
     role: "Team Member",
     description: "",
   },

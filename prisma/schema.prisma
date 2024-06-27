@@ -155,6 +155,8 @@ model Project {
   lockBoxCode       String?
   notes             String?
   materials         Material[] @relation("ProjectMaterials")
+
+  
 }
 
 model Material {
