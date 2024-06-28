@@ -65,111 +65,27 @@ const upperManagement: TeamMember[] = [
 ];
 
 const teamMembers: TeamMember[] = [
-  {
-    name: "Ricco",
-    role: "Team Member",
-    description: "",
-  },
-  {
-    name: "Fred",
-    role: "Team Member",
-    description: "",
-  },
-  {
-    name: "Jes",
-    role: "Team Member",
-    description: "",
-  },
-  {
-    name: "Kenneth",
-    role: "Team Member",
-    description: "",
-  },
-  {
-    name: "Theo",
-    role: "Team Member",
-    description: "",
-  },
-  {
-    name: "Julia",
-    role: "Team Member",
-    description: "",
-  },
-  {
-    name: "Beth",
-    role: "Team Member",
-    description: "",
-  },
-  {
-    name: "Lyn",
-    role: "Team Member",
-    description: "",
-  },
-  {
-    name: "George",
-    role: "Team Member",
-    description: "",
-  },
-  {
-    name: "Chriskie",
-    role: "Team Member",
-    description: "",
-  },
-  {
-    name: "Keenan",
-    role: "Team Member",
-    description: "",
-  },
-  {
-    name: "Jun C",
-    role: "Team Member",
-    description: "",
-  },
-  {
-    name: "Julius",
-    role: "Team Member",
-    description: "",
-  },
-  {
-    name: "Lisa",
-    role: "Team Member",
-    description: "",
-  },
-  {
-    name: "Lito",
-    role: "Team Member",
-    description: "",
-  },
-  {
-    name: "Lorraine",
-    role: "Team Member",
-    description: "",
-  },
-  {
-    name: "Vivian",
-    role: "Team Member",
-    description: "",
-  },
-  {
-    name: "Jomil",
-    role: "Team Member",
-    description: "",
-  },
-  {
-    name: "Ben",
-    role: "Team Member",
-    description: "",
-  },
-  {
-    name: "Kennedy",
-    role: "Team Member",
-    description: "",
-  },
-  {
-    name: "Jhoanasses",
-    role: "Team Member",
-    description: "",
-  },
+  { name: "Ricco", role: "Team Member", description: "" },
+  { name: "Fred", role: "Team Member", description: "" },
+  { name: "Jes", role: "Team Member", description: "" },
+  { name: "Kenneth", role: "Team Member", description: "" },
+  { name: "Theo", role: "Team Member", description: "" },
+  { name: "Julia", role: "Team Member", description: "" },
+  { name: "Beth", role: "Team Member", description: "" },
+  { name: "Lyn", role: "Team Member", description: "" },
+  { name: "George", role: "Team Member", description: "" },
+  { name: "Chriskie", role: "Team Member", description: "" },
+  { name: "Keenan", role: "Team Member", description: "" },
+  { name: "Jun C", role: "Team Member", description: "" },
+  { name: "Julius", role: "Team Member", description: "" },
+  { name: "Lisa", role: "Team Member", description: "" },
+  { name: "Lito", role: "Team Member", description: "" },
+  { name: "Lorraine", role: "Team Member", description: "" },
+  { name: "Vivian", role: "Team Member", description: "" },
+  { name: "Jomil", role: "Team Member", description: "" },
+  { name: "Ben", role: "Team Member", description: "" },
+  { name: "Kennedy", role: "Team Member", description: "" },
+  { name: "Jhoanasses", role: "Team Member", description: "" },
 ];
 
 const roleColors: { [key: string]: string } = {
@@ -225,8 +141,12 @@ const MeetTheTeamPage: React.FC = () => {
 
   const animationVariants = {
     hidden: { opacity: 0, y: 50 },
-    visible: { opacity: 1, y: 0 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } },
     hover: {
+      scale: 1.05,
+      transition: { duration: 0.3 },
+    },
+    tap: {
       scale: 1.05,
       transition: { duration: 0.3 },
     },
@@ -243,7 +163,7 @@ const MeetTheTeamPage: React.FC = () => {
   const getGridClasses = (length: number) => {
     if (length === 1) return "justify-center";
     if (length === 10) return "justify-center sm:grid-cols-5";
-    return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3";
+    return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5";
   };
 
   const owner = upperManagement.find(
@@ -262,7 +182,7 @@ const MeetTheTeamPage: React.FC = () => {
         <motion.h1
           className="mb-10 cursor-pointer text-center text-4xl font-extrabold text-white lg:text-6xl"
           initial="hidden"
-          animate={{ opacity: 1, y: 0 }}
+          animate="visible"
           transition={{ duration: 0.5 }}
           onClick={handleMenuToggle}
         >
@@ -296,82 +216,81 @@ const MeetTheTeamPage: React.FC = () => {
           <motion.div
             className="text-center text-3xl font-bold text-white"
             initial="hidden"
-            animate={{ opacity: 1, y: 0 }}
+            animate="visible"
             transition={{ duration: 0.5, delay: 0.2 }}
           >
             Office Team
           </motion.div>
           {owner && (
             <motion.div
-              className={`rounded-lg p-6 shadow-lg ${roleColors[owner.role]} relative mb-12`}
+              className={`relative mb-12 rounded-lg p-6 shadow-lg ${roleColors[owner.role]}`}
               initial="hidden"
-              animate={{ opacity: 1, y: 0 }}
+              animate="visible"
               transition={{ duration: 0.5, delay: 0.2 }}
             >
               <div className="flex flex-col items-center">
-                <div className="mb-4 h-32 w-32 overflow-hidden rounded-full bg-gray-200 shadow-2xl">
+                <div className="relative mb-4 -mt-16 h-32 w-32 overflow-hidden rounded-full bg-gray-200 shadow-2xl lg:-mt-24 lg:h-40 lg:w-40">
                   <img
                     src={getImagePath(owner.name)}
                     alt={owner.name}
                     className="h-full w-full object-cover"
                   />
                 </div>
-                <h2 className="text-2xl font-semibold text-white">
+                <h2 className="text-2xl font-semibold text-white lg:text-3xl">
                   {owner.name}
                 </h2>
                 <div className="mb-4 rounded-lg bg-white px-3 py-1 text-xs font-medium text-gray-800">
                   {owner.role}
                 </div>
-                <div className="mt-2 rounded-lg bg-white px-3 py-2 text-sm text-gray-800 shadow-md">
+                <div className="mt-2 rounded-lg bg-white px-3 py-2 text-sm text-gray-800 shadow-md lg:text-base">
                   {owner.description}
                 </div>
               </div>
             </motion.div>
           )}
           <div
-            className={`flex flex-wrap justify-center gap-8 ${getGridClasses(
+            className={`flex flex-wrap justify-center gap-12 ${getGridClasses(
               nonOwnerManagement.length,
             )}`}
           >
             {nonOwnerManagement.map((member, index) => {
               const controls = useAnimation();
               const ref = useRef<HTMLDivElement>(null);
-              const inView = useInView(ref);
+              const inView = useInView(ref, { once: true });
 
               useEffect(() => {
                 if (inView) {
                   controls.start("visible");
-                } else {
-                  controls.start("hidden");
                 }
               }, [controls, inView]);
 
               return (
                 <motion.div
                   key={index}
-                  className={`rounded-lg p-6 shadow-lg ${roleColors[member.role]} relative`}
+                  className={`relative rounded-lg p-6 shadow-lg ${roleColors[member.role]}`}
                   initial="hidden"
                   animate={controls}
                   variants={animationVariants}
-                  transition={{ duration: 0.5, delay: index * 0.2 }}
+                  transition={{ duration: 0.5, delay: index * 0.1 }}
                   whileHover="hover"
+                  whileTap="tap"
                   ref={ref}
                 >
                   <div className="flex flex-col items-center">
-                    <div className="mb-4 h-24 w-24 overflow-hidden rounded-full bg-gray-200 shadow-2xl">
+                    <div className="relative mb-4 -mt-16 h-24 w-24 overflow-hidden rounded-full bg-gray-200 shadow-2xl lg:-mt-20 lg:h-32 lg:w-32">
                       <img
                         src={getImagePath(member.name)}
                         alt={member.name}
                         className="h-full w-full object-cover"
                       />
                     </div>
-                    <h2 className="text-xl font-semibold text-white">
+                    <h2 className="text-xl font-semibold text-white lg:text-2xl">
                       {member.name}
                     </h2>
                     <div className="mb-4 rounded-lg bg-white px-3 py-1 text-xs font-medium text-gray-800">
                       {member.role}
                     </div>
-                    <div className="mt-2 rounded-lg bg-white px-3 py-2 text-sm text-gray-800 shadow-md">
+                    <div className="mt-2 rounded-lg bg-white px-3 py-2 text-sm text-gray-800 shadow-md lg:text-base">
                       {member.description}
                     </div>
                   </div>
@@ -384,7 +303,7 @@ const MeetTheTeamPage: React.FC = () => {
           <motion.div
             className="text-center text-3xl font-bold text-white"
             initial="hidden"
-            animate={{ opacity: 1, y: 0 }}
+            animate="visible"
             transition={{ duration: 0.5, delay: 0.2 }}
           >
             Team Members
@@ -392,7 +311,7 @@ const MeetTheTeamPage: React.FC = () => {
           <motion.div
             className={`rounded-lg p-6 shadow-lg ${roleColors["Team Member"]}`}
             initial="hidden"
-            animate={{ opacity: 1, y: 0 }}
+            animate="visible"
             transition={{ duration: 0.5, delay: 0.2 }}
           >
             <h2 className="mb-4 text-center text-2xl font-bold text-white">
@@ -404,13 +323,11 @@ const MeetTheTeamPage: React.FC = () => {
               {teamMembers.map((member, memberIndex) => {
                 const controls = useAnimation();
                 const ref = useRef<HTMLDivElement>(null);
-                const inView = useInView(ref);
+                const inView = useInView(ref, { once: true });
 
                 useEffect(() => {
                   if (inView) {
                     controls.start("visible");
-                  } else {
-                    controls.start("hidden");
                   }
                 }, [controls, inView]);
 
@@ -421,18 +338,19 @@ const MeetTheTeamPage: React.FC = () => {
                     initial="hidden"
                     animate={controls}
                     variants={animationVariants}
-                    transition={{ duration: 0.5, delay: memberIndex * 0.1 }} // Adjusted delay for smoother stagger
+                    transition={{ duration: 0.5, delay: memberIndex * 0.1 }}
                     whileHover="hover"
+                    whileTap="tap"
                     ref={ref}
                   >
-                    <div className="mb-4 h-24 w-24 overflow-hidden rounded-full bg-gray-200 shadow-xl">
+                    <div className="relative mb-4 h-28 w-28 overflow-hidden rounded-full bg-gray-200 shadow-xl lg:h-32 lg:w-32">
                       <img
                         src={getImagePath(member.name)}
                         alt={member.name}
                         className="h-full w-full object-cover"
                       />
                     </div>
-                    <p className="text-lg font-semibold text-white">
+                    <p className="text-lg font-semibold text-white lg:text-xl">
                       {member.name}
                     </p>
                   </motion.div>
