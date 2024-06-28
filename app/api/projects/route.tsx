@@ -1,13 +1,34 @@
-// api/projects/route.tsx
+// app/api/projects/route.ts
 
+import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/app/libs/prismadb";
-import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/libs/authOption";
 import { APIErr } from "@/app/libs/interfaces";
+import Holidays from "date-holidays";
+
+// Initialize the holidays library for BC, Canada
+const hd = new Holidays("CA", "BC");
+
+// Helper function to add weeks to a date excluding holidays
+const addWeeksExcludingHolidays = (startDate: Date, weeks: number): Date => {
+  let resultDate = new Date(startDate);
+  let daysToAdd = weeks * 7;
+
+  while (daysToAdd > 0) {
+    resultDate.setDate(resultDate.getDate() + 1);
+    const isWeekend = resultDate.getDay() === 0 || resultDate.getDay() === 6; // 0 = Sunday, 6 = Saturday
+    const isHoliday = hd.isHoliday(resultDate);
+    if (!isWeekend && !isHoliday) {
+      daysToAdd -= 1;
+    }
+  }
+
+  return resultDate;
+};
 
 // READ
-export async function GET(request: Request) {
+export async function GET(req: NextRequest) {
   try {
     const projects = await prisma.project.findMany();
     return NextResponse.json({ projects, status: 200 });
@@ -28,19 +49,20 @@ async function isProjectCodeExist(normalizedCode: string, projectId?: string) {
 
   return projects.some(
     (project) =>
-      project.id !== projectId && project.code.trim().toUpperCase() === normalizedCode
+      project.id !== projectId &&
+      project.code.trim().toUpperCase() === normalizedCode,
   );
 }
 
 // CREATE
-export async function POST(request: Request) {
+export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ status: 401, error: "Unauthorized" });
     }
 
-    const { code } = await request.json();
+    const { code } = await req.json();
 
     if (!code) {
       return NextResponse.json({
@@ -59,7 +81,10 @@ export async function POST(request: Request) {
     }
 
     const newProject = await prisma.project.create({
-      data: { code: normalizedCode },
+      data: {
+        code: normalizedCode,
+        projectStatus: "Not Started",
+      },
     });
 
     return NextResponse.json({ project: newProject, status: 201 });
@@ -73,14 +98,22 @@ export async function POST(request: Request) {
 }
 
 // UPDATE (PATCH)
-export async function PATCH(request: Request) {
+export async function PATCH(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ status: 401, error: "Unauthorized" });
     }
 
-    const { id, code, ...data } = await request.json();
+    const {
+      id,
+      code,
+      dateAttended,
+      dateApproved,
+      frStartDate,
+      lengthWeek,
+      ...data
+    } = await req.json();
 
     if (!code) {
       return NextResponse.json({
@@ -100,6 +133,32 @@ export async function PATCH(request: Request) {
 
     data.code = normalizedCode;
 
+    if (dateAttended) {
+      data.projectStatus = "Emergency";
+    }
+
+    if (dateApproved) {
+      data.projectStatus = "Final Repairs";
+    }
+
+    if (frStartDate && lengthWeek && data.projectStatus === "Final Repairs") {
+      const frStart = new Date(frStartDate);
+      const completionDate = addWeeksExcludingHolidays(
+        frStart,
+        parseInt(lengthWeek),
+      );
+      const packBackDate = new Date(completionDate);
+      packBackDate.setDate(packBackDate.getDate() - 3);
+
+      data.completionDate = completionDate.toISOString().split("T")[0];
+      data.packBackDate = packBackDate.toISOString().split("T")[0];
+
+      const currentDate = new Date();
+      if (currentDate > completionDate) {
+        data.projectStatus = "Overdue";
+      }
+    }
+
     const updatedProject = await prisma.project.update({
       where: { id },
       data,
@@ -116,14 +175,14 @@ export async function PATCH(request: Request) {
 }
 
 // DELETE
-export async function DELETE(request: Request) {
+export async function DELETE(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ status: 401, error: "Unauthorized" });
     }
 
-    const { id } = await request.json();
+    const { id } = await req.json();
 
     if (!id) {
       return NextResponse.json({
@@ -136,7 +195,10 @@ export async function DELETE(request: Request) {
       where: { id },
     });
 
-    return NextResponse.json({ status: 200, message: "Project deleted successfully" });
+    return NextResponse.json({
+      status: 200,
+      message: "Project deleted successfully",
+    });
   } catch (error) {
     const { code = 500, message = "internal server error" } = error as APIErr;
     return NextResponse.json({
