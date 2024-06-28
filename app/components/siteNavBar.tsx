@@ -113,7 +113,7 @@ const Navbar: React.FC<NavbarProps> = ({ onPortalClick }) => {
                 Featured
               </Link>
               <Link
-                href="/under-construction"
+                href="/teampage"
                 className="rounded-md px-2 py-2 text-sm font-medium text-gray-300 hover:text-white"
               >
                 Meet Our Team
@@ -151,7 +151,7 @@ const Navbar: React.FC<NavbarProps> = ({ onPortalClick }) => {
               Featured
             </Link>
             <Link
-              href="/under-construction"
+              href="//teampage"
               className="block rounded-md px-3 py-2 text-base font-medium text-gray-300 hover:text-white"
             >
               Meet Our Team
