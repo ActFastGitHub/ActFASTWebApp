@@ -192,7 +192,7 @@ const useDoubleTapToTop = () => {
     const handleDoubleTap = (event: TouchEvent) => {
       const now = new Date().getTime();
       const timeSinceLastTouch = now - (lastTouch.current || 0);
-      if (timeSinceLastTouch < 500 && timeSinceLastTouch > 0) {
+      if (timeSinceLastTouch < 200 && timeSinceLastTouch > 0) {
         window.scrollTo({ top: 0, behavior: "smooth" });
         event.preventDefault();
       }
