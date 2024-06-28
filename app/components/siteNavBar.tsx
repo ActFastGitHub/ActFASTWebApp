@@ -151,7 +151,7 @@ const Navbar: React.FC<NavbarProps> = ({ onPortalClick }) => {
               Featured
             </Link>
             <Link
-              href="//teampage"
+              href="/teampage"
               className="block rounded-md px-3 py-2 text-base font-medium text-gray-300 hover:text-white"
             >
               Meet Our Team
