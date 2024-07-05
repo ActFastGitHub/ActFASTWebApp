@@ -9,6 +9,7 @@ import email from "@/app/images/email.svg";
 import phone from "@/app/images/phone.svg";
 import bday from "@/app/images/bday.svg";
 import loc from "@/app/images/location.svg";
+import defaultProfileImage from "@/app/images/blank-profile.jpg";
 import EditProfile from "@/app/components/editProfile";
 
 const ProfilePage = () => {
@@ -117,7 +118,7 @@ const ProfilePage = () => {
                   <div className="w-full rounded-lg bg-white p-6 shadow-lg sm:w-2/3 lg:w-1/2">
                     <div className="flex flex-col items-center">
                       <img
-                        src={user?.image}
+                        src={user?.image || defaultProfileImage.src}
                         alt=""
                         className="mt-[-50px] h-[100px] w-[100px] rounded-full object-cover shadow-md"
                       />

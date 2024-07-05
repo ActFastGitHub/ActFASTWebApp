@@ -50,6 +50,15 @@ const categoryOptions = [
   { value: "OTHERS", label: "OTHERS" },
 ];
 
+const dateRangeOptions = [
+  { value: "1w", label: "Last Week" },
+  { value: "1m", label: "Last Month" },
+  { value: "3m", label: "Last 3 Months" },
+  { value: "6m", label: "Last 6 Months" },
+  { value: "1y", label: "Last Year" },
+  { value: "all", label: "All Time" },
+];
+
 const ItemsManagement = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -66,6 +75,7 @@ const ItemsManagement = () => {
   const [showDetails, setShowDetails] = useState<{ [key: string]: boolean }>(
     {},
   );
+  const [dateRange, setDateRange] = useState("allTime");
 
   const fetchItems = async (page: number = 1) => {
     try {
@@ -74,13 +84,22 @@ const ItemsManagement = () => {
           searchTerm: searchQuery,
           category: categoryFilter,
           projectCode: projectFilter,
+          dateRange,
           page,
           limit: 10,
         },
       });
 
       if (response.data && response.data.items) {
-        setItems(response.data.items);
+        const sortedItems = response.data.items.sort((a: Item, b: Item) => {
+          if (new Date(b.addedAt) > new Date(a.addedAt)) return 1;
+          if (new Date(b.addedAt) < new Date(a.addedAt)) return -1;
+          return new Date(b.lastModifiedAt) > new Date(a.lastModifiedAt)
+            ? 1
+            : -1;
+        });
+
+        setItems(sortedItems);
         setTotalPages(response.data.totalPages);
       } else {
         setItems([]);
@@ -115,7 +134,14 @@ const ItemsManagement = () => {
       fetchItems(page);
       fetchProjects();
     }
-  }, [session?.user.email, searchQuery, categoryFilter, projectFilter, page]);
+  }, [
+    session?.user.email,
+    searchQuery,
+    categoryFilter,
+    projectFilter,
+    dateRange,
+    page,
+  ]);
 
   useEffect(() => {
     if (status !== "loading" && !session) {
@@ -226,42 +252,6 @@ const ItemsManagement = () => {
     <div className="relative min-h-screen bg-gray-100">
       <Navbar />
       <div className="p-6 pt-24">
-        <div className="mb-6 flex flex-col items-center justify-between space-y-4 sm:flex-row sm:space-y-0">
-          <h1 className="text-3xl font-bold">Manage Items</h1>
-          <div className="flex flex-col items-center space-y-4 sm:flex-row sm:space-x-4 sm:space-y-0">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={handleSearch}
-              placeholder="Search by name or description"
-              className="w-auto w-full rounded border px-4 py-2 lg:w-72 xl:w-96"
-            />
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-auto w-full rounded border px-4 py-2 lg:w-72 xl:w-96"
-            >
-              <option value="">All Categories</option>
-              {categoryOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={projectFilter}
-              onChange={(e) => setProjectFilter(e.target.value)}
-              className="w-auto w-full rounded border px-4 py-2 lg:w-72 xl:w-96"
-            >
-              <option value="">All Projects</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.code}>
-                  {project.code}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
         <form onSubmit={handleCreateItem} className="mb-6 space-y-4">
           <h2 className="text-2xl font-bold">Create New Item</h2>
           <input
@@ -350,6 +340,57 @@ const ItemsManagement = () => {
             Create Item
           </button>
         </form>
+
+        <div className="my-6 border-t-2 border-gray-300"></div>
+
+        <div className="mb-6 space-y-4">
+          <h1 className="text-3xl font-bold">Manage Items</h1>
+          <div className="flex flex-col sm:flex-row sm:space-x-4">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={handleSearch}
+              placeholder="Search by name or description"
+              className="mb-4 w-full rounded border px-4 py-2 sm:mb-0"
+            />
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="mb-4 w-full rounded border px-4 py-2 sm:mb-0"
+            >
+              <option value="">All Categories</option>
+              {categoryOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <select
+              value={projectFilter}
+              onChange={(e) => setProjectFilter(e.target.value)}
+              className="mb-4 w-full rounded border px-4 py-2 sm:mb-0"
+            >
+              <option value="">All Projects</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.code}>
+                  {project.code}
+                </option>
+              ))}
+            </select>
+            <select
+              value={dateRange}
+              onChange={(e) => setDateRange(e.target.value)}
+              className="w-full rounded border px-4 py-2"
+            >
+              {dateRangeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
         {items.length > 0 ? (
           <div className="space-y-4">
             {items.map((item) => (

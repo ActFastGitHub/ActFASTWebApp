@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { UserProps } from "@/app/libs/interfaces";
 import { usePathname, useRouter } from "next/navigation";
 import AFLogo from "@/app/images/actfast-logo.jpg";
+import defaultProfileImage from "@/app/images/blank-profile.jpg";
 import Link from "next/link";
 
 const Navbar = () => {
@@ -41,7 +42,7 @@ const Navbar = () => {
                     {user ? (
                         <div className='relative inline-block'>
                             <img
-                                src={user.image}
+                                src={user.image || defaultProfileImage.src}
                                 onClick={toggleDropdown}
                                 alt='Profile'
                                 className='w-[40px] h-[40px] object-cover rounded-full ring-1 ring-gray-300 dark:ring-gray-500 cursor-pointer'
