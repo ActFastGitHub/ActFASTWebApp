@@ -1,11 +1,11 @@
-// app/api/updateProjectStatuses/route.ts
+// app/api/projects/updateProjectStatus/route.tsx
 
-import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/app/libs/prismadb";
-import Holidays from "date-holidays";
+import { NextRequest, NextResponse } from 'next/server';
+import prisma from '@/app/libs/prismadb';
+import Holidays from 'date-holidays';
 
 // Initialize the holidays library for BC, Canada
-const hd = new Holidays("CA", "BC");
+const hd = new Holidays('CA', 'BC');
 
 // Helper function to check if a date is a holiday
 const checkHoliday = (date: Date): boolean => {
@@ -31,7 +31,8 @@ const addWeeksExcludingHolidays = (startDate: Date, weeks: number): Date => {
 
 // API route handler
 export async function GET(req: NextRequest) {
-  const apiKey = req.headers.get("x-api-key");
+  console.log('API Key from environment:', process.env.UPDATE_API_KEY); // Temporary log for debugging
+  const apiKey = req.headers.get('x-api-key');
   if (apiKey !== process.env.UPDATE_API_KEY) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
@@ -46,10 +47,7 @@ export async function GET(req: NextRequest) {
 
       if (project.completionDate) {
         const completionDate = new Date(project.completionDate);
-        if (
-          currentDate > completionDate &&
-          project.projectStatus !== "Overdue"
-        ) {
+        if (currentDate > completionDate && project.projectStatus !== "Overdue") {
           updatedData.projectStatus = "Overdue";
         }
       }
@@ -62,14 +60,9 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({
-      message: "Project statuses updated successfully.",
-    });
+    return NextResponse.json({ message: "Project statuses updated successfully." });
   } catch (error) {
     console.error("Error updating project statuses:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

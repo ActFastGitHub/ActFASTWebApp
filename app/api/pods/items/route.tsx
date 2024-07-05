@@ -6,6 +6,32 @@ import { Prisma } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/libs/authOption";
 
+// Function to get the date based on the range
+const getDateFromRange = (range: string): Date | undefined => {
+  const now = new Date();
+  let fromDate;
+  switch (range) {
+    case "1w":
+      fromDate = new Date(now.setDate(now.getDate() - 7));
+      break;
+    case "1m":
+      fromDate = new Date(now.setMonth(now.getMonth() - 1));
+      break;
+    case "3m":
+      fromDate = new Date(now.setMonth(now.getMonth() - 3));
+      break;
+    case "6m":
+      fromDate = new Date(now.setMonth(now.getMonth() - 6));
+      break;
+    case "1y":
+      fromDate = new Date(now.setFullYear(now.getFullYear() - 1));
+      break;
+    default:
+      fromDate = undefined;
+  }
+  return fromDate;
+};
+
 // GET ALL ITEMS WITH FILTERS AND PAGINATION
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -15,7 +41,14 @@ export async function GET(request: Request) {
   const page = parseInt(searchParams.get("page") || "1", 10);
   const limit = parseInt(searchParams.get("limit") || "10", 10);
   const searchTerm = searchParams.get("searchTerm") || "";
+  const dateRange = searchParams.get("dateRange") || "all";
+  const dateRangeIn = searchParams.get("dateRangeIn") || "all";
+  const dateRangeOut = searchParams.get("dateRangeOut") || "all";
   const skip = (page - 1) * limit;
+
+  const fromDate = getDateFromRange(dateRange);
+  const fromDateIn = getDateFromRange(dateRangeIn);
+  const fromDateOut = getDateFromRange(dateRangeOut);
 
   try {
     const searchFilter: Prisma.ItemWhereInput = searchTerm
@@ -45,6 +78,18 @@ export async function GET(request: Request) {
 
     const categoryFilter: Prisma.ItemWhereInput = category ? { category } : {};
 
+    const dateFilter: Prisma.ItemWhereInput = fromDate
+      ? { lastModifiedAt: { gte: fromDate } }
+      : {};
+
+    const dateFilterIn: Prisma.ItemWhereInput = fromDateIn
+      ? { packedInAt: { gte: fromDateIn } }
+      : {};
+
+    const dateFilterOut: Prisma.ItemWhereInput = fromDateOut
+      ? { packedOutAt: { gte: fromDateOut } }
+      : {};
+
     const [items, totalCount] = await Promise.all([
       prisma.item.findMany({
         where: {
@@ -52,6 +97,9 @@ export async function GET(request: Request) {
           ...projectFilter,
           ...boxFilter,
           ...categoryFilter,
+          ...dateFilter,
+          ...dateFilterIn,
+          ...dateFilterOut,
         },
         skip,
         take: limit,
@@ -63,6 +111,9 @@ export async function GET(request: Request) {
           ...projectFilter,
           ...boxFilter,
           ...categoryFilter,
+          ...dateFilter,
+          ...dateFilterIn,
+          ...dateFilterOut,
         },
       }),
     ]);

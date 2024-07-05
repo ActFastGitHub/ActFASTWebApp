@@ -5,14 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, FormEvent, useMemo } from "react";
 import Navbar from "@/app/components/navBar";
 import toast from "react-hot-toast";
-import {
-  FaEdit,
-  FaTrashAlt,
-  FaEye,
-  FaEyeSlash,
-  FaLink,
-  FaUnlink,
-} from "react-icons/fa";
+import { FaEye, FaEyeSlash, FaLink, FaUnlink } from "react-icons/fa";
 import { useSession } from "next-auth/react";
 
 const colorOptions = [
@@ -20,6 +13,15 @@ const colorOptions = [
   { value: "bg-green-500", label: "Empty Pod (Green)" },
   { value: "bg-yellow-500", label: "Semi-filled Pod (Yellow)" },
   { value: "bg-red-500", label: "Full Pod (Red)" },
+];
+
+const dateRangeOptions = [
+  { value: "1w", label: "Last Week" },
+  { value: "1m", label: "Last Month" },
+  { value: "3m", label: "Last 3 Months" },
+  { value: "6m", label: "Last 6 Months" },
+  { value: "1y", label: "Last Year" },
+  { value: "all", label: "All Time" },
 ];
 
 interface EditBoxProps {
@@ -50,7 +52,13 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
   const [items, setItems] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>("");
-  const [showDetails, setShowDetails] = useState<{ [key: string]: boolean }>({});
+  const [selectedDateRange, setSelectedDateRange] = useState<string>("all");
+  const [selectedDateRangeIn, setSelectedDateRangeIn] = useState<string>("all");
+  const [selectedDateRangeOut, setSelectedDateRangeOut] =
+    useState<string>("all");
+  const [showDetails, setShowDetails] = useState<{ [key: string]: boolean }>(
+    {},
+  );
   const [disabled, setDisabled] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -77,11 +85,11 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
 
   useEffect(() => {
     fetchItems();
-  }, [page, selectedProject]);
+  }, [page, selectedProject, selectedDateRange]);
 
   useEffect(() => {
     fetchPackedItems();
-  }, [id]);
+  }, [id, selectedProject, selectedDateRangeIn, selectedDateRangeOut]);
 
   const fetchBoxDetails = async () => {
     try {
@@ -106,6 +114,7 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
           page,
           limit: ITEMS_PER_PAGE,
           searchTerm: searchTermProject,
+          dateRange: selectedDateRange,
         },
       });
 
@@ -136,14 +145,31 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
   const fetchPackedItems = async () => {
     try {
       const response = await axios.get(`/api/pods/items`, {
-        params: { boxId: id },
+        params: {
+          boxId: id,
+          projectCode: selectedProject,
+          dateRangeIn: selectedDateRangeIn,
+          dateRangeOut: selectedDateRangeOut,
+        },
       });
       const allItems = response.data.items;
       setPackedInItems(
-        allItems.filter((item: any) => item.packedStatus === "In"),
+        allItems
+          .filter((item: any) => item.packedStatus === "In")
+          .sort(
+            (a: any, b: any) =>
+              new Date(b.packedInAt).getTime() -
+              new Date(a.packedInAt).getTime(),
+          ),
       );
       setPackedOutItems(
-        allItems.filter((item: any) => item.packedStatus === "Out"),
+        allItems
+          .filter((item: any) => item.packedStatus === "Out")
+          .sort(
+            (a: any, b: any) =>
+              new Date(b.packedOutAt).getTime() -
+              new Date(a.packedOutAt).getTime(),
+          ),
       );
     } catch (error) {
       console.error("Error fetching packed items:", error);
@@ -247,28 +273,51 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
     setSearchTermProject(e.target.value);
   };
 
-  const filteredPackedInItems = useMemo(() => 
-    packedInItems.filter((item) =>
-      `${item.name} ${item.description}`
-        .toLowerCase()
-        .includes(searchTermIn.toLowerCase())
-  ), [packedInItems, searchTermIn]);
+  const handleDateRangeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedDateRange(e.target.value);
+  };
 
-  const filteredPackedOutItems = useMemo(() => 
-    packedOutItems.filter((item) =>
-      `${item.name} ${item.description}`
-        .toLowerCase()
-        .includes(searchTermOut.toLowerCase())
-  ), [packedOutItems, searchTermOut]);
+  const handleDateRangeInChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedDateRangeIn(e.target.value);
+  };
 
-  const filteredItems = useMemo(() => 
-    items.filter(
-      (item) =>
-        !packedInItems.some((inItem) => inItem.id === item.id) &&
+  const handleDateRangeOutChange = (
+    e: React.ChangeEvent<HTMLSelectElement>,
+  ) => {
+    setSelectedDateRangeOut(e.target.value);
+  };
+
+  const filteredPackedInItems = useMemo(
+    () =>
+      packedInItems.filter((item) =>
         `${item.name} ${item.description}`
           .toLowerCase()
-          .includes(searchTermProject.toLowerCase())
-  ), [items, packedInItems, searchTermProject]);
+          .includes(searchTermIn.toLowerCase()),
+      ),
+    [packedInItems, searchTermIn],
+  );
+
+  const filteredPackedOutItems = useMemo(
+    () =>
+      packedOutItems.filter((item) =>
+        `${item.name} ${item.description}`
+          .toLowerCase()
+          .includes(searchTermOut.toLowerCase()),
+      ),
+    [packedOutItems, searchTermOut],
+  );
+
+  const filteredItems = useMemo(
+    () =>
+      items.filter(
+        (item) =>
+          !packedInItems.some((inItem) => inItem.id === item.id) &&
+          `${item.name} ${item.description}`
+            .toLowerCase()
+            .includes(searchTermProject.toLowerCase()),
+      ),
+    [items, packedInItems, searchTermProject],
+  );
 
   return (
     <div className="relative flex min-h-screen flex-col items-center bg-gray-200 p-4 pt-16">
@@ -363,10 +412,21 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
           onChange={(e) => setSelectedProject(e.target.value)}
           className="mb-4 w-full rounded border border-gray-300 p-2"
         >
-          <option value="">Select Project</option>
+          <option value="">All Projects</option>
           {projects.map((project) => (
             <option key={project.id} value={project.code}>
               {project.code}
+            </option>
+          ))}
+        </select>
+        <select
+          value={selectedDateRange}
+          onChange={handleDateRangeChange}
+          className="mb-4 w-full rounded border border-gray-300 p-2"
+        >
+          {dateRangeOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
             </option>
           ))}
         </select>
@@ -450,14 +510,18 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
               <button
                 onClick={() => handlePageChange(page - 1)}
                 disabled={page === 1}
-                className={`rounded px-4 py-2 ${page === 1 ? "bg-gray-300" : "bg-blue-500 text-white"}`}
+                className={`rounded px-4 py-2 ${
+                  page === 1 ? "bg-gray-300" : "bg-blue-500 text-white"
+                }`}
               >
                 Previous
               </button>
               <button
                 onClick={() => handlePageChange(page + 1)}
                 disabled={page === totalPages}
-                className={`rounded px-4 py-2 ${page === totalPages ? "bg-gray-300" : "bg-blue-500 text-white"}`}
+                className={`rounded px-4 py-2 ${
+                  page === totalPages ? "bg-gray-300" : "bg-blue-500 text-white"
+                }`}
               >
                 Next
               </button>
@@ -469,6 +533,29 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
       </div>
       <div className="mt-6 w-full max-w-2xl rounded-lg bg-white p-6 shadow-md">
         <h2 className="mb-4 text-xl font-bold">Packed In Items</h2>
+        <select
+          value={selectedProject}
+          onChange={(e) => setSelectedProject(e.target.value)}
+          className="mb-4 w-full rounded border border-gray-300 p-2"
+        >
+          <option value="">All Projects</option>
+          {projects.map((project) => (
+            <option key={project.id} value={project.code}>
+              {project.code}
+            </option>
+          ))}
+        </select>
+        <select
+          value={selectedDateRangeIn}
+          onChange={handleDateRangeInChange}
+          className="mb-4 w-full rounded border border-gray-300 p-2"
+        >
+          {dateRangeOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
         <input
           type="text"
           placeholder="Search Packed In Items"
@@ -545,6 +632,26 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
                 )}
               </div>
             ))}
+            <div className="flex justify-center space-x-2">
+              <button
+                onClick={() => handlePageChange(page - 1)}
+                disabled={page === 1}
+                className={`rounded px-4 py-2 ${
+                  page === 1 ? "bg-gray-300" : "bg-blue-500 text-white"
+                }`}
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => handlePageChange(page + 1)}
+                disabled={page === totalPages}
+                className={`rounded px-4 py-2 ${
+                  page === totalPages ? "bg-gray-300" : "bg-blue-500 text-white"
+                }`}
+              >
+                Next
+              </button>
+            </div>
           </div>
         ) : (
           <p>No items found for this box.</p>
@@ -552,6 +659,29 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
       </div>
       <div className="mt-6 w-full max-w-2xl rounded-lg bg-white p-6 shadow-md">
         <h2 className="mb-4 text-xl font-bold">Packed Out Items</h2>
+        <select
+          value={selectedProject}
+          onChange={(e) => setSelectedProject(e.target.value)}
+          className="mb-4 w-full rounded border border-gray-300 p-2"
+        >
+          <option value="">All Projects</option>
+          {projects.map((project) => (
+            <option key={project.id} value={project.code}>
+              {project.code}
+            </option>
+          ))}
+        </select>
+        <select
+          value={selectedDateRangeOut}
+          onChange={handleDateRangeOutChange}
+          className="mb-4 w-full rounded border border-gray-300 p-2"
+        >
+          {dateRangeOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
         <input
           type="text"
           placeholder="Search Packed Out Items"
@@ -628,6 +758,26 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
                 )}
               </div>
             ))}
+            <div className="flex justify-center space-x-2">
+              <button
+                onClick={() => handlePageChange(page - 1)}
+                disabled={page === 1}
+                className={`rounded px-4 py-2 ${
+                  page === 1 ? "bg-gray-300" : "bg-blue-500 text-white"
+                }`}
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => handlePageChange(page + 1)}
+                disabled={page === totalPages}
+                className={`rounded px-4 py-2 ${
+                  page === totalPages ? "bg-gray-300" : "bg-blue-500 text-white"
+                }`}
+              >
+                Next
+              </button>
+            </div>
           </div>
         ) : (
           <p>No items found for this box.</p>
