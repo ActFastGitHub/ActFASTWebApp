@@ -43,6 +43,19 @@ export async function PATCH(
       });
     }
 
+    const profile = await prisma.profile.findUnique({
+      where: {
+        userEmail: session.user.email,
+      },
+    });
+
+    if (!profile) {
+      return NextResponse.json({
+        message: "Profile not found",
+        status: 404,
+      });
+    }
+
     const updatedItem = await prisma.item.update({
       where: { id },
       data: {
@@ -51,6 +64,9 @@ export async function PATCH(
         },
         packedStatus: "In",
         packedInAt: new Date(),
+        lastModifiedBy: {
+          connect: { nickname: profile.nickname! },
+        },
       },
     });
 
