@@ -18,6 +18,8 @@ type EditProjectData = {
   [key: string]: Partial<Project>;
 };
 
+type ProjectField = keyof Project;
+
 const ViewAllProjects = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -45,7 +47,7 @@ const ViewAllProjects = () => {
       );
       setProjects(sortedProjects);
       setFilteredProjects(sortedProjects);
-      setTotalProjects(sortedProjects.length); // Update total projects count
+      setTotalProjects(sortedProjects.length);
     } catch (error) {
       console.error("Error fetching projects:", error);
       toast.error("Failed to fetch projects");
@@ -78,7 +80,7 @@ const ViewAllProjects = () => {
         setProjects(updatedProjects);
         setFilteredProjects(updatedProjects);
         setNewProjectCode("");
-        setTotalProjects(updatedProjects.length); // Update total projects count
+        setTotalProjects(updatedProjects.length);
         toast.success("Project created successfully!");
       } else {
         toast.error(
@@ -126,11 +128,12 @@ const ViewAllProjects = () => {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
     projectId: string
   ) => {
+    const { name, value } = e.target;
     setEditProjectData((prevData) => ({
       ...prevData,
       [projectId]: {
         ...prevData[projectId],
-        [e.target.name]: e.target.value,
+        [name]: value,
       },
     }));
   };
@@ -245,15 +248,13 @@ const ViewAllProjects = () => {
                 <div className="mx-auto w-full max-w-lg rounded-lg bg-white p-6 shadow-lg">
                   <div className="flex flex-col items-center">
                     <div className="mt-4 text-center">
-                      <div className="text-2xl font-bold">
+                      <div className="text-2xl font-bold truncate w-full">
                         {editableProjectId === project?.id ? (
                           <input
                             type="text"
                             name="code"
                             value={
-                              editProjectData[project?.id]?.code ||
-                              project?.code ||
-                              ""
+                              editProjectData[project?.id]?.code || project?.code || ""
                             }
                             onChange={(e) => handleChange(e, project?.id!)}
                             className="ml-2 w-full rounded border px-2 py-1"
@@ -262,227 +263,58 @@ const ViewAllProjects = () => {
                           project?.code
                         )}
                       </div>
-                      <p className="text-gray-600">{project?.address}</p>
+                      <p className="text-gray-600 break-words">{project?.address}</p>
                     </div>
                     <div className="mt-6 w-full space-y-4">
-                      <p className="flex items-center text-lg">
-                        <strong>Insured: </strong>
-                        {editableProjectId === project?.id ? (
-                          <input
-                            type="text"
-                            name="insured"
-                            value={
-                              editProjectData[project?.id]?.insured ||
-                              project?.insured ||
-                              ""
-                            }
-                            onChange={(e) => handleChange(e, project?.id!)}
-                            className="ml-2 w-full rounded border px-2 py-1"
-                          />
-                        ) : (
-                          project?.insured
-                        )}
-                      </p>
-                      <p className="flex items-center text-lg">
-                        <strong>Phone: </strong>
-                        {editableProjectId === project?.id ? (
-                          <input
-                            type="text"
-                            name="phoneNumber"
-                            value={
-                              editProjectData[project?.id]?.phoneNumber ||
-                              project?.phoneNumber ||
-                              ""
-                            }
-                            onChange={(e) => handleChange(e, project?.id!)}
-                            className="ml-2 w-full rounded border px-2 py-1"
-                          />
-                        ) : (
-                          project?.phoneNumber
-                        )}
-                      </p>
-                      <p className="flex items-center text-lg">
-                        <strong>Type of Damage: </strong>
-                        {editableProjectId === project?.id ? (
-                          <input
-                            type="text"
-                            name="typeOfDamage"
-                            value={
-                              editProjectData[project?.id]?.typeOfDamage ||
-                              project?.typeOfDamage ||
-                              ""
-                            }
-                            onChange={(e) => handleChange(e, project?.id!)}
-                            className="ml-2 w-full rounded border px-2 py-1"
-                          />
-                        ) : (
-                          project?.typeOfDamage
-                        )}
-                      </p>
-                      <p className="flex items-center text-lg">
-                        <strong>Category: </strong>
-                        {editableProjectId === project?.id ? (
-                          <input
-                            type="text"
-                            name="category"
-                            value={
-                              editProjectData[project?.id]?.category ||
-                              project?.category ||
-                              ""
-                            }
-                            onChange={(e) => handleChange(e, project?.id!)}
-                            className="ml-2 w-full rounded border px-2 py-1"
-                          />
-                        ) : (
-                          project?.category
-                        )}
-                      </p>
+                      {(["insured", "address", "phoneNumber", "typeOfDamage", "category"] as ProjectField[]).map((field) => (
+                        <p key={field} className="flex flex-col sm:flex-row sm:items-center text-lg break-words">
+                          <strong className="sm:w-1/3">{field.replace(/([A-Z])/g, ' $1')}: </strong>
+                          {editableProjectId === project?.id ? (
+                            <input
+                              type="text"
+                              name={field}
+                              value={
+                                editProjectData[project?.id]?.[field] || project?.[field] || ""
+                              }
+                              onChange={(e) => handleChange(e, project?.id!)}
+                              className="ml-2 w-full rounded border px-2 py-1"
+                            />
+                          ) : (
+                            <span className="sm:w-2/3">{project?.[field]}</span>
+                          )}
+                        </p>
+                      ))}
                       {showMoreDetails === project?.id && (
                         <div className="mt-4 w-full space-y-4">
-                          <p className="flex items-center text-lg">
-                            <strong>Email: </strong>
-                            {editableProjectId === project?.id ? (
-                              <input
-                                type="email"
-                                name="email"
-                                value={
-                                  editProjectData[project?.id]?.email ||
-                                  project?.email ||
-                                  ""
-                                }
-                                onChange={(e) => handleChange(e, project?.id!)}
-                                className="ml-2 w-full rounded border px-2 py-1"
-                              />
-                            ) : (
-                              project?.email
-                            )}
-                          </p>
-                          <p className="flex items-center text-lg">
-                            <strong>Insurance Provider: </strong>
-                            {editableProjectId === project?.id ? (
-                              <input
-                                type="text"
-                                name="insuranceProvider"
-                                value={
-                                  editProjectData[project?.id]
-                                    ?.insuranceProvider ||
-                                  project?.insuranceProvider ||
-                                  ""
-                                }
-                                onChange={(e) => handleChange(e, project?.id!)}
-                                className="ml-2 w-full rounded border px-2 py-1"
-                              />
-                            ) : (
-                              project?.insuranceProvider
-                            )}
-                          </p>
-                          <p className="flex items-center text-lg">
-                            <strong>Claim No: </strong>
-                            {editableProjectId === project?.id ? (
-                              <input
-                                type="text"
-                                name="claimNo"
-                                value={
-                                  editProjectData[project?.id]?.claimNo ||
-                                  project?.claimNo ||
-                                  ""
-                                }
-                                onChange={(e) => handleChange(e, project?.id!)}
-                                className="ml-2 w-full rounded border px-2 py-1"
-                              />
-                            ) : (
-                              project?.claimNo
-                            )}
-                          </p>
-                          <p className="flex items-center text-lg">
-                            <strong>Adjuster: </strong>
-                            {editableProjectId === project?.id ? (
-                              <input
-                                type="text"
-                                name="adjuster"
-                                value={
-                                  editProjectData[project?.id]?.adjuster ||
-                                  project?.adjuster ||
-                                  ""
-                                }
-                                onChange={(e) => handleChange(e, project?.id!)}
-                                className="ml-2 w-full rounded border px-2 py-1"
-                              />
-                            ) : (
-                              project?.adjuster
-                            )}
-                          </p>
-                          <p className="flex items-center text-lg">
-                            <strong>Date of Loss: </strong>
-                            {editableProjectId === project?.id ? (
-                              <input
-                                type="date"
-                                name="dateOfLoss"
-                                value={
-                                  editProjectData[project?.id]?.dateOfLoss ||
-                                  project?.dateOfLoss ||
-                                  ""
-                                }
-                                onChange={(e) => handleChange(e, project?.id!)}
-                                className="ml-2 w-full rounded border px-2 py-1"
-                              />
-                            ) : (
-                              project?.dateOfLoss
-                            )}
-                          </p>
-                          <p className="flex items-center text-lg">
-                            <strong>Date Attended: </strong>
-                            {editableProjectId === project?.id ? (
-                              <input
-                                type="date"
-                                name="dateAttended"
-                                value={
-                                  editProjectData[project?.id]?.dateAttended ||
-                                  project?.dateAttended ||
-                                  ""
-                                }
-                                onChange={(e) => handleChange(e, project?.id!)}
-                                className="ml-2 w-full rounded border px-2 py-1"
-                              />
-                            ) : (
-                              project?.dateAttended
-                            )}
-                          </p>
-                          <p className="flex items-center text-lg">
-                            <strong>Lock Box Code: </strong>
-                            {editableProjectId === project?.id ? (
-                              <input
-                                type="text"
-                                name="lockBoxCode"
-                                value={
-                                  editProjectData[project?.id]?.lockBoxCode ||
-                                  project?.lockBoxCode ||
-                                  ""
-                                }
-                                onChange={(e) => handleChange(e, project?.id!)}
-                                className="ml-2 w-full rounded border px-2 py-1"
-                              />
-                            ) : (
-                              project?.lockBoxCode
-                            )}
-                          </p>
-                          <p className="flex items-center text-lg">
-                            <strong>Notes: </strong>
-                            {editableProjectId === project?.id ? (
-                              <textarea
-                                name="notes"
-                                value={
-                                  editProjectData[project?.id]?.notes ||
-                                  project?.notes ||
-                                  ""
-                                }
-                                onChange={(e) => handleChange(e, project?.id!)}
-                                className="ml-2 w-full rounded border px-2 py-1"
-                              />
-                            ) : (
-                              project?.notes
-                            )}
-                          </p>
+                          {(["email", "insuranceProvider", "claimNo", "adjuster", "dateOfLoss", "dateAttended", "lockBoxCode", "notes"] as ProjectField[]).map((field) => (
+                            <p key={field} className="flex flex-col sm:flex-row sm:items-center text-lg break-words">
+                              <strong className="sm:w-1/3">{field.replace(/([A-Z])/g, ' $1')}: </strong>
+                              {editableProjectId === project?.id ? (
+                                field === "notes" ? (
+                                  <textarea
+                                    name={field}
+                                    value={
+                                      editProjectData[project?.id]?.[field] || project?.[field] || ""
+                                    }
+                                    onChange={(e) => handleChange(e, project?.id!)}
+                                    className="ml-2 w-full rounded border px-2 py-1"
+                                  />
+                                ) : (
+                                  <input
+                                    type={field.includes("date") ? "date" : "text"}
+                                    name={field}
+                                    value={
+                                      editProjectData[project?.id]?.[field] || project?.[field] || ""
+                                    }
+                                    onChange={(e) => handleChange(e, project?.id!)}
+                                    className="ml-2 w-full rounded border px-2 py-1"
+                                  />
+                                )
+                              ) : (
+                                <span className="sm:w-2/3">{project?.[field]}</span>
+                              )}
+                            </p>
+                          ))}
                         </div>
                       )}
                       <button
@@ -545,4 +377,3 @@ const ViewAllProjects = () => {
 };
 
 export default ViewAllProjects;
-
