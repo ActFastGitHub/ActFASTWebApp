@@ -9,16 +9,16 @@ import { ModeProvider } from "@/app/context/ModeContext";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
-  title: "ActFAST Restoration and Repairs | Surrey, Metro Vancouver",
+  title: "ActFAST Restoration and Repairs | Surrey, Metro Vancouver, Okanagan",
   description:
-    "ActFAST is a restoration and repairs company based in Surrey, covering the Metro Vancouver area. We specialize in flood, mold, and fire insurance claims, catering mainly to the Filipino community.",
+    "ActFAST is a restoration and repairs company based in Surrey, Metro Vancouver, and the Okanagan region. We specialize in flood, mold, and fire insurance claims, serving communities across Kelowna, Vernon, and nearby cities.",
   robots: "index, follow",
   keywords:
-    "Restoration, Repairs, Flood Damage, Mold Removal, Fire Damage, Insurance Claims, Surrey, Metro Vancouver, Filipino Community",
+    "Restoration, Repairs, Flood Damage, Mold Removal, Fire Damage, Insurance Claims, Surrey, Metro Vancouver, Okanagan, Kelowna, Vernon, Filipino Community",
   openGraph: {
-    title: "ActFAST Restoration and Repairs",
+    title: "ActFAST Restoration and Repairs | Surrey, Metro Vancouver, Okanagan",
     description:
-      "ActFAST is a restoration and repairs company based in Surrey, covering the Metro Vancouver area. We specialize in flood, mold, and fire insurance claims.",
+      "ActFAST is a restoration and repairs company serving Surrey, Metro Vancouver, and the Okanagan region. Specializing in flood, mold, and fire insurance claims, we cater to a wide range of communities.",
     url: "https://www.actfast.ca",
     type: "website",
     images: [
