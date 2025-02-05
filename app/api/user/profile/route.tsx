@@ -1,3 +1,5 @@
+// app\api\user\profile\route.tsx
+
 import prisma from "@/app/libs/prismadb";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";

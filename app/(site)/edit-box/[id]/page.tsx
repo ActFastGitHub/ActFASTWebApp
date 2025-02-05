@@ -185,7 +185,7 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
       const response = await axios.patch(`/api/pods`, {
         data: {
           boxid: id,
-          name,
+          name: name.toUpperCase(),
           color,
         },
       });
@@ -334,7 +334,7 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
           <input
             type="text"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => setName((e.target.value).toUpperCase())}
             className="mt-1 w-full rounded border border-gray-300 p-2"
           />
         </div>
