@@ -17,8 +17,8 @@ model User {
   hashedPassword String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
-  isDeleted      Boolean   @default(false) // New field for soft deletion
-  
+  isDeleted      Boolean   @default(false)
+
   accounts Account[]
   Profile  Profile?
 }
@@ -45,7 +45,6 @@ model Account {
 model Profile {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  // Profile Details
   lastName    String?
   firstName   String?
   nickname    String? @unique
@@ -53,27 +52,28 @@ model Profile {
   phonenumber String?
   image       String?
 
-  // Hidden Details
   employeeID     String?
-  role           String? // Admin, Member, Lead, Owner
+  role           String?
   driversLicense String?
   active         Boolean?
 
-  // Define the 1-to-1 relationship with User using email as the reference
   userEmail String @unique @map("userEmail")
   user      User   @relation(fields: [userEmail], references: [email])
 
-  // 1-to-1 relationship - This is the relationship to Address
   location Location?
 
-  // 1-to-many relationship with Boxes last modified by this profile
-  boxesModified Box[] @relation("LastModifiedProfile")
-
-  // 1-to-many relationship with Items added by this profile
-  itemsAdded Item[] @relation("AddedByProfile")
-
-  // 1-to-many relationship with Items last modified by this profile
+  boxesModified Box[]  @relation("LastModifiedProfile")
+  itemsAdded    Item[] @relation("AddedByProfile")
   itemsModified Item[] @relation("ModifiedByProfile")
+
+  materialsCreated  Material[] @relation("MaterialCreatedBy")
+  materialsModified Material[] @relation("MaterialModifiedBy")
+
+  subcontractorsCreated  Subcontractor[] @relation("SubcontractorCreatedBy")
+  subcontractorsModified Subcontractor[] @relation("SubcontractorModifiedBy")
+
+  laborCostsCreated  LaborCost[] @relation("LaborCostCreatedBy")
+  laborCostsModified LaborCost[] @relation("LaborCostModifiedBy")
 }
 
 model Location {
@@ -131,17 +131,11 @@ model Item {
   addedBy        Profile? @relation("AddedByProfile", fields: [addedById], references: [nickname])
   lastModifiedBy Profile? @relation("ModifiedByProfile", fields: [lastModifiedById], references: [nickname])
   box            Box?     @relation("BoxItems", fields: [boxId], references: [boxNumber])
-
-  @@index([name])
-  @@index([description])
-  @@index([projectCode])
-  @@index([packedInAt])
-  @@index([packedOutAt])
 }
 
 model Project {
-  id                String     @id @default(auto()) @map("_id") @db.ObjectId
-  code              String     @unique
+  id                String  @id @default(auto()) @map("_id") @db.ObjectId
+  code              String  @unique
   insured           String?
   address           String?
   email             String?
@@ -155,66 +149,84 @@ model Project {
   dateAttended      String?
   lockBoxCode       String?
   notes             String?
-  materials         Material[] @relation("ProjectMaterials")
 
-  // Overview
-  nrList String? 
-  projectStatus String? // Not Started, Emergency, Final Repairs, Overdue, Completed, (Special Cases: Waiting)
-  
-  // Emergency 
-  siteReport String?
-  icc String?
-  emergencyEstimate String?
-  contentsEstimate String?
-  frEstimate String?
-  acmSample String? 
-  urgent String? 
+  budget         Float           @default(0.0)
+  materials      Material[]      @relation("ProjectMaterials")
+  subcontractors Subcontractor[] @relation("ProjectSubcontractors")
+  laborCosts     LaborCost[]     @relation("ProjectLabor")
 
-  // Final Repairs
-  dateApproved String?
-  lengthWeek String? 
-  frStartDate String?
-  packBackDate String?
-  actualPackBackDate String?
-  completionDate String?
-  actualCompletionDate String? 
-
-  insulation String? 
-  drywall String? 
-  painting String?
-  flooring String?
-  tiles String? 
-  cabinetries String? 
-  electrical String? 
-  plumbing String? 
-  issues String? 
-
-  // Strata Details
-  strataClaimNo String?
-  strataAdjuster String?
-  strataEmergencyEstimate String? 
-  strataContentsEstimate String?
-  strataFREstimate String? 
-
+  totalMaterialCost      Float @default(0.0)
+  totalSubcontractorCost Float @default(0.0)
+  totalLaborCost         Float @default(0.0)
+  totalProjectCost       Float @default(0.0)
 }
 
 model Material {
-  id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  projectCode String  @db.ObjectId
+  project     Project @relation("ProjectMaterials", fields: [projectCode], references: [id])
+
+  name              String
   type              String
   description       String?
-  brand             String?
   unitOfMeasurement String?
-  selectedQuantity  Int?
-  usedQuantity      Int?
-  costPerUnit       Float?
+  quantityOrdered   Int
   supplierName      String?
   supplierContact   String?
-  status            String? // e.g., "ordered", "received", "in use"
-  selectedAt        DateTime  @default(now())
-  usedAt            DateTime?
-  projectCode       String
-  project           Project   @relation("ProjectMaterials", fields: [projectCode], references: [code])
+  costPerUnit       Float
+  totalCost         Float   @default(0.0)
+  status            String?
 
-  @@index([type])
-  @@index([projectCode])
+  subcontractorCode String?        @db.ObjectId
+  subcontractor     Subcontractor? @relation("SubcontractorMaterials", fields: [subcontractorCode], references: [id])
+
+  createdById      String?
+  createdAt        DateTime @default(now())
+  lastModifiedById String?
+  lastModifiedAt   DateTime @updatedAt
+
+  createdBy      Profile? @relation("MaterialCreatedBy", fields: [createdById], references: [nickname])
+  lastModifiedBy Profile? @relation("MaterialModifiedBy", fields: [lastModifiedById], references: [nickname])
+}
+
+model Subcontractor {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  projectCode String  @db.ObjectId
+  project     Project @relation("ProjectSubcontractors", fields: [projectCode], references: [id])
+
+  name        String
+  expertise   String
+  contactInfo String?
+  agreedCost  Float      @default(0.0) // Fixed cost per contract
+  materials   Material[] @relation("SubcontractorMaterials")
+
+  totalCost Float @default(0.0) // Sum of agreed cost + materials purchased
+
+  createdById      String?
+  createdAt        DateTime @default(now())
+  lastModifiedById String?
+  lastModifiedAt   DateTime @updatedAt
+
+  createdBy      Profile? @relation("SubcontractorCreatedBy", fields: [createdById], references: [nickname])
+  lastModifiedBy Profile? @relation("SubcontractorModifiedBy", fields: [lastModifiedById], references: [nickname])
+}
+
+model LaborCost {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  projectCode String  @db.ObjectId
+  project     Project @relation("ProjectLabor", fields: [projectCode], references: [id])
+
+  employeeName String // Name of in-house employee
+  role         String? // Optional role description
+  hoursWorked  Float
+  hourlyRate   Float   @default(35.0) // Fixed hourly rate for in-house employees
+  totalCost    Float   @default(0.0) // Computed: hoursWorked * hourlyRate
+
+  createdById      String?
+  createdAt        DateTime @default(now())
+  lastModifiedById String?
+  lastModifiedAt   DateTime @updatedAt
+
+  createdBy      Profile? @relation("LaborCostCreatedBy", fields: [createdById], references: [nickname])
+  lastModifiedBy Profile? @relation("LaborCostModifiedBy", fields: [lastModifiedById], references: [nickname])
 }
