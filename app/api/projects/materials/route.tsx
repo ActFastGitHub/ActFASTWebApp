@@ -5,16 +5,58 @@ import prisma from "@/app/libs/prismadb";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/libs/authOption";
 
-// CREATE
+// CREATE MATERIAL
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session) {
+
+    if (!session || !session.user?.email) {
       return NextResponse.json({ status: 401, error: "Unauthorized" });
     }
 
-    const data = await request.json();
-    const newMaterial = await prisma.material.create({ data });
+    const body = await request.json();
+    const {
+      projectCode,
+      name,
+      type,
+      description,
+      unitOfMeasurement,
+      quantityOrdered,
+      costPerUnit,
+      supplierName,
+      supplierContact,
+      status,
+    } = body.data;
+
+    // Get the user's profile to set `createdById`
+    const userProfile = await prisma.profile.findUnique({
+      where: { userEmail: session.user.email },
+      select: { nickname: true },
+    });
+
+    if (!userProfile) {
+      return NextResponse.json({
+        message: "User profile not found",
+        status: 404,
+      });
+    }
+
+    const newMaterial = await prisma.material.create({
+      data: {
+        projectCode,
+        name,
+        type,
+        description,
+        unitOfMeasurement,
+        quantityOrdered,
+        costPerUnit,
+        supplierName,
+        supplierContact,
+        status,
+        createdById: userProfile.nickname, // Track who created it
+        createdAt: new Date(), // Set creation timestamp
+      },
+    });
 
     return NextResponse.json({ material: newMaterial, status: 201 });
   } catch (error) {
@@ -22,7 +64,7 @@ export async function POST(request: Request) {
   }
 }
 
-// READ
+// READ MATERIALS WITH PAGINATION AND SEARCH
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -46,6 +88,14 @@ export async function GET(request: Request) {
       where,
       skip: (page - 1) * limit,
       take: limit,
+      include: {
+        createdBy: {
+          select: { firstName: true, lastName: true, nickname: true },
+        },
+        lastModifiedBy: {
+          select: { firstName: true, lastName: true, nickname: true },
+        },
+      },
     });
 
     const totalMaterials = await prisma.material.count({ where });
