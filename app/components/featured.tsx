@@ -7,6 +7,7 @@ import "swiper/css";
 import "swiper/css/effect-fade";
 import "swiper/css/pagination";
 import "swiper/css/navigation";
+
 import { motion, useAnimation } from "framer-motion";
 import { useInView } from "react-intersection-observer";
 
@@ -27,9 +28,11 @@ const FeaturedProject: React.FC<FeaturedProjectProps> = ({
   const controls = useAnimation();
 
   useEffect(() => {
-    controls.start(inView ? "visible" : "hidden");
+    if (inView) controls.start("visible");
+    else controls.start("hidden");
   }, [controls, inView]);
 
+  // Merge the before/after images into a single array
   const combinedImages = beforeImages.flatMap((beforeImage, index) => [
     { src: beforeImage, label: "Before" },
     { src: afterImages[index], label: "After" },
@@ -37,7 +40,7 @@ const FeaturedProject: React.FC<FeaturedProjectProps> = ({
 
   return (
     <motion.div
-      className="bg-white rounded-lg shadow-lg overflow-hidden"
+      ref={ref}
       initial="hidden"
       animate={controls}
       variants={{
@@ -45,11 +48,11 @@ const FeaturedProject: React.FC<FeaturedProjectProps> = ({
         hidden: { opacity: 0, y: 50 },
       }}
       transition={{ duration: 0.5 }}
-      ref={ref}
+      className="bg-white rounded-lg shadow-lg overflow-hidden"
     >
       <div className="p-6">
+        {/* Title */}
         <motion.h2
-          className="mb-4 text-center text-3xl font-bold text-black"
           initial="hidden"
           animate={controls}
           variants={{
@@ -57,11 +60,13 @@ const FeaturedProject: React.FC<FeaturedProjectProps> = ({
             hidden: { opacity: 0, y: 50 },
           }}
           transition={{ duration: 0.5, delay: 0.2 }}
+          className="mb-4 text-center text-3xl font-bold text-black"
         >
           {title}
         </motion.h2>
+
+        {/* Description */}
         <motion.p
-          className="mb-6 text-center text-lg text-black"
           initial="hidden"
           animate={controls}
           variants={{
@@ -69,33 +74,39 @@ const FeaturedProject: React.FC<FeaturedProjectProps> = ({
             hidden: { opacity: 0, y: 50 },
           }}
           transition={{ duration: 0.5, delay: 0.4 }}
+          className="mb-6 text-center text-lg text-black"
         >
           {description}
         </motion.p>
+
+        {/* Swiper Carousel */}
         <Swiper
           effect="fade"
+          fadeEffect={{ crossFade: true }}
           navigation
           pagination={{ clickable: true }}
-          loop={true}
+          loop
           autoplay={{ delay: 3000, disableOnInteraction: false }}
           slidesPerView={1}
-          className="w-full"
           modules={[EffectFade, Navigation, Pagination, Autoplay]}
+          className="w-full"
         >
-          {combinedImages.map((image, index) => (
-            <SwiperSlide key={index}>
-              <div
-                className="relative flex w-full items-center justify-center"
-                style={{ height: "500px" }}
-              >
-                <motion.img
+          {combinedImages.map((image, idx) => (
+            <SwiperSlide key={idx}>
+              {/* 
+                Responsive fixed-height container
+                - h-64 on small devices (256px)
+                - h-80 on sm screens (~320px)
+                - h-96 on md screens (~384px)
+                - h-[500px] on lg screens (500px)
+              */}
+              <div className="relative w-full h-64 sm:h-80 md:h-96 lg:h-[500px] bg-white flex items-center justify-center overflow-hidden rounded">
+                <img
                   src={image.src}
-                  alt={`${title} ${image.label} ${index + 1}`}
-                  className="h-full w-full object-cover rounded"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.8 }}
+                  alt={`${title} ${image.label} ${idx + 1}`}
+                  className="max-w-full max-h-full object-contain"
                 />
+                {/* Label in top-left corner */}
                 <span className="absolute left-2 top-2 rounded bg-black bg-opacity-50 px-2 py-1 text-sm text-white">
                   {image.label}
                 </span>
@@ -109,4 +120,3 @@ const FeaturedProject: React.FC<FeaturedProjectProps> = ({
 };
 
 export default FeaturedProject;
-
