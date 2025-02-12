@@ -50,7 +50,7 @@ const FeaturedPage: React.FC = () => {
   const handleCloseModal = () => setShowModal(false);
 
   return (
-    <div className="bg-gray-900 py-16">
+    <div className="bg-gray-900 min-h-screen py-16">
       <Navbar onPortalClick={handlePortalClick} />
       <div className="container mx-auto mt-6 px-6">
         <motion.h1
