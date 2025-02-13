@@ -165,6 +165,11 @@ const teamSections: TeamSection[] = [
           "Specialist in final repairs, touch-ups, and warranty work to ensure top-quality results.",
       },
       {
+        name: "Bobby",
+        description:
+          "Highly adept at final repairs with a strong specialty in drywalling; also flexible in handling various tasks."
+      },
+      {
         name: "Christopher",
         description:
           "Newest member of the final repairs team with strong expertise in HVAC systems.",
@@ -206,7 +211,7 @@ const roleColors: { [key: string]: string } = {
   "Emergency Team": "bg-blue-600",
   "Logistics Team": "bg-green-700",
   "Final Repairs Team": "bg-yellow-700",
-  "Automotive": "bg-indigo-700",
+  Automotive: "bg-indigo-700",
 };
 
 // ----------------------------
@@ -281,10 +286,10 @@ const MeetTheTeamPage: React.FC = () => {
   };
 
   const owner = upperManagement.find(
-    (member) => member.role === "General Manager"
+    (member) => member.role === "General Manager",
   );
   const nonOwnerManagement = upperManagement.filter(
-    (member) => member.role !== "General Manager"
+    (member) => member.role !== "General Manager",
   );
 
   const getImagePath = (name: string) =>
@@ -296,7 +301,7 @@ const MeetTheTeamPage: React.FC = () => {
       <div className="container mx-auto mt-6 px-6">
         {/* ----------------- Page Title ----------------- */}
         <motion.h1
-          className="mb-10 cursor-pointer text-center text-4xl font-extrabold text-white lg:text-6xl hover:text-gray-200 transition-colors"
+          className="mb-10 cursor-pointer text-center text-4xl font-extrabold text-white transition-colors hover:text-gray-200 lg:text-6xl"
           initial="hidden"
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
@@ -317,7 +322,7 @@ const MeetTheTeamPage: React.FC = () => {
             <ul className="flex flex-col items-center space-y-2">
               <li
                 onClick={() => scrollToSection("office-team")}
-                className="cursor-pointer hover:text-cyan-300 transition-colors"
+                className="cursor-pointer transition-colors hover:text-cyan-300"
               >
                 Office Team
               </li>
@@ -325,7 +330,7 @@ const MeetTheTeamPage: React.FC = () => {
                 <li
                   key={index}
                   onClick={() => scrollToSection(section.role)}
-                  className="cursor-pointer hover:text-cyan-300 transition-colors"
+                  className="cursor-pointer transition-colors hover:text-cyan-300"
                 >
                   {section.role}
                 </li>
@@ -348,7 +353,7 @@ const MeetTheTeamPage: React.FC = () => {
           {/* Owner / General Manager */}
           {owner && (
             <motion.div
-              className={`relative mb-12 rounded-2xl p-6 shadow-xl transition duration-300 transform hover:-translate-y-1 hover:shadow-2xl ${
+              className={`relative mb-12 transform rounded-2xl p-6 shadow-xl transition duration-300 hover:-translate-y-1 hover:shadow-2xl ${
                 roleColors[owner.role]
               }`}
               initial="hidden"
@@ -356,7 +361,7 @@ const MeetTheTeamPage: React.FC = () => {
               transition={{ duration: 0.5, delay: 0.2 }}
             >
               <div className="flex flex-col items-center">
-                <div className="relative mb-4 -mt-16 h-32 w-32 overflow-hidden rounded-full bg-gray-200 ring-4 ring-white shadow-2xl lg:-mt-24 lg:h-40 lg:w-40">
+                <div className="relative -mt-16 mb-4 h-32 w-32 overflow-hidden rounded-full bg-gray-200 shadow-2xl ring-4 ring-white lg:-mt-24 lg:h-40 lg:w-40">
                   <img
                     src={getImagePath(owner.name)}
                     alt={owner.name}
@@ -379,7 +384,7 @@ const MeetTheTeamPage: React.FC = () => {
           {/* Non-owner management */}
           <div
             className={`flex flex-wrap justify-center gap-12 ${getGridClasses(
-              nonOwnerManagement.length
+              nonOwnerManagement.length,
             )}`}
           >
             {nonOwnerManagement.map((member, index) => {
@@ -396,7 +401,7 @@ const MeetTheTeamPage: React.FC = () => {
               return (
                 <motion.div
                   key={index}
-                  className={`relative rounded-2xl p-6 shadow-xl transition duration-300 transform hover:-translate-y-1 hover:shadow-2xl ${
+                  className={`relative transform rounded-2xl p-6 shadow-xl transition duration-300 hover:-translate-y-1 hover:shadow-2xl ${
                     roleColors[member.role]
                   }`}
                   initial="hidden"
@@ -408,7 +413,7 @@ const MeetTheTeamPage: React.FC = () => {
                   ref={ref}
                 >
                   <div className="flex flex-col items-center">
-                    <div className="relative mb-4 -mt-16 h-24 w-24 overflow-hidden rounded-full bg-gray-200 ring-4 ring-white shadow-2xl lg:-mt-20 lg:h-32 lg:w-32">
+                    <div className="relative -mt-16 mb-4 h-24 w-24 overflow-hidden rounded-full bg-gray-200 shadow-2xl ring-4 ring-white lg:-mt-20 lg:h-32 lg:w-32">
                       <img
                         src={getImagePath(member.name)}
                         alt={member.name}
@@ -449,7 +454,7 @@ const MeetTheTeamPage: React.FC = () => {
               {teamSection.role}
             </motion.div>
             <motion.div
-              className={`rounded-2xl p-6 shadow-xl transition duration-300 transform hover:-translate-y-1 hover:shadow-2xl ${
+              className={`transform rounded-2xl p-6 shadow-xl transition duration-300 hover:-translate-y-1 hover:shadow-2xl ${
                 roleColors[teamSection.role] || "bg-orange-500"
               }`}
               initial="hidden"
@@ -468,7 +473,7 @@ const MeetTheTeamPage: React.FC = () => {
               </p>
               <div
                 className={`grid gap-4 ${getGridClasses(
-                  teamSection.members.length
+                  teamSection.members.length,
                 )}`}
               >
                 {teamSection.members.map((member, memberIndex) => {
@@ -493,7 +498,7 @@ const MeetTheTeamPage: React.FC = () => {
                       whileHover="hover"
                       ref={ref}
                     >
-                      <div className="mb-4 h-24 w-24 overflow-hidden rounded-full bg-gray-200 ring-4 ring-white shadow-xl">
+                      <div className="mb-4 h-24 w-24 overflow-hidden rounded-full bg-gray-200 shadow-xl ring-4 ring-white">
                         <img
                           src={getImagePath(member.name)}
                           alt={member.name}
