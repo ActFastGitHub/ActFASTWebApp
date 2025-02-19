@@ -18,6 +18,12 @@ type Project = {
   totalProjectCost?: number;
 };
 
+type ProfileInfo = {
+  firstName?: string;
+  lastName?: string;
+  nickname?: string;
+};
+
 type Material = {
   id: string;
   type: string;
@@ -29,6 +35,12 @@ type Material = {
   supplierName?: string;
   supplierContact?: string;
   status?: string;
+
+  // Additional fields for who/when
+  createdAt?: string;
+  lastModifiedAt?: string;
+  createdBy?: ProfileInfo;
+  lastModifiedBy?: ProfileInfo;
 };
 
 type Subcontractor = {
@@ -38,6 +50,12 @@ type Subcontractor = {
   contactInfo?: string;
   agreedCost?: number;
   totalCost?: number;
+
+  // Additional fields for who/when
+  createdAt?: string;
+  lastModifiedAt?: string;
+  createdBy?: ProfileInfo;
+  lastModifiedBy?: ProfileInfo;
 };
 
 type LaborCost = {
@@ -47,6 +65,12 @@ type LaborCost = {
   hoursWorked: number;
   hourlyRate: number;
   totalCost: number;
+
+  // Additional fields for who/when
+  createdAt?: string;
+  lastModifiedAt?: string;
+  createdBy?: ProfileInfo;
+  lastModifiedBy?: ProfileInfo;
 };
 
 type EditMaterialData = {
@@ -116,15 +140,9 @@ const ProjectCostManagement = () => {
   const [searchQuery, setSearchQuery] = useState("");
 
   const [newMaterial, setNewMaterial] = useState<Partial<Material>>({});
-  const [editableMaterialId, setEditableMaterialId] = useState<string | null>(
-    null
-  );
-  const [editMaterialData, setEditMaterialData] = useState<EditMaterialData>(
-    {}
-  );
-  const [showMaterialDetails, setShowMaterialDetails] = useState<{
-    [key: string]: boolean;
-  }>({});
+  const [editableMaterialId, setEditableMaterialId] = useState<string | null>(null);
+  const [editMaterialData, setEditMaterialData] = useState<EditMaterialData>({});
+  const [showMaterialDetails, setShowMaterialDetails] = useState<{ [key: string]: boolean }>({});
 
   /**
    * State: Subcontractors
@@ -133,16 +151,10 @@ const ProjectCostManagement = () => {
   const [subPage, setSubPage] = useState(1);
   const [subTotalPages, setSubTotalPages] = useState(1);
 
-  const [newSubcontractor, setNewSubcontractor] = useState<
-    Partial<Subcontractor>
-  >({});
-  const [editableSubcontractorId, setEditableSubcontractorId] =
-    useState<string | null>(null);
-  const [editSubcontractorData, setEditSubcontractorData] =
-    useState<EditSubcontractorData>({});
-  const [showSubDetails, setShowSubDetails] = useState<{
-    [key: string]: boolean;
-  }>({});
+  const [newSubcontractor, setNewSubcontractor] = useState<Partial<Subcontractor>>({});
+  const [editableSubcontractorId, setEditableSubcontractorId] = useState<string | null>(null);
+  const [editSubcontractorData, setEditSubcontractorData] = useState<EditSubcontractorData>({});
+  const [showSubDetails, setShowSubDetails] = useState<{ [key: string]: boolean }>({});
 
   /**
    * State: Labor Costs
@@ -152,15 +164,9 @@ const ProjectCostManagement = () => {
   const [laborTotalPages, setLaborTotalPages] = useState(1);
 
   const [newLaborCost, setNewLaborCost] = useState<Partial<LaborCost>>({});
-  const [editableLaborCostId, setEditableLaborCostId] = useState<
-    string | null
-  >(null);
-  const [editLaborCostData, setEditLaborCostData] = useState<EditLaborCostData>(
-    {}
-  );
-  const [showLaborDetails, setShowLaborDetails] = useState<{
-    [key: string]: boolean;
-  }>({});
+  const [editableLaborCostId, setEditableLaborCostId] = useState<string | null>(null);
+  const [editLaborCostData, setEditLaborCostData] = useState<EditLaborCostData>({});
+  const [showLaborDetails, setShowLaborDetails] = useState<{ [key: string]: boolean }>({});
 
   /**
    * Auth check
@@ -182,10 +188,10 @@ const ProjectCostManagement = () => {
           (a: Project, b: Project) => b.code.localeCompare(a.code)
         );
         setProjects(sortedProjects);
-  
+
         // If there is a selected projectFilter, reset `selectedProject` accordingly
         if (projectFilter) {
-          const found = sortedProjects.find((p: { code: string; }) => p.code === projectFilter);
+          const found = sortedProjects.find((p: { code: string }) => p.code === projectFilter);
           if (found) {
             setSelectedProject(found);
             setNewBudget(found.budget || 0);
@@ -199,7 +205,6 @@ const ProjectCostManagement = () => {
       toast.error("Failed to fetch projects");
     }
   };
-  
 
   /**
    * Re-check if we have a selected project from the projectFilter
@@ -288,10 +293,7 @@ const ProjectCostManagement = () => {
   };
 
   const handleMaterialChange = (
-    e:
-      | ChangeEvent<HTMLInputElement>
-      | ChangeEvent<HTMLTextAreaElement>
-      | ChangeEvent<HTMLSelectElement>,
+    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
     materialId: string
   ) => {
     const { name, value } = e.target;
@@ -720,7 +722,6 @@ const ProjectCostManagement = () => {
                 Total Expense:{" "}
                 {selectedProject.totalProjectCost?.toLocaleString() || 0}
               </p>
-              {/* Display remaining budget if desired */}
               <p>
                 Remaining Budget:{" "}
                 {(
@@ -949,9 +950,7 @@ const ProjectCostManagement = () => {
                           session?.user.role as string
                         ) && (
                           <button
-                            onClick={() =>
-                              handleMaterialEditToggle(material.id)
-                            }
+                            onClick={() => handleMaterialEditToggle(material.id)}
                             className="rounded bg-blue-500 p-2 text-white hover:bg-blue-600"
                           >
                             <FaEdit />
@@ -990,6 +989,37 @@ const ProjectCostManagement = () => {
                           <p>Contact: {material.supplierContact}</p>
                         )}
                         {material.status && <p>Status: {material.status}</p>}
+
+                        {/* Show created/modified info */}
+                        <hr className="my-2" />
+                        <p>
+                          Created By:{" "}
+                          {material.createdBy
+                            ? `${material.createdBy.firstName ?? ""} ${
+                                material.createdBy.lastName ?? ""
+                              } (${material.createdBy.nickname ?? ""})`
+                            : "N/A"}
+                        </p>
+                        <p>
+                          Created At:{" "}
+                          {material.createdAt
+                            ? new Date(material.createdAt).toLocaleString()
+                            : "N/A"}
+                        </p>
+                        <p>
+                          Last Modified By:{" "}
+                          {material.lastModifiedBy
+                            ? `${material.lastModifiedBy.firstName ?? ""} ${
+                                material.lastModifiedBy.lastName ?? ""
+                              } (${material.lastModifiedBy.nickname ?? ""})`
+                            : "N/A"}
+                        </p>
+                        <p>
+                          Last Modified At:{" "}
+                          {material.lastModifiedAt
+                            ? new Date(material.lastModifiedAt).toLocaleString()
+                            : "N/A"}
+                        </p>
                       </div>
                     )}
 
@@ -1009,9 +1039,7 @@ const ProjectCostManagement = () => {
                         />
                         <textarea
                           name="description"
-                          value={
-                            editMaterialData[material.id]?.description || ""
-                          }
+                          value={editMaterialData[material.id]?.description || ""}
                           onChange={(e) => handleMaterialChange(e, material.id)}
                           placeholder="Description"
                           className="w-full rounded border px-4 py-2"
@@ -1019,8 +1047,7 @@ const ProjectCostManagement = () => {
                         <select
                           name="unitOfMeasurement"
                           value={
-                            editMaterialData[material.id]?.unitOfMeasurement ||
-                            ""
+                            editMaterialData[material.id]?.unitOfMeasurement || ""
                           }
                           onChange={(e) => handleMaterialChange(e, material.id)}
                           className="w-full rounded border px-4 py-2"
@@ -1036,8 +1063,7 @@ const ProjectCostManagement = () => {
                           type="number"
                           name="quantityOrdered"
                           value={
-                            editMaterialData[material.id]?.quantityOrdered ||
-                            ""
+                            editMaterialData[material.id]?.quantityOrdered || ""
                           }
                           onChange={(e) => handleMaterialChange(e, material.id)}
                           placeholder="Quantity"
@@ -1047,9 +1073,7 @@ const ProjectCostManagement = () => {
                           type="number"
                           name="costPerUnit"
                           step="any"
-                          value={
-                            editMaterialData[material.id]?.costPerUnit || ""
-                          }
+                          value={editMaterialData[material.id]?.costPerUnit || ""}
                           onChange={(e) => handleMaterialChange(e, material.id)}
                           placeholder="Cost Per Unit"
                           className="w-full rounded border px-4 py-2"
@@ -1080,9 +1104,7 @@ const ProjectCostManagement = () => {
                     onClick={() => handleMaterialPageChange(materialsPage - 1)}
                     disabled={materialsPage === 1}
                     className={`rounded px-4 py-2 ${
-                      materialsPage === 1
-                        ? "bg-gray-300"
-                        : "bg-blue-500 text-white"
+                      materialsPage === 1 ? "bg-gray-300" : "bg-blue-500 text-white"
                     }`}
                   >
                     Previous
@@ -1246,6 +1268,37 @@ const ProjectCostManagement = () => {
                         {sub.totalCost !== undefined && (
                           <p>Total Cost: {sub.totalCost}</p>
                         )}
+
+                        {/* Show created/modified info */}
+                        <hr className="my-2" />
+                        <p>
+                          Created By:{" "}
+                          {sub.createdBy
+                            ? `${sub.createdBy.firstName ?? ""} ${
+                                sub.createdBy.lastName ?? ""
+                              } (${sub.createdBy.nickname ?? ""})`
+                            : "N/A"}
+                        </p>
+                        <p>
+                          Created At:{" "}
+                          {sub.createdAt
+                            ? new Date(sub.createdAt).toLocaleString()
+                            : "N/A"}
+                        </p>
+                        <p>
+                          Last Modified By:{" "}
+                          {sub.lastModifiedBy
+                            ? `${sub.lastModifiedBy.firstName ?? ""} ${
+                                sub.lastModifiedBy.lastName ?? ""
+                              } (${sub.lastModifiedBy.nickname ?? ""})`
+                            : "N/A"}
+                        </p>
+                        <p>
+                          Last Modified At:{" "}
+                          {sub.lastModifiedAt
+                            ? new Date(sub.lastModifiedAt).toLocaleString()
+                            : "N/A"}
+                        </p>
                       </div>
                     )}
 
@@ -1266,9 +1319,7 @@ const ProjectCostManagement = () => {
                         <input
                           type="text"
                           name="expertise"
-                          value={
-                            editSubcontractorData[sub.id]?.expertise || ""
-                          }
+                          value={editSubcontractorData[sub.id]?.expertise || ""}
                           onChange={(e) => handleSubChange(e, sub.id)}
                           placeholder="Expertise"
                           className="w-full rounded border px-4 py-2"
@@ -1276,9 +1327,7 @@ const ProjectCostManagement = () => {
                         <input
                           type="text"
                           name="contactInfo"
-                          value={
-                            editSubcontractorData[sub.id]?.contactInfo || ""
-                          }
+                          value={editSubcontractorData[sub.id]?.contactInfo || ""}
                           onChange={(e) => handleSubChange(e, sub.id)}
                           placeholder="Contact Info"
                           className="w-full rounded border px-4 py-2"
@@ -1432,9 +1481,7 @@ const ProjectCostManagement = () => {
                   <div key={lab.id} className="rounded bg-white p-4 shadow">
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className="text-xl font-bold">
-                          {lab.employeeName}
-                        </div>
+                        <div className="text-xl font-bold">{lab.employeeName}</div>
                         <p className="text-gray-600">{lab.role}</p>
                       </div>
                       <div className="flex space-x-2">
@@ -1471,6 +1518,37 @@ const ProjectCostManagement = () => {
                         <p>Hours Worked: {lab.hoursWorked}</p>
                         <p>Hourly Rate: {lab.hourlyRate}</p>
                         <p>Total Cost: {lab.totalCost}</p>
+
+                        {/* Show created/modified info */}
+                        <hr className="my-2" />
+                        <p>
+                          Created By:{" "}
+                          {lab.createdBy
+                            ? `${lab.createdBy.firstName ?? ""} ${
+                                lab.createdBy.lastName ?? ""
+                              } (${lab.createdBy.nickname ?? ""})`
+                            : "N/A"}
+                        </p>
+                        <p>
+                          Created At:{" "}
+                          {lab.createdAt
+                            ? new Date(lab.createdAt).toLocaleString()
+                            : "N/A"}
+                        </p>
+                        <p>
+                          Last Modified By:{" "}
+                          {lab.lastModifiedBy
+                            ? `${lab.lastModifiedBy.firstName ?? ""} ${
+                                lab.lastModifiedBy.lastName ?? ""
+                              } (${lab.lastModifiedBy.nickname ?? ""})`
+                            : "N/A"}
+                        </p>
+                        <p>
+                          Last Modified At:{" "}
+                          {lab.lastModifiedAt
+                            ? new Date(lab.lastModifiedAt).toLocaleString()
+                            : "N/A"}
+                        </p>
                       </div>
                     )}
 
@@ -1482,9 +1560,7 @@ const ProjectCostManagement = () => {
                         <input
                           type="text"
                           name="employeeName"
-                          value={
-                            editLaborCostData[lab.id]?.employeeName || ""
-                          }
+                          value={editLaborCostData[lab.id]?.employeeName || ""}
                           onChange={(e) => handleLaborChange(e, lab.id)}
                           placeholder="Employee Name"
                           className="w-full rounded border px-4 py-2"

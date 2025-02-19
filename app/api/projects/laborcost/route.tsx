@@ -38,7 +38,10 @@ export async function POST(request: Request) {
       select: { nickname: true },
     });
     if (!userProfile) {
-      return NextResponse.json({ message: "User profile not found", status: 404 });
+      return NextResponse.json({
+        message: "User profile not found",
+        status: 404,
+      });
     }
 
     const newLaborCost = await prisma.laborCost.create({
@@ -80,6 +83,14 @@ export async function GET(request: Request) {
       where,
       skip: (page - 1) * limit,
       take: limit,
+      include: {
+        createdBy: {
+          select: { firstName: true, lastName: true, nickname: true },
+        },
+        lastModifiedBy: {
+          select: { firstName: true, lastName: true, nickname: true },
+        },
+      },
     });
 
     const totalLaborCosts = await prisma.laborCost.count({ where });
