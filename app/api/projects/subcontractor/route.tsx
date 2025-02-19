@@ -15,7 +15,8 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { projectCode, name, expertise, contactInfo, agreedCost } = body.data || {};
+    const { projectCode, name, expertise, contactInfo, agreedCost } =
+      body.data || {};
 
     if (!projectCode) {
       return NextResponse.json({
@@ -65,16 +66,27 @@ export async function POST(request: Request) {
   }
 }
 
+// GET with searchTerm logic
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const projectCode = searchParams.get("projectCode");
+    const searchTerm = searchParams.get("searchTerm") || ""; // <-- get the searchTerm
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
 
     const where: any = {};
     if (projectCode) {
       where.projectCode = projectCode;
+    }
+
+    // If we have a searchTerm, search in "name" and "expertise"
+    // For partial matching, use "contains" + mode: "insensitive"
+    if (searchTerm) {
+      where.OR = [
+        { name: { contains: searchTerm, mode: "insensitive" } },
+        { expertise: { contains: searchTerm, mode: "insensitive" } },
+      ];
     }
 
     const subcontractors = await prisma.subcontractor.findMany({

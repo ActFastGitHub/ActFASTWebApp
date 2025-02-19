@@ -67,16 +67,26 @@ export async function POST(request: Request) {
   }
 }
 
+// GET with searchTerm logic
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const projectCode = searchParams.get("projectCode");
+    const searchTerm = searchParams.get("searchTerm") || ""; // <-- new
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
 
     const where: any = {};
     if (projectCode) {
       where.projectCode = projectCode;
+    }
+
+    // If searchTerm is present, search in employeeName, role, etc.
+    if (searchTerm) {
+      where.OR = [
+        { employeeName: { contains: searchTerm, mode: "insensitive" } },
+        { role: { contains: searchTerm, mode: "insensitive" } },
+      ];
     }
 
     const laborCosts = await prisma.laborCost.findMany({

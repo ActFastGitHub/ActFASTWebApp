@@ -84,11 +84,12 @@ export async function POST(request: Request) {
   }
 }
 
+// GET with updated searchTerm logic
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const projectCode = searchParams.get("projectCode");
-    const searchTerm = searchParams.get("searchTerm");
+    const searchTerm = searchParams.get("searchTerm") || ""; // <--
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
 
@@ -96,10 +97,14 @@ export async function GET(request: Request) {
     if (projectCode) {
       where.projectCode = projectCode;
     }
+
+    // Add supplierName + status to the existing search
     if (searchTerm) {
       where.OR = [
         { type: { contains: searchTerm, mode: "insensitive" } },
         { description: { contains: searchTerm, mode: "insensitive" } },
+        { supplierName: { contains: searchTerm, mode: "insensitive" } },
+        { status: { contains: searchTerm, mode: "insensitive" } },
       ];
     }
 

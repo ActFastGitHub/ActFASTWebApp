@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, FormEvent, ChangeEvent } from "react";
@@ -35,8 +36,6 @@ type Material = {
   supplierName?: string;
   supplierContact?: string;
   status?: string;
-
-  // Additional fields for who/when
   createdAt?: string;
   lastModifiedAt?: string;
   createdBy?: ProfileInfo;
@@ -50,8 +49,6 @@ type Subcontractor = {
   contactInfo?: string;
   agreedCost?: number;
   totalCost?: number;
-
-  // Additional fields for who/when
   createdAt?: string;
   lastModifiedAt?: string;
   createdBy?: ProfileInfo;
@@ -65,8 +62,6 @@ type LaborCost = {
   hoursWorked: number;
   hourlyRate: number;
   totalCost: number;
-
-  // Additional fields for who/when
   createdAt?: string;
   lastModifiedAt?: string;
   createdBy?: ProfileInfo;
@@ -137,7 +132,8 @@ const ProjectCostManagement = () => {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [materialsPage, setMaterialsPage] = useState(1);
   const [materialsTotalPages, setMaterialsTotalPages] = useState(1);
-  const [searchQuery, setSearchQuery] = useState("");
+  // Material-specific search
+  const [materialsSearchTerm, setMaterialsSearchTerm] = useState("");
 
   const [newMaterial, setNewMaterial] = useState<Partial<Material>>({});
   const [editableMaterialId, setEditableMaterialId] = useState<string | null>(null);
@@ -150,6 +146,8 @@ const ProjectCostManagement = () => {
   const [subcontractors, setSubcontractors] = useState<Subcontractor[]>([]);
   const [subPage, setSubPage] = useState(1);
   const [subTotalPages, setSubTotalPages] = useState(1);
+  // Subcontractor-specific search
+  const [subSearchTerm, setSubSearchTerm] = useState("");
 
   const [newSubcontractor, setNewSubcontractor] = useState<Partial<Subcontractor>>({});
   const [editableSubcontractorId, setEditableSubcontractorId] = useState<string | null>(null);
@@ -162,6 +160,8 @@ const ProjectCostManagement = () => {
   const [laborCosts, setLaborCosts] = useState<LaborCost[]>([]);
   const [laborPage, setLaborPage] = useState(1);
   const [laborTotalPages, setLaborTotalPages] = useState(1);
+  // Labor-specific search
+  const [laborSearchTerm, setLaborSearchTerm] = useState("");
 
   const [newLaborCost, setNewLaborCost] = useState<Partial<LaborCost>>({});
   const [editableLaborCostId, setEditableLaborCostId] = useState<string | null>(null);
@@ -191,7 +191,7 @@ const ProjectCostManagement = () => {
 
         // If there is a selected projectFilter, reset `selectedProject` accordingly
         if (projectFilter) {
-          const found = sortedProjects.find((p: { code: string }) => p.code === projectFilter);
+          const found = sortedProjects.find((p: Project) => p.code === projectFilter);
           if (found) {
             setSelectedProject(found);
             setNewBudget(found.budget || 0);
@@ -235,7 +235,7 @@ const ProjectCostManagement = () => {
     try {
       const response = await axios.get("/api/projects/materials", {
         params: {
-          searchTerm: searchQuery,
+          searchTerm: materialsSearchTerm,
           projectCode: projectFilter,
           page,
           limit: 20,
@@ -372,7 +372,12 @@ const ProjectCostManagement = () => {
     }
     try {
       const response = await axios.get("/api/projects/subcontractor", {
-        params: { projectCode: projectFilter, page, limit: 20 },
+        params: {
+          searchTerm: subSearchTerm,
+          projectCode: projectFilter,
+          page,
+          limit: 20,
+        },
       });
       if (response.data && response.data.subcontractors) {
         setSubcontractors(response.data.subcontractors);
@@ -496,7 +501,12 @@ const ProjectCostManagement = () => {
     }
     try {
       const response = await axios.get("/api/projects/laborcost", {
-        params: { projectCode: projectFilter, page, limit: 20 },
+        params: {
+          searchTerm: laborSearchTerm,
+          projectCode: projectFilter,
+          page,
+          limit: 20,
+        },
       });
       if (response.data && response.data.laborCosts) {
         setLaborCosts(response.data.laborCosts);
@@ -658,7 +668,34 @@ const ProjectCostManagement = () => {
     fetchMaterials(1);
     fetchSubcontractors(1);
     fetchLaborCosts(1);
-  }, [projectFilter, searchQuery]);
+  }, [projectFilter]);
+
+  // Trigger material refetch on search changes
+  useEffect(() => {
+    setMaterialsPage(1);
+    if (projectFilter) {
+      fetchMaterials(1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [materialsSearchTerm]);
+
+  // Trigger subcontractor refetch on search changes
+  useEffect(() => {
+    setSubPage(1);
+    if (projectFilter) {
+      fetchSubcontractors(1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subSearchTerm]);
+
+  // Trigger labor refetch on search changes
+  useEffect(() => {
+    setLaborPage(1);
+    if (projectFilter) {
+      fetchLaborCosts(1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [laborSearchTerm]);
 
   useEffect(() => {
     // whenever we pick a new selectedProject, set newBudget
@@ -671,67 +708,77 @@ const ProjectCostManagement = () => {
     <div className="relative min-h-screen bg-gray-100">
       <Navbar />
       <div className="p-6 pt-24">
-        <div className="mb-6 flex flex-col items-start justify-between space-y-4 sm:flex-row sm:space-y-0">
+        <div className="mb-6 flex flex-col items-start space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
           <h1 className="text-3xl font-bold">Manage Project Costs</h1>
-          <div className="flex flex-col items-start space-y-4 sm:flex-row sm:space-x-4 sm:space-y-0">
-            {/* SEARCH BOX for Materials */}
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search materials..."
-              className="w-full rounded border px-4 py-2 text-sm lg:w-72 xl:w-96"
-            />
-            {/* SELECT PROJECT */}
-            <select
-              value={projectFilter}
-              onChange={(e) => setProjectFilter(e.target.value)}
-              className="w-full rounded border px-4 py-2 text-sm lg:w-72 xl:w-96"
-            >
-              <option value="">Select a Project</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.code}>
-                  {p.code}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* SELECT PROJECT DROPDOWN */}
+          <select
+            value={projectFilter}
+            onChange={(e) => setProjectFilter(e.target.value)}
+            className="w-full rounded border px-4 py-2 text-sm sm:w-64"
+          >
+            <option value="">Select a Project</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.code}>
+                {p.code}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Display Project Info if we have a selectedProject */}
         {selectedProject && (
           <div className="mb-6 rounded bg-white p-4 shadow">
-            <h2 className="text-2xl font-bold">
-              Project: {selectedProject.code}
-            </h2>
-            <div className="mt-2 flex flex-col space-y-1 text-sm text-gray-600">
-              <p>Budget: {selectedProject.budget?.toLocaleString() || 0}</p>
-              <p>
-                Materials Subtotal:{" "}
-                {selectedProject.totalMaterialCost?.toLocaleString() || 0}
-              </p>
-              <p>
-                Subcontractors Subtotal:{" "}
-                {selectedProject.totalSubcontractorCost?.toLocaleString() || 0}
-              </p>
-              <p>
-                Labor Cost Subtotal:{" "}
-                {selectedProject.totalLaborCost?.toLocaleString() || 0}
-              </p>
-              <p>
-                Total Expense:{" "}
-                {selectedProject.totalProjectCost?.toLocaleString() || 0}
-              </p>
-              <p>
-                Remaining Budget:{" "}
-                {(
-                  (selectedProject.budget || 0) -
-                  (selectedProject.totalProjectCost || 0)
-                ).toLocaleString()}
-              </p>
+            <h2 className="text-2xl font-bold mb-4">Project: {selectedProject.code}</h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div className="flex flex-col space-y-2">
+                <div className="flex flex-col">
+                  <span>Budget</span>
+                  <span className="bg-green-100 text-green-800 p-2 rounded font-semibold">
+                    ${selectedProject.budget?.toLocaleString() || "0"}
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span>Materials Subtotal</span>
+                  <span className="p-2">
+                    ${selectedProject.totalMaterialCost?.toLocaleString() || "0"}
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span>Subcontractors Subtotal</span>
+                  <span className="p-2">
+                    ${selectedProject.totalSubcontractorCost?.toLocaleString() || "0"}
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span>Labor Cost Subtotal</span>
+                  <span className="p-2">
+                    ${selectedProject.totalLaborCost?.toLocaleString() || "0"}
+                  </span>
+                </div>
+              </div>
+              <div className="flex flex-col space-y-2">
+                <div className="flex flex-col">
+                  <span>Total Expense</span>
+                  <span className="bg-red-100 text-red-800 p-2 rounded font-semibold">
+                    ${selectedProject.totalProjectCost?.toLocaleString() || "0"}
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span>Remaining Budget</span>
+                  <span className="bg-yellow-100 text-yellow-800 p-2 rounded font-semibold">
+                    $
+                    {(
+                      (selectedProject.budget || 0) -
+                      (selectedProject.totalProjectCost || 0)
+                    ).toLocaleString()}
+                  </span>
+                </div>
+              </div>
             </div>
+
             {/* Form to update the project's budget */}
-            <form onSubmit={handleUpdateBudget} className="mt-4 space-y-2">
+            <form onSubmit={handleUpdateBudget} className="mt-6 space-y-2">
               <label className="block text-sm font-semibold text-gray-700">
                 Update Budget
               </label>
@@ -753,10 +800,20 @@ const ProjectCostManagement = () => {
 
         {/* MATERIALS SECTION */}
         {selectedProject && (
-          <div className="mb-6">
-            <h2 className="mb-2 text-2xl font-bold">
-              Materials for {selectedProject.code}
-            </h2>
+          <div className="mb-10">
+            <div className="mb-2 flex flex-col space-y-2 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+              <h2 className="text-2xl font-bold">
+                Materials for {selectedProject.code} (Total: {materials.length})
+              </h2>
+              {/* SEARCH for MATERIALS */}
+              <input
+                type="text"
+                value={materialsSearchTerm}
+                onChange={(e) => setMaterialsSearchTerm(e.target.value)}
+                placeholder="Search materials..."
+                className="w-full rounded border px-4 py-2 text-sm sm:w-64"
+              />
+            </div>
             {/* CREATE NEW MATERIAL */}
             <form onSubmit={handleCreateMaterial} className="mb-6 space-y-4">
               <div className="flex flex-col md:flex-row md:space-x-4">
@@ -874,7 +931,7 @@ const ProjectCostManagement = () => {
                     <option value="">Select Status</option>
                     <option value="ordered">Ordered</option>
                     <option value="received">Received</option>
-                    <option value="in use">In Use</option>
+                    <option value="delivered">Delivered</option>
                   </select>
                 </div>
               </div>
@@ -902,8 +959,7 @@ const ProjectCostManagement = () => {
                   <label className="block text-sm font-semibold text-gray-700">
                     Supplier Contact
                   </label>
-                  <input
-                    type="text"
+                  <textarea
                     name="supplierContact"
                     value={newMaterial.supplierContact || ""}
                     onChange={(e) =>
@@ -940,11 +996,7 @@ const ProjectCostManagement = () => {
                           onClick={() => toggleMaterialDetails(material.id)}
                           className="rounded bg-gray-300 p-2 hover:bg-gray-400"
                         >
-                          {showMaterialDetails[material.id] ? (
-                            <FaEyeSlash />
-                          ) : (
-                            <FaEye />
-                          )}
+                          {showMaterialDetails[material.id] ? <FaEyeSlash /> : <FaEye />}
                         </button>
                         {["admin", "lead", "owner"].includes(
                           session?.user.role as string
@@ -1087,7 +1139,7 @@ const ProjectCostManagement = () => {
                           <option value="">Select Status</option>
                           <option value="ordered">Ordered</option>
                           <option value="received">Received</option>
-                          <option value="in use">In Use</option>
+                          <option value="delivered">Delivered</option>
                         </select>
                         <button
                           type="submit"
@@ -1130,10 +1182,22 @@ const ProjectCostManagement = () => {
 
         {/* SUBCONTRACTORS SECTION */}
         {selectedProject && (
-          <div className="mb-6">
-            <h2 className="mb-2 text-2xl font-bold">
-              Subcontractors for {selectedProject.code}
-            </h2>
+          <div className="mb-10">
+            <div className="mb-2 flex flex-col space-y-2 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+              <h2 className="text-2xl font-bold">
+                Subcontractors for {selectedProject.code} (Total: {subcontractors.length})
+              </h2>
+              {/* SEARCH for SUBCONTRACTORS */}
+              <input
+                type="text"
+                value={subSearchTerm}
+                onChange={(e) => setSubSearchTerm(e.target.value)}
+                placeholder="Search subcontractors..."
+                className="w-full rounded border px-4 py-2 text-sm sm:w-64"
+              />
+            </div>
+
+            {/* CREATE NEW SUBCONTRACTOR */}
             <form onSubmit={handleCreateSubcontractor} className="mb-6 space-y-4">
               <div className="flex flex-col md:flex-row md:space-x-4">
                 <div className="w-full md:w-1/2">
@@ -1159,8 +1223,7 @@ const ProjectCostManagement = () => {
                   <label className="block text-sm font-semibold text-gray-700">
                     Expertise
                   </label>
-                  <input
-                    type="text"
+                  <textarea
                     name="expertise"
                     value={newSubcontractor.expertise || ""}
                     onChange={(e) =>
@@ -1179,8 +1242,7 @@ const ProjectCostManagement = () => {
                   <label className="block text-sm font-semibold text-gray-700">
                     Contact Info
                   </label>
-                  <input
-                    type="text"
+                  <textarea
                     name="contactInfo"
                     value={newSubcontractor.contactInfo || ""}
                     onChange={(e) =>
@@ -1316,16 +1378,14 @@ const ProjectCostManagement = () => {
                           className="w-full rounded border px-4 py-2"
                           required
                         />
-                        <input
-                          type="text"
+                        <textarea
                           name="expertise"
                           value={editSubcontractorData[sub.id]?.expertise || ""}
                           onChange={(e) => handleSubChange(e, sub.id)}
                           placeholder="Expertise"
                           className="w-full rounded border px-4 py-2"
                         />
-                        <input
-                          type="text"
+                        <textarea
                           name="contactInfo"
                           value={editSubcontractorData[sub.id]?.contactInfo || ""}
                           onChange={(e) => handleSubChange(e, sub.id)}
@@ -1365,9 +1425,7 @@ const ProjectCostManagement = () => {
                     onClick={() => handleSubPageChange(subPage + 1)}
                     disabled={subPage === subTotalPages}
                     className={`rounded px-4 py-2 ${
-                      subPage === subTotalPages
-                        ? "bg-gray-300"
-                        : "bg-blue-500 text-white"
+                      subPage === subTotalPages ? "bg-gray-300" : "bg-blue-500 text-white"
                     }`}
                   >
                     Next
@@ -1382,10 +1440,20 @@ const ProjectCostManagement = () => {
 
         {/* LABOR COSTS SECTION */}
         {selectedProject && (
-          <div className="mb-6">
-            <h2 className="mb-2 text-2xl font-bold">
-              Labor Costs for {selectedProject.code}
-            </h2>
+          <div className="mb-10">
+            <div className="mb-2 flex flex-col space-y-2 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+              <h2 className="text-2xl font-bold">
+                Labor Costs for {selectedProject.code} (Total: {laborCosts.length})
+              </h2>
+              {/* SEARCH for LABOR */}
+              <input
+                type="text"
+                value={laborSearchTerm}
+                onChange={(e) => setLaborSearchTerm(e.target.value)}
+                placeholder="Search employees..."
+                className="w-full rounded border px-4 py-2 text-sm sm:w-64"
+              />
+            </div>
             <form onSubmit={handleCreateLaborCost} className="mb-6 space-y-4">
               <div className="flex flex-col md:flex-row md:space-x-4">
                 <div className="w-full md:w-1/2">
@@ -1411,8 +1479,7 @@ const ProjectCostManagement = () => {
                   <label className="block text-sm font-semibold text-gray-700">
                     Role
                   </label>
-                  <input
-                    type="text"
+                  <textarea
                     name="role"
                     value={newLaborCost.role || ""}
                     onChange={(e) =>
@@ -1566,8 +1633,7 @@ const ProjectCostManagement = () => {
                           className="w-full rounded border px-4 py-2"
                           required
                         />
-                        <input
-                          type="text"
+                        <textarea
                           name="role"
                           value={editLaborCostData[lab.id]?.role || ""}
                           onChange={(e) => handleLaborChange(e, lab.id)}
@@ -1617,9 +1683,7 @@ const ProjectCostManagement = () => {
                     onClick={() => handleLaborPageChange(laborPage + 1)}
                     disabled={laborPage === laborTotalPages}
                     className={`rounded px-4 py-2 ${
-                      laborPage === laborTotalPages
-                        ? "bg-gray-300"
-                        : "bg-blue-500 text-white"
+                      laborPage === laborTotalPages ? "bg-gray-300" : "bg-blue-500 text-white"
                     }`}
                   >
                     Next
