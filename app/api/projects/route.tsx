@@ -1,4 +1,4 @@
-// app/api/projects/route.ts
+// app/api/projects/route.tsx
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/app/libs/prismadb";

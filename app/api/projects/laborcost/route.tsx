@@ -1,4 +1,4 @@
-// api/projects/subcontractor/route.tsx
+// api/projects/laborcost/route.tsx
 
 import { NextResponse } from "next/server";
 import prisma from "@/app/libs/prismadb";
@@ -15,7 +15,8 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { projectCode, name, expertise, contactInfo, agreedCost } = body.data || {};
+    const { projectCode, employeeName, role, hoursWorked, hourlyRate } =
+      body.data || {};
 
     if (!projectCode) {
       return NextResponse.json({
@@ -23,44 +24,42 @@ export async function POST(request: Request) {
         error: "projectCode is required",
       });
     }
-    if (!name) {
+    if (!employeeName) {
       return NextResponse.json({
         status: 400,
-        error: "Subcontractor name is required",
+        error: "employeeName is required",
       });
     }
+    const finalHourlyRate = hourlyRate ?? 35;
+    const totalCost = (hoursWorked ?? 0) * finalHourlyRate;
 
     const userProfile = await prisma.profile.findUnique({
       where: { userEmail: session.user.email },
       select: { nickname: true },
     });
-
     if (!userProfile) {
-      return NextResponse.json({
-        status: 404,
-        error: "User profile not found",
-      });
+      return NextResponse.json({ message: "User profile not found", status: 404 });
     }
 
-    // agreedCost used for now; totalCost is adjusted in recalcProjectCosts
-    const newSubcontractor = await prisma.subcontractor.create({
+    const newLaborCost = await prisma.laborCost.create({
       data: {
         projectCode,
-        name,
-        expertise,
-        contactInfo,
-        agreedCost: agreedCost ?? 0,
+        employeeName,
+        role,
+        hoursWorked: hoursWorked ?? 0,
+        hourlyRate: finalHourlyRate,
+        totalCost,
         createdById: userProfile.nickname,
         createdAt: new Date(),
       },
     });
 
-    // Recalculate the project subtotals
+    // Recalc
     await recalcProjectCosts(projectCode);
 
-    return NextResponse.json({ subcontractor: newSubcontractor, status: 201 });
+    return NextResponse.json({ laborCost: newLaborCost, status: 201 });
   } catch (error) {
-    console.error("Error creating subcontractor:", error);
+    console.error("Error creating labor cost:", error);
     return NextResponse.json({ status: 500, error: "Internal server error" });
   }
 }
@@ -77,26 +76,18 @@ export async function GET(request: Request) {
       where.projectCode = projectCode;
     }
 
-    const subcontractors = await prisma.subcontractor.findMany({
+    const laborCosts = await prisma.laborCost.findMany({
       where,
       skip: (page - 1) * limit,
       take: limit,
-      include: {
-        createdBy: {
-          select: { firstName: true, lastName: true, nickname: true },
-        },
-        lastModifiedBy: {
-          select: { firstName: true, lastName: true, nickname: true },
-        },
-      },
     });
 
-    const totalSubcontractors = await prisma.subcontractor.count({ where });
-    const totalPages = Math.ceil(totalSubcontractors / limit);
+    const totalLaborCosts = await prisma.laborCost.count({ where });
+    const totalPages = Math.ceil(totalLaborCosts / limit);
 
-    return NextResponse.json({ subcontractors, totalPages, status: 200 });
+    return NextResponse.json({ laborCosts, totalPages, status: 200 });
   } catch (error) {
-    console.error("Error fetching subcontractors:", error);
+    console.error("Error fetching labor costs:", error);
     return NextResponse.json({ status: 500, error: "Internal server error" });
   }
 }

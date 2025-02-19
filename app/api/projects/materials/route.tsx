@@ -4,12 +4,11 @@ import { NextResponse } from "next/server";
 import prisma from "@/app/libs/prismadb";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/libs/authOption";
+import { recalcProjectCosts } from "@/app/utils/recalcProjectCosts";
 
-// CREATE MATERIAL
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
-
     if (!session || !session.user?.email) {
       return NextResponse.json({ status: 401, error: "Unauthorized" });
     }
@@ -26,9 +25,22 @@ export async function POST(request: Request) {
       supplierName,
       supplierContact,
       status,
-    } = body.data;
+    } = body.data || {};
 
-    // Get the user's profile to set `createdById`
+    if (!projectCode) {
+      return NextResponse.json({
+        status: 400,
+        error: "projectCode is required",
+      });
+    }
+    if (!type) {
+      return NextResponse.json({
+        status: 400,
+        error: "Material 'type' is required",
+      });
+    }
+
+    // Get the user's profile
     const userProfile = await prisma.profile.findUnique({
       where: { userEmail: session.user.email },
       select: { nickname: true },
@@ -36,35 +48,42 @@ export async function POST(request: Request) {
 
     if (!userProfile) {
       return NextResponse.json({
-        message: "User profile not found",
         status: 404,
+        error: "User profile not found",
       });
     }
+
+    // Compute total cost
+    const computedCost = (quantityOrdered ?? 0) * (costPerUnit ?? 0);
 
     const newMaterial = await prisma.material.create({
       data: {
         projectCode,
-        name,
+        name: name ?? "",
         type,
         description,
         unitOfMeasurement,
-        quantityOrdered,
-        costPerUnit,
+        quantityOrdered: quantityOrdered ?? 0,
+        costPerUnit: costPerUnit ?? 0,
+        totalCost: computedCost,
         supplierName,
         supplierContact,
         status,
-        createdById: userProfile.nickname, // Track who created it
-        createdAt: new Date(), // Set creation timestamp
+        createdById: userProfile.nickname,
+        createdAt: new Date(),
       },
     });
 
+    // Recalculate project totals
+    await recalcProjectCosts(projectCode);
+
     return NextResponse.json({ material: newMaterial, status: 201 });
   } catch (error) {
+    console.error("Error creating material:", error);
     return NextResponse.json({ status: 500, error: "Internal server error" });
   }
 }
 
-// READ MATERIALS WITH PAGINATION AND SEARCH
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -103,6 +122,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ materials, totalPages, status: 200 });
   } catch (error) {
+    console.error("Error fetching materials:", error);
     return NextResponse.json({ status: 500, error: "Internal server error" });
   }
 }

@@ -203,8 +203,8 @@ model Project {
 
 model Material {
   id          String  @id @default(auto()) @map("_id") @db.ObjectId
-  projectCode String  @db.ObjectId
-  project     Project @relation("ProjectMaterials", fields: [projectCode], references: [id])
+  projectCode String
+  project     Project @relation("ProjectMaterials", fields: [projectCode], references: [code])
 
   name              String
   type              String
@@ -231,8 +231,8 @@ model Material {
 
 model Subcontractor {
   id          String  @id @default(auto()) @map("_id") @db.ObjectId
-  projectCode String  @db.ObjectId
-  project     Project @relation("ProjectSubcontractors", fields: [projectCode], references: [id])
+  projectCode String
+  project     Project @relation("ProjectSubcontractors", fields: [projectCode], references: [code])
 
   name        String
   expertise   String
@@ -253,8 +253,8 @@ model Subcontractor {
 
 model LaborCost {
   id          String  @id @default(auto()) @map("_id") @db.ObjectId
-  projectCode String  @db.ObjectId
-  project     Project @relation("ProjectLabor", fields: [projectCode], references: [id])
+  projectCode String  
+  project     Project @relation("ProjectLabor", fields: [projectCode], references: [code])
 
   employeeName String // Name of in-house employee
   role         String? // Optional role description

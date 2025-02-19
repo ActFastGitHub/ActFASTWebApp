@@ -1,51 +1,27 @@
-// api/projects/materials/[id]/route.tsx
-
 import { NextResponse } from "next/server";
 import prisma from "@/app/libs/prismadb";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/libs/authOption";
 
-// GET SPECIFIC MATERIAL
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } },
-) {
-  try {
-    const { id } = params;
+import { recalcProjectCosts } from "@/app/utils/recalcProjectCosts";
 
-    const material = await prisma.material.findUnique({
-      where: { id },
-      include: {
-        createdBy: { select: { firstName: true, lastName: true, nickname: true } },
-        lastModifiedBy: { select: { firstName: true, lastName: true, nickname: true } },
-      },
-    });
-
-    if (!material) {
-      return NextResponse.json({ error: "Material not found" }, { status: 404 });
-    }
-
-    return NextResponse.json(material, { status: 200 });
-  } catch (error) {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
-  }
-}
-
-// UPDATE SPECIFIC MATERIAL
 export async function PATCH(
   request: Request,
   { params }: { params: { id: string } },
 ) {
   const session = await getServerSession(authOptions);
-
   if (!session || !session.user?.email) {
     return NextResponse.json({ message: "Unauthorized access", status: 401 });
   }
 
   try {
     const { id } = params;
-    const body = await request.json();
+    const { data } = await request.json();
+    if (!data) {
+      return NextResponse.json({ message: "No data provided", status: 400 });
+    }
     const {
+      projectCode,
       type,
       description,
       unitOfMeasurement,
@@ -54,9 +30,21 @@ export async function PATCH(
       supplierName,
       supplierContact,
       status,
-    } = body.data;
+    } = data;
 
-    // Get the user's profile (to get the nickname for tracking)
+    if (!projectCode) {
+      return NextResponse.json({
+        status: 400,
+        message: "projectCode is required",
+      });
+    }
+    if (!type) {
+      return NextResponse.json({
+        status: 400,
+        message: "Material 'type' cannot be empty",
+      });
+    }
+
     const userProfile = await prisma.profile.findUnique({
       where: { userEmail: session.user.email },
       select: { nickname: true },
@@ -66,21 +54,29 @@ export async function PATCH(
       return NextResponse.json({ message: "User profile not found", status: 404 });
     }
 
+    // Recompute total cost
+    const computedCost = (quantityOrdered ?? 0) * (costPerUnit ?? 0);
+
     const updatedMaterial = await prisma.material.update({
       where: { id },
       data: {
+        projectCode,
         type,
         description,
         unitOfMeasurement,
-        quantityOrdered,
-        costPerUnit,
+        quantityOrdered: quantityOrdered ?? 0,
+        costPerUnit: costPerUnit ?? 0,
+        totalCost: computedCost,
         supplierName,
         supplierContact,
         status,
-        lastModifiedById: userProfile.nickname, // Track who last modified
-        lastModifiedAt: new Date(), // Auto-update timestamp
+        lastModifiedById: userProfile.nickname,
+        lastModifiedAt: new Date(),
       },
     });
+
+    // Recalc totals
+    await recalcProjectCosts(projectCode);
 
     return NextResponse.json({ material: updatedMaterial, status: 200 });
   } catch (error) {
@@ -89,13 +85,11 @@ export async function PATCH(
   }
 }
 
-// DELETE SPECIFIC MATERIAL
 export async function DELETE(
   request: Request,
   { params }: { params: { id: string } },
 ) {
   const session = await getServerSession(authOptions);
-
   if (!session) {
     return NextResponse.json({ message: "Unauthorized access", status: 401 });
   }
@@ -103,10 +97,20 @@ export async function DELETE(
   try {
     const { id } = params;
 
+    // Before deleting, find the material to get its projectCode
+    const mat = await prisma.material.findUnique({ where: { id } });
+    if (!mat) {
+      return NextResponse.json({ status: 404, message: "Not found" });
+    }
+
     await prisma.material.delete({ where: { id } });
+
+    // Recalc totals
+    await recalcProjectCosts(mat.projectCode);
 
     return NextResponse.json({ message: "Material deleted", status: 200 });
   } catch (error) {
+    console.error("Error deleting material:", error);
     return NextResponse.json({ status: 500, error: "Internal server error" });
   }
 }
