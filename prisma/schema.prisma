@@ -192,6 +192,7 @@ model Project {
   strataFREstimate        String?
 
   budget         Float           @default(0.0)
+  scope          String?
   subcontractors Subcontractor[] @relation("ProjectSubcontractors")
   laborCosts     LaborCost[]     @relation("ProjectLabor")
 
@@ -253,7 +254,7 @@ model Subcontractor {
 
 model LaborCost {
   id          String  @id @default(auto()) @map("_id") @db.ObjectId
-  projectCode String  
+  projectCode String
   project     Project @relation("ProjectLabor", fields: [projectCode], references: [code])
 
   employeeName String // Name of in-house employee

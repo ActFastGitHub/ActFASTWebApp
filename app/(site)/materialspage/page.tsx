@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState, FormEvent, ChangeEvent } from "react";
@@ -7,6 +6,10 @@ import { useRouter } from "next/navigation";
 import Navbar from "@/app/components/navBar";
 import toast from "react-hot-toast";
 import axios from "axios";
+
+// Headless UI + Heroicons
+import { Combobox } from "@headlessui/react";
+import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/24/outline";
 import { FaEdit, FaTrashAlt, FaEye, FaEyeSlash } from "react-icons/fa";
 
 type Project = {
@@ -126,6 +129,17 @@ const ProjectCostManagement = () => {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [newBudget, setNewBudget] = useState<number>(0);
 
+  // For the Headless UI Combobox typing
+  const [query, setQuery] = useState("");
+
+  // Computed list: filters projects in real-time as the user types
+  const filteredProjects =
+    query === ""
+      ? projects
+      : projects.filter((p) =>
+          p.code.toLowerCase().includes(query.toLowerCase()),
+        );
+
   /**
    * State: Materials
    */
@@ -136,9 +150,15 @@ const ProjectCostManagement = () => {
   const [materialsSearchTerm, setMaterialsSearchTerm] = useState("");
 
   const [newMaterial, setNewMaterial] = useState<Partial<Material>>({});
-  const [editableMaterialId, setEditableMaterialId] = useState<string | null>(null);
-  const [editMaterialData, setEditMaterialData] = useState<EditMaterialData>({});
-  const [showMaterialDetails, setShowMaterialDetails] = useState<{ [key: string]: boolean }>({});
+  const [editableMaterialId, setEditableMaterialId] = useState<string | null>(
+    null,
+  );
+  const [editMaterialData, setEditMaterialData] = useState<EditMaterialData>(
+    {},
+  );
+  const [showMaterialDetails, setShowMaterialDetails] = useState<{
+    [key: string]: boolean;
+  }>({});
 
   /**
    * State: Subcontractors
@@ -149,10 +169,17 @@ const ProjectCostManagement = () => {
   // Subcontractor-specific search
   const [subSearchTerm, setSubSearchTerm] = useState("");
 
-  const [newSubcontractor, setNewSubcontractor] = useState<Partial<Subcontractor>>({});
-  const [editableSubcontractorId, setEditableSubcontractorId] = useState<string | null>(null);
-  const [editSubcontractorData, setEditSubcontractorData] = useState<EditSubcontractorData>({});
-  const [showSubDetails, setShowSubDetails] = useState<{ [key: string]: boolean }>({});
+  const [newSubcontractor, setNewSubcontractor] = useState<
+    Partial<Subcontractor>
+  >({});
+  const [editableSubcontractorId, setEditableSubcontractorId] = useState<
+    string | null
+  >(null);
+  const [editSubcontractorData, setEditSubcontractorData] =
+    useState<EditSubcontractorData>({});
+  const [showSubDetails, setShowSubDetails] = useState<{
+    [key: string]: boolean;
+  }>({});
 
   /**
    * State: Labor Costs
@@ -164,9 +191,15 @@ const ProjectCostManagement = () => {
   const [laborSearchTerm, setLaborSearchTerm] = useState("");
 
   const [newLaborCost, setNewLaborCost] = useState<Partial<LaborCost>>({});
-  const [editableLaborCostId, setEditableLaborCostId] = useState<string | null>(null);
-  const [editLaborCostData, setEditLaborCostData] = useState<EditLaborCostData>({});
-  const [showLaborDetails, setShowLaborDetails] = useState<{ [key: string]: boolean }>({});
+  const [editableLaborCostId, setEditableLaborCostId] = useState<string | null>(
+    null,
+  );
+  const [editLaborCostData, setEditLaborCostData] = useState<EditLaborCostData>(
+    {},
+  );
+  const [showLaborDetails, setShowLaborDetails] = useState<{
+    [key: string]: boolean;
+  }>({});
 
   /**
    * Auth check
@@ -185,13 +218,15 @@ const ProjectCostManagement = () => {
       const response = await axios.get("/api/projects");
       if (response.data && response.data.projects) {
         const sortedProjects = response.data.projects.sort(
-          (a: Project, b: Project) => b.code.localeCompare(a.code)
+          (a: Project, b: Project) => b.code.localeCompare(a.code),
         );
         setProjects(sortedProjects);
 
         // If there is a selected projectFilter, reset `selectedProject` accordingly
         if (projectFilter) {
-          const found = sortedProjects.find((p: Project) => p.code === projectFilter);
+          const found = sortedProjects.find(
+            (p: Project) => p.code === projectFilter,
+          );
           if (found) {
             setSelectedProject(found);
             setNewBudget(found.budget || 0);
@@ -294,7 +329,7 @@ const ProjectCostManagement = () => {
 
   const handleMaterialChange = (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
-    materialId: string
+    materialId: string,
   ) => {
     const { name, value } = e.target;
     setEditMaterialData((prev) => ({
@@ -428,7 +463,7 @@ const ProjectCostManagement = () => {
 
   const handleSubChange = (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-    subId: string
+    subId: string,
   ) => {
     const { name, value } = e.target;
     setEditSubcontractorData((prev) => ({
@@ -560,7 +595,7 @@ const ProjectCostManagement = () => {
 
   const handleLaborChange = (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-    laborId: string
+    laborId: string,
   ) => {
     const { name, value } = e.target;
     setEditLaborCostData((prev) => ({
@@ -676,8 +711,7 @@ const ProjectCostManagement = () => {
     if (projectFilter) {
       fetchMaterials(1);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [materialsSearchTerm]);
+  }, [materialsSearchTerm]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Trigger subcontractor refetch on search changes
   useEffect(() => {
@@ -685,8 +719,7 @@ const ProjectCostManagement = () => {
     if (projectFilter) {
       fetchSubcontractors(1);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subSearchTerm]);
+  }, [subSearchTerm]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Trigger labor refetch on search changes
   useEffect(() => {
@@ -694,8 +727,7 @@ const ProjectCostManagement = () => {
     if (projectFilter) {
       fetchLaborCosts(1);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [laborSearchTerm]);
+  }, [laborSearchTerm]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     // whenever we pick a new selectedProject, set newBudget
@@ -708,46 +740,124 @@ const ProjectCostManagement = () => {
     <div className="relative min-h-screen bg-gray-100">
       <Navbar />
       <div className="p-6 pt-24">
+        {/* HEADER: Title + Project Combobox */}
         <div className="mb-6 flex flex-col items-start space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
           <h1 className="text-3xl font-bold">Manage Project Costs</h1>
-          {/* SELECT PROJECT DROPDOWN */}
-          <select
-            value={projectFilter}
-            onChange={(e) => setProjectFilter(e.target.value)}
-            className="w-full rounded border px-4 py-2 text-sm sm:w-64"
-          >
-            <option value="">Select a Project</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.code}>
-                {p.code}
-              </option>
-            ))}
-          </select>
+
+          {/* ================================
+              PROJECT COMBOBOX
+          =================================*/}
+          <div className="w-full sm:w-auto">
+            <label
+              htmlFor="searchProject"
+              className="mb-1 block text-sm font-semibold text-gray-700"
+            >
+              Search or Select a Project
+            </label>
+            <Combobox
+              as="div"
+              value={projectFilter}
+              onChange={(selectedValue) => {
+                setProjectFilter(selectedValue ?? "");
+              }}
+            >
+              <div className="relative mt-1">
+                <Combobox.Input
+                  id="searchProject"
+                  className="w-full rounded-md border border-gray-300 bg-white py-2 pl-3 pr-10 text-sm leading-5 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:w-64"
+                  displayValue={(selectedCode: string) => selectedCode}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Type to filter..."
+                />
+
+                <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2">
+                  <ChevronUpDownIcon
+                    className="h-5 w-5 text-gray-400"
+                    aria-hidden="true"
+                  />
+                </Combobox.Button>
+
+                {/* Options */}
+                {filteredProjects.length > 0 && (
+                  <Combobox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                    {filteredProjects.map((project) => (
+                      <Combobox.Option
+                        key={project.id}
+                        value={project.code}
+                        className={({ active }) =>
+                          `relative cursor-pointer select-none py-2 pl-3 pr-9 ${
+                            active ? "bg-blue-600 text-white" : "text-gray-900"
+                          }`
+                        }
+                      >
+                        {({ active, selected }) => (
+                          <>
+                            <span
+                              className={`block truncate ${
+                                selected ? "font-semibold" : ""
+                              }`}
+                            >
+                              {project.code}
+                            </span>
+                            {selected && (
+                              <span
+                                className={`absolute inset-y-0 right-0 flex items-center pr-4 ${
+                                  active ? "text-white" : "text-blue-600"
+                                }`}
+                              >
+                                <CheckIcon
+                                  className="h-5 w-5"
+                                  aria-hidden="true"
+                                />
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </Combobox.Option>
+                    ))}
+                  </Combobox.Options>
+                )}
+
+                {/* If no projects found */}
+                {query !== "" && filteredProjects.length === 0 && (
+                  <div className="absolute z-10 mt-1 w-full cursor-default rounded-md bg-white px-3 py-2 text-sm text-gray-500 shadow-lg ring-1 ring-black ring-opacity-5">
+                    No projects found.
+                  </div>
+                )}
+              </div>
+            </Combobox>
+          </div>
         </div>
+        {/* END Header */}
 
         {/* Display Project Info if we have a selectedProject */}
         {selectedProject && (
           <div className="mb-6 rounded bg-white p-4 shadow">
-            <h2 className="text-2xl font-bold mb-4">Project: {selectedProject.code}</h2>
+            <h2 className="mb-4 text-2xl font-bold">
+              Project: {selectedProject.code}
+            </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
               <div className="flex flex-col space-y-2">
                 <div className="flex flex-col">
                   <span>Budget</span>
-                  <span className="bg-green-100 text-green-800 p-2 rounded font-semibold">
+                  <span className="rounded bg-green-100 p-2 font-semibold text-green-800">
                     ${selectedProject.budget?.toLocaleString() || "0"}
                   </span>
                 </div>
                 <div className="flex flex-col">
                   <span>Materials Subtotal</span>
                   <span className="p-2">
-                    ${selectedProject.totalMaterialCost?.toLocaleString() || "0"}
+                    $
+                    {selectedProject.totalMaterialCost?.toLocaleString() || "0"}
                   </span>
                 </div>
                 <div className="flex flex-col">
                   <span>Subcontractors Subtotal</span>
                   <span className="p-2">
-                    ${selectedProject.totalSubcontractorCost?.toLocaleString() || "0"}
+                    $
+                    {selectedProject.totalSubcontractorCost?.toLocaleString() ||
+                      "0"}
                   </span>
                 </div>
                 <div className="flex flex-col">
@@ -760,13 +870,13 @@ const ProjectCostManagement = () => {
               <div className="flex flex-col space-y-2">
                 <div className="flex flex-col">
                   <span>Total Expense</span>
-                  <span className="bg-red-100 text-red-800 p-2 rounded font-semibold">
+                  <span className="rounded bg-red-100 p-2 font-semibold text-red-800">
                     ${selectedProject.totalProjectCost?.toLocaleString() || "0"}
                   </span>
                 </div>
                 <div className="flex flex-col">
                   <span>Remaining Budget</span>
-                  <span className="bg-yellow-100 text-yellow-800 p-2 rounded font-semibold">
+                  <span className="rounded bg-yellow-100 p-2 font-semibold text-yellow-800">
                     $
                     {(
                       (selectedProject.budget || 0) -
@@ -801,19 +911,47 @@ const ProjectCostManagement = () => {
         {/* MATERIALS SECTION */}
         {selectedProject && (
           <div className="mb-10">
+            {/* Title & Search */}
             <div className="mb-2 flex flex-col space-y-2 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
               <h2 className="text-2xl font-bold">
                 Materials for {selectedProject.code} (Total: {materials.length})
               </h2>
-              {/* SEARCH for MATERIALS */}
-              <input
-                type="text"
-                value={materialsSearchTerm}
-                onChange={(e) => setMaterialsSearchTerm(e.target.value)}
-                placeholder="Search materials..."
-                className="w-full rounded border px-4 py-2 text-sm sm:w-64"
-              />
+
+              {/* ================================
+                  STYLED SEARCH for MATERIALS
+              =================================*/}
+              <div className="relative mb-2 w-full sm:mb-0 sm:w-64">
+                <label
+                  htmlFor="materialsSearch"
+                  className="mb-1 block text-sm font-semibold text-gray-700"
+                >
+                  Search Materials
+                </label>
+                <div className="relative">
+                  <input
+                    id="materialsSearch"
+                    type="text"
+                    value={materialsSearchTerm}
+                    onChange={(e) => setMaterialsSearchTerm(e.target.value)}
+                    placeholder="Type to filter materials..."
+                    className="w-full rounded-md border border-gray-300 py-2 pl-3 pr-10 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                  <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    <svg
+                      className="h-5 w-5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M21 21l-6-6M17 9a8 8 0 11-16 0 8 8 0 0116 0z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
             </div>
+
             {/* CREATE NEW MATERIAL */}
             <form onSubmit={handleCreateMaterial} className="mb-6 space-y-4">
               <div className="flex flex-col md:flex-row md:space-x-4">
@@ -985,7 +1123,10 @@ const ProjectCostManagement = () => {
             {materials.length > 0 ? (
               <div className="space-y-4">
                 {materials.map((material) => (
-                  <div key={material.id} className="rounded bg-white p-4 shadow">
+                  <div
+                    key={material.id}
+                    className="rounded bg-white p-4 shadow"
+                  >
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-xl font-bold">{material.type}</div>
@@ -996,20 +1137,26 @@ const ProjectCostManagement = () => {
                           onClick={() => toggleMaterialDetails(material.id)}
                           className="rounded bg-gray-300 p-2 hover:bg-gray-400"
                         >
-                          {showMaterialDetails[material.id] ? <FaEyeSlash /> : <FaEye />}
+                          {showMaterialDetails[material.id] ? (
+                            <FaEyeSlash />
+                          ) : (
+                            <FaEye />
+                          )}
                         </button>
                         {["admin", "lead", "owner"].includes(
-                          session?.user.role as string
+                          session?.user.role as string,
                         ) && (
                           <button
-                            onClick={() => handleMaterialEditToggle(material.id)}
+                            onClick={() =>
+                              handleMaterialEditToggle(material.id)
+                            }
                             className="rounded bg-blue-500 p-2 text-white hover:bg-blue-600"
                           >
                             <FaEdit />
                           </button>
                         )}
                         {["admin", "lead", "owner"].includes(
-                          session?.user.role as string
+                          session?.user.role as string,
                         ) && (
                           <button
                             onClick={() => deleteMaterial(material.id)}
@@ -1091,7 +1238,9 @@ const ProjectCostManagement = () => {
                         />
                         <textarea
                           name="description"
-                          value={editMaterialData[material.id]?.description || ""}
+                          value={
+                            editMaterialData[material.id]?.description || ""
+                          }
                           onChange={(e) => handleMaterialChange(e, material.id)}
                           placeholder="Description"
                           className="w-full rounded border px-4 py-2"
@@ -1099,7 +1248,8 @@ const ProjectCostManagement = () => {
                         <select
                           name="unitOfMeasurement"
                           value={
-                            editMaterialData[material.id]?.unitOfMeasurement || ""
+                            editMaterialData[material.id]?.unitOfMeasurement ||
+                            ""
                           }
                           onChange={(e) => handleMaterialChange(e, material.id)}
                           className="w-full rounded border px-4 py-2"
@@ -1125,7 +1275,9 @@ const ProjectCostManagement = () => {
                           type="number"
                           name="costPerUnit"
                           step="any"
-                          value={editMaterialData[material.id]?.costPerUnit || ""}
+                          value={
+                            editMaterialData[material.id]?.costPerUnit || ""
+                          }
                           onChange={(e) => handleMaterialChange(e, material.id)}
                           placeholder="Cost Per Unit"
                           className="w-full rounded border px-4 py-2"
@@ -1156,7 +1308,9 @@ const ProjectCostManagement = () => {
                     onClick={() => handleMaterialPageChange(materialsPage - 1)}
                     disabled={materialsPage === 1}
                     className={`rounded px-4 py-2 ${
-                      materialsPage === 1 ? "bg-gray-300" : "bg-blue-500 text-white"
+                      materialsPage === 1
+                        ? "bg-gray-300"
+                        : "bg-blue-500 text-white"
                     }`}
                   >
                     Previous
@@ -1183,22 +1337,53 @@ const ProjectCostManagement = () => {
         {/* SUBCONTRACTORS SECTION */}
         {selectedProject && (
           <div className="mb-10">
+            {/* Title & Search */}
             <div className="mb-2 flex flex-col space-y-2 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
               <h2 className="text-2xl font-bold">
-                Subcontractors for {selectedProject.code} (Total: {subcontractors.length})
+                Subcontractors for {selectedProject.code} (Total:{" "}
+                {subcontractors.length})
               </h2>
-              {/* SEARCH for SUBCONTRACTORS */}
-              <input
-                type="text"
-                value={subSearchTerm}
-                onChange={(e) => setSubSearchTerm(e.target.value)}
-                placeholder="Search subcontractors..."
-                className="w-full rounded border px-4 py-2 text-sm sm:w-64"
-              />
+
+              {/* ================================
+                  STYLED SEARCH for SUBCONTRACTORS
+              =================================*/}
+              <div className="relative mb-2 w-full sm:mb-0 sm:w-64">
+                <label
+                  htmlFor="subSearch"
+                  className="mb-1 block text-sm font-semibold text-gray-700"
+                >
+                  Search Subcontractors
+                </label>
+                <div className="relative">
+                  <input
+                    id="subSearch"
+                    type="text"
+                    value={subSearchTerm}
+                    onChange={(e) => setSubSearchTerm(e.target.value)}
+                    placeholder="Type to filter subcontractors..."
+                    className="w-full rounded-md border border-gray-300 py-2 pl-3 pr-10 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                  <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    <svg
+                      className="h-5 w-5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M21 21l-6-6M17 9a8 8 0 11-16 0 8 8 0 0116 0z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* CREATE NEW SUBCONTRACTOR */}
-            <form onSubmit={handleCreateSubcontractor} className="mb-6 space-y-4">
+            <form
+              onSubmit={handleCreateSubcontractor}
+              className="mb-6 space-y-4"
+            >
               <div className="flex flex-col md:flex-row md:space-x-4">
                 <div className="w-full md:w-1/2">
                   <label className="block text-sm font-semibold text-gray-700">
@@ -1300,7 +1485,7 @@ const ProjectCostManagement = () => {
                           {showSubDetails[sub.id] ? <FaEyeSlash /> : <FaEye />}
                         </button>
                         {["admin", "lead", "owner"].includes(
-                          session?.user.role as string
+                          session?.user.role as string,
                         ) && (
                           <button
                             onClick={() => handleSubEditToggle(sub.id)}
@@ -1310,7 +1495,7 @@ const ProjectCostManagement = () => {
                           </button>
                         )}
                         {["admin", "lead", "owner"].includes(
-                          session?.user.role as string
+                          session?.user.role as string,
                         ) && (
                           <button
                             onClick={() => deleteSubcontractor(sub.id)}
@@ -1387,7 +1572,9 @@ const ProjectCostManagement = () => {
                         />
                         <textarea
                           name="contactInfo"
-                          value={editSubcontractorData[sub.id]?.contactInfo || ""}
+                          value={
+                            editSubcontractorData[sub.id]?.contactInfo || ""
+                          }
                           onChange={(e) => handleSubChange(e, sub.id)}
                           placeholder="Contact Info"
                           className="w-full rounded border px-4 py-2"
@@ -1396,7 +1583,9 @@ const ProjectCostManagement = () => {
                           type="number"
                           name="agreedCost"
                           step="any"
-                          value={editSubcontractorData[sub.id]?.agreedCost || ""}
+                          value={
+                            editSubcontractorData[sub.id]?.agreedCost || ""
+                          }
                           onChange={(e) => handleSubChange(e, sub.id)}
                           placeholder="Agreed Cost"
                           className="w-full rounded border px-4 py-2"
@@ -1425,7 +1614,9 @@ const ProjectCostManagement = () => {
                     onClick={() => handleSubPageChange(subPage + 1)}
                     disabled={subPage === subTotalPages}
                     className={`rounded px-4 py-2 ${
-                      subPage === subTotalPages ? "bg-gray-300" : "bg-blue-500 text-white"
+                      subPage === subTotalPages
+                        ? "bg-gray-300"
+                        : "bg-blue-500 text-white"
                     }`}
                   >
                     Next
@@ -1441,19 +1632,48 @@ const ProjectCostManagement = () => {
         {/* LABOR COSTS SECTION */}
         {selectedProject && (
           <div className="mb-10">
+            {/* Title & Search */}
             <div className="mb-2 flex flex-col space-y-2 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
               <h2 className="text-2xl font-bold">
-                Labor Costs for {selectedProject.code} (Total: {laborCosts.length})
+                Labor Costs for {selectedProject.code} (Total:{" "}
+                {laborCosts.length})
               </h2>
-              {/* SEARCH for LABOR */}
-              <input
-                type="text"
-                value={laborSearchTerm}
-                onChange={(e) => setLaborSearchTerm(e.target.value)}
-                placeholder="Search employees..."
-                className="w-full rounded border px-4 py-2 text-sm sm:w-64"
-              />
+
+              {/* ================================
+                  STYLED SEARCH for LABOR
+              =================================*/}
+              <div className="relative mb-2 w-full sm:mb-0 sm:w-64">
+                <label
+                  htmlFor="laborSearch"
+                  className="mb-1 block text-sm font-semibold text-gray-700"
+                >
+                  Search Employees
+                </label>
+                <div className="relative">
+                  <input
+                    id="laborSearch"
+                    type="text"
+                    value={laborSearchTerm}
+                    onChange={(e) => setLaborSearchTerm(e.target.value)}
+                    placeholder="Type to filter employees..."
+                    className="w-full rounded-md border border-gray-300 py-2 pl-3 pr-10 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                  <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    <svg
+                      className="h-5 w-5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M21 21l-6-6M17 9a8 8 0 11-16 0 8 8 0 0116 0z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
             </div>
+
             <form onSubmit={handleCreateLaborCost} className="mb-6 space-y-4">
               <div className="flex flex-col md:flex-row md:space-x-4">
                 <div className="w-full md:w-1/2">
@@ -1548,7 +1768,9 @@ const ProjectCostManagement = () => {
                   <div key={lab.id} className="rounded bg-white p-4 shadow">
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className="text-xl font-bold">{lab.employeeName}</div>
+                        <div className="text-xl font-bold">
+                          {lab.employeeName}
+                        </div>
                         <p className="text-gray-600">{lab.role}</p>
                       </div>
                       <div className="flex space-x-2">
@@ -1556,10 +1778,14 @@ const ProjectCostManagement = () => {
                           onClick={() => toggleLaborDetails(lab.id)}
                           className="rounded bg-gray-300 p-2 hover:bg-gray-400"
                         >
-                          {showLaborDetails[lab.id] ? <FaEyeSlash /> : <FaEye />}
+                          {showLaborDetails[lab.id] ? (
+                            <FaEyeSlash />
+                          ) : (
+                            <FaEye />
+                          )}
                         </button>
                         {["admin", "lead", "owner"].includes(
-                          session?.user.role as string
+                          session?.user.role as string,
                         ) && (
                           <button
                             onClick={() => handleLaborEditToggle(lab.id)}
@@ -1569,7 +1795,7 @@ const ProjectCostManagement = () => {
                           </button>
                         )}
                         {["admin", "lead", "owner"].includes(
-                          session?.user.role as string
+                          session?.user.role as string,
                         ) && (
                           <button
                             onClick={() => deleteLaborCost(lab.id)}
@@ -1683,7 +1909,9 @@ const ProjectCostManagement = () => {
                     onClick={() => handleLaborPageChange(laborPage + 1)}
                     disabled={laborPage === laborTotalPages}
                     className={`rounded px-4 py-2 ${
-                      laborPage === laborTotalPages ? "bg-gray-300" : "bg-blue-500 text-white"
+                      laborPage === laborTotalPages
+                        ? "bg-gray-300"
+                        : "bg-blue-500 text-white"
                     }`}
                   >
                     Next
