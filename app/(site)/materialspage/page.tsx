@@ -842,28 +842,47 @@ const ProjectCostManagement = () => {
                 <div className="flex flex-col">
                   <span>Budget</span>
                   <span className="rounded bg-green-100 p-2 font-semibold text-green-800">
-                    ${selectedProject.budget?.toLocaleString() || "0"}
+                    $
+                    {selectedProject.budget?.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    }) || "0.00"}
                   </span>
                 </div>
                 <div className="flex flex-col">
                   <span>Materials Subtotal</span>
                   <span className="p-2">
                     $
-                    {selectedProject.totalMaterialCost?.toLocaleString() || "0"}
+                    {selectedProject.totalMaterialCost?.toLocaleString(
+                      undefined,
+                      {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      },
+                    ) || "0"}
                   </span>
                 </div>
                 <div className="flex flex-col">
                   <span>Subcontractors Subtotal</span>
                   <span className="p-2">
                     $
-                    {selectedProject.totalSubcontractorCost?.toLocaleString() ||
-                      "0"}
+                    {selectedProject.totalSubcontractorCost?.toLocaleString(
+                      undefined,
+                      {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      },
+                    ) || "0"}
                   </span>
                 </div>
                 <div className="flex flex-col">
                   <span>Labor Cost Subtotal</span>
                   <span className="p-2">
-                    ${selectedProject.totalLaborCost?.toLocaleString() || "0"}
+                    $
+                    {selectedProject.totalLaborCost?.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    }) || "0"}
                   </span>
                 </div>
               </div>
@@ -871,7 +890,14 @@ const ProjectCostManagement = () => {
                 <div className="flex flex-col">
                   <span>Total Expense</span>
                   <span className="rounded bg-red-100 p-2 font-semibold text-red-800">
-                    ${selectedProject.totalProjectCost?.toLocaleString() || "0"}
+                    $
+                    {selectedProject.totalProjectCost?.toLocaleString(
+                      undefined,
+                      {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      },
+                    ) || "0"}
                   </span>
                 </div>
                 <div className="flex flex-col">
@@ -881,7 +907,10 @@ const ProjectCostManagement = () => {
                     {(
                       (selectedProject.budget || 0) -
                       (selectedProject.totalProjectCost || 0)
-                    ).toLocaleString()}
+                    ).toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </span>
                 </div>
               </div>
@@ -1176,10 +1205,25 @@ const ProjectCostManagement = () => {
                           <p>Quantity: {material.quantityOrdered}</p>
                         )}
                         {material.costPerUnit !== undefined && (
-                          <p>Cost/Unit: {material.costPerUnit}</p>
+                          <p>
+                            Cost/Unit: $
+                            {(material.costPerUnit ?? 0).toLocaleString(
+                              undefined,
+                              {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              },
+                            )}
+                          </p>
                         )}
                         {material.totalCost !== undefined && (
-                          <p>Total Cost: {material.totalCost}</p>
+                          <p>
+                            Total Cost: $
+                            {material.totalCost.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </p>
                         )}
                         {material.supplierName && (
                           <p>Supplier: {material.supplierName}</p>
@@ -1510,10 +1554,22 @@ const ProjectCostManagement = () => {
                       <div className="mt-4 space-y-1 text-sm text-gray-600">
                         {sub.contactInfo && <p>Contact: {sub.contactInfo}</p>}
                         {sub.agreedCost !== undefined && (
-                          <p>Agreed Cost: {sub.agreedCost}</p>
+                          <p>
+                            Agreed Cost: $
+                            {sub.agreedCost.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </p>
                         )}
                         {sub.totalCost !== undefined && (
-                          <p>Total Cost: {sub.totalCost}</p>
+                          <p>
+                            Total Cost: $
+                            {sub.totalCost.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </p>
                         )}
 
                         {/* Show created/modified info */}
@@ -1809,8 +1865,20 @@ const ProjectCostManagement = () => {
                     {showLaborDetails[lab.id] && (
                       <div className="mt-4 space-y-1 text-sm text-gray-600">
                         <p>Hours Worked: {lab.hoursWorked}</p>
-                        <p>Hourly Rate: {lab.hourlyRate}</p>
-                        <p>Total Cost: {lab.totalCost}</p>
+                        <p>
+                          Hourly Rate: $
+                          {lab.hourlyRate.toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </p>
+                        <p>
+                          Total Cost: $
+                          {lab.totalCost.toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </p>
 
                         {/* Show created/modified info */}
                         <hr className="my-2" />
