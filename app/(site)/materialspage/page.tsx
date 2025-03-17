@@ -10,8 +10,17 @@ import axios from "axios";
 // Headless UI + Heroicons
 import { Combobox } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/24/outline";
-import { FaEdit, FaTrashAlt, FaEye, FaEyeSlash } from "react-icons/fa";
 
+import ProjectBudgetCard from "@/app/components/materialsPage/ProjectBudgetCard";
+import MaterialSection from "@/app/components/materialsPage/MaterialsSection";
+import SubcontractorSection from "@/app/components/materialsPage/SubcontractorSection";
+import LaborCostSection from "@/app/components/materialsPage/LaborCostSection";
+
+import { FaEye, FaEyeSlash, FaEdit, FaTrashAlt } from "react-icons/fa";
+
+/** -------------------
+ * Types
+ --------------------*/
 type Project = {
   id: string;
   code: string;
@@ -83,40 +92,6 @@ type EditLaborCostData = {
   [laborCostId: string]: Partial<LaborCost>;
 };
 
-const unitOptions = [
-  "kg",
-  "g",
-  "mg",
-  "liters",
-  "ml",
-  "pieces",
-  "units",
-  "meters",
-  "cm",
-  "mm",
-  "inches",
-  "feet",
-  "yards",
-  "square meters",
-  "square cm",
-  "square inches",
-  "square feet",
-  "cubic meters",
-  "cubic cm",
-  "cubic inches",
-  "packs",
-  "rolls",
-  "pints",
-  "gallons",
-  "quarts",
-  "fluid ounces",
-  "square yards",
-  "cubic yards",
-  "tons",
-  "ounces",
-  "milligrams",
-];
-
 const ProjectCostManagement = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -146,9 +121,7 @@ const ProjectCostManagement = () => {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [materialsPage, setMaterialsPage] = useState(1);
   const [materialsTotalPages, setMaterialsTotalPages] = useState(1);
-  // Material-specific search
   const [materialsSearchTerm, setMaterialsSearchTerm] = useState("");
-
   const [newMaterial, setNewMaterial] = useState<Partial<Material>>({});
   const [editableMaterialId, setEditableMaterialId] = useState<string | null>(
     null,
@@ -166,9 +139,7 @@ const ProjectCostManagement = () => {
   const [subcontractors, setSubcontractors] = useState<Subcontractor[]>([]);
   const [subPage, setSubPage] = useState(1);
   const [subTotalPages, setSubTotalPages] = useState(1);
-  // Subcontractor-specific search
   const [subSearchTerm, setSubSearchTerm] = useState("");
-
   const [newSubcontractor, setNewSubcontractor] = useState<
     Partial<Subcontractor>
   >({});
@@ -187,9 +158,7 @@ const ProjectCostManagement = () => {
   const [laborCosts, setLaborCosts] = useState<LaborCost[]>([]);
   const [laborPage, setLaborPage] = useState(1);
   const [laborTotalPages, setLaborTotalPages] = useState(1);
-  // Labor-specific search
   const [laborSearchTerm, setLaborSearchTerm] = useState("");
-
   const [newLaborCost, setNewLaborCost] = useState<Partial<LaborCost>>({});
   const [editableLaborCostId, setEditableLaborCostId] = useState<string | null>(
     null,
@@ -210,9 +179,9 @@ const ProjectCostManagement = () => {
     }
   }, [session, status, router]);
 
-  /**
-   * Fetch Projects
-   */
+  /** =========================
+   *  Fetch Projects
+   *  =========================*/
   const fetchProjects = async () => {
     try {
       const response = await axios.get("/api/projects");
@@ -222,7 +191,7 @@ const ProjectCostManagement = () => {
         );
         setProjects(sortedProjects);
 
-        // If there is a selected projectFilter, reset `selectedProject` accordingly
+        // If there is a selected projectFilter, reset `selectedProject`
         if (projectFilter) {
           const found = sortedProjects.find(
             (p: Project) => p.code === projectFilter,
@@ -241,9 +210,6 @@ const ProjectCostManagement = () => {
     }
   };
 
-  /**
-   * Re-check if we have a selected project from the projectFilter
-   */
   const refreshSelectedProject = () => {
     if (!projectFilter) {
       setSelectedProject(null);
@@ -258,9 +224,9 @@ const ProjectCostManagement = () => {
     }
   };
 
-  /**
-   * Materials
-   */
+  /** =========================
+   *  Fetch + Create + Update + Delete for Materials
+   *  =========================*/
   const fetchMaterials = async (page = 1) => {
     if (!projectFilter) {
       setMaterials([]);
@@ -273,7 +239,7 @@ const ProjectCostManagement = () => {
           searchTerm: materialsSearchTerm,
           projectCode: projectFilter,
           page,
-          limit: 20,
+          limit: 30,
         },
       });
       if (response.data && response.data.materials) {
@@ -297,7 +263,7 @@ const ProjectCostManagement = () => {
     }
     try {
       const finalPayload = { ...newMaterial };
-      finalPayload.type = finalPayload.type || ""; // default if needed
+      finalPayload.type = finalPayload.type || "";
 
       await axios.post("/api/projects/materials", {
         data: { ...finalPayload, projectCode: projectFilter },
@@ -306,7 +272,7 @@ const ProjectCostManagement = () => {
 
       // Re-fetch
       fetchMaterials(materialsPage);
-      fetchProjects(); // Update project subtotals in UI
+      fetchProjects(); // Update project subtotals
       setNewMaterial({});
     } catch (error) {
       console.error("Error creating material:", error);
@@ -396,9 +362,9 @@ const ProjectCostManagement = () => {
     }
   };
 
-  /**
-   * Subcontractors
-   */
+  /** =========================
+   *  Fetch + Create + Update + Delete for Subcontractors
+   *  =========================*/
   const fetchSubcontractors = async (page = 1) => {
     if (!projectFilter) {
       setSubcontractors([]);
@@ -411,7 +377,7 @@ const ProjectCostManagement = () => {
           searchTerm: subSearchTerm,
           projectCode: projectFilter,
           page,
-          limit: 20,
+          limit: 30,
         },
       });
       if (response.data && response.data.subcontractors) {
@@ -525,9 +491,9 @@ const ProjectCostManagement = () => {
     }
   };
 
-  /**
-   * Labor Costs
-   */
+  /** =========================
+   *  Fetch + Create + Update + Delete for Labor Costs
+   *  =========================*/
   const fetchLaborCosts = async (page = 1) => {
     if (!projectFilter) {
       setLaborCosts([]);
@@ -540,7 +506,7 @@ const ProjectCostManagement = () => {
           searchTerm: laborSearchTerm,
           projectCode: projectFilter,
           page,
-          limit: 20,
+          limit: 30,
         },
       });
       if (response.data && response.data.laborCosts) {
@@ -660,9 +626,9 @@ const ProjectCostManagement = () => {
     }
   };
 
-  /**
-   * Update Project Budget
-   */
+  /** =========================
+   *  Update Project Budget
+   *  =========================*/
   const handleUpdateBudget = async (e: FormEvent) => {
     e.preventDefault();
     if (!selectedProject) return;
@@ -684,9 +650,9 @@ const ProjectCostManagement = () => {
     }
   };
 
-  /**
-   * Use Effects
-   */
+  /** =========================
+   *  useEffect: On load + watchers
+   *  =========================*/
   useEffect(() => {
     // initial load of projects
     if (session?.user.email) {
@@ -695,7 +661,7 @@ const ProjectCostManagement = () => {
   }, [session?.user.email]);
 
   useEffect(() => {
-    // when projectFilter changes, select that project & load sub-lists
+    // When projectFilter changes, reselect the project & fetch sub-lists
     refreshSelectedProject();
     setMaterialsPage(1);
     setSubPage(1);
@@ -705,7 +671,7 @@ const ProjectCostManagement = () => {
     fetchLaborCosts(1);
   }, [projectFilter]);
 
-  // Trigger material refetch on search changes
+  // Trigger material refetch on materialsSearchTerm changes
   useEffect(() => {
     setMaterialsPage(1);
     if (projectFilter) {
@@ -713,7 +679,7 @@ const ProjectCostManagement = () => {
     }
   }, [materialsSearchTerm]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Trigger subcontractor refetch on search changes
+  // Trigger subcontractor refetch on subSearchTerm changes
   useEffect(() => {
     setSubPage(1);
     if (projectFilter) {
@@ -721,7 +687,7 @@ const ProjectCostManagement = () => {
     }
   }, [subSearchTerm]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Trigger labor refetch on search changes
+  // Trigger labor refetch on laborSearchTerm changes
   useEffect(() => {
     setLaborPage(1);
     if (projectFilter) {
@@ -729,13 +695,16 @@ const ProjectCostManagement = () => {
     }
   }, [laborSearchTerm]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Whenever we pick a new selectedProject, set newBudget
   useEffect(() => {
-    // whenever we pick a new selectedProject, set newBudget
     if (selectedProject && typeof selectedProject.budget === "number") {
       setNewBudget(selectedProject.budget);
     }
   }, [selectedProject]);
 
+  /** =========================
+   *  RENDER
+   *  =========================*/
   return (
     <div className="relative min-h-screen bg-gray-100">
       <Navbar />
@@ -744,9 +713,7 @@ const ProjectCostManagement = () => {
         <div className="mb-6 flex flex-col items-start space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
           <h1 className="text-3xl font-bold">Manage Project Costs</h1>
 
-          {/* ================================
-              PROJECT COMBOBOX
-          =================================*/}
+          {/* Project Combobox */}
           <div className="w-full sm:w-auto">
             <label
               htmlFor="searchProject"
@@ -830,1166 +797,86 @@ const ProjectCostManagement = () => {
         </div>
         {/* END Header */}
 
-        {/* Display Project Info if we have a selectedProject */}
+        {/* Show data sections only if a project is selected */}
         {selectedProject && (
-          <div className="mb-6 rounded bg-white p-4 shadow">
-            <h2 className="mb-4 text-2xl font-bold">
-              Project: {selectedProject.code}
-            </h2>
+          <>
+            {/* PROJECT BUDGET / SUMMARY */}
+            <ProjectBudgetCard
+              selectedProject={selectedProject}
+              newBudget={newBudget}
+              setNewBudget={setNewBudget}
+              handleUpdateBudget={handleUpdateBudget}
+            />
 
-            <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
-              <div className="flex flex-col space-y-2">
-                <div className="flex flex-col">
-                  <span>Budget</span>
-                  <span className="rounded bg-green-100 p-2 font-semibold text-green-800">
-                    $
-                    {selectedProject.budget?.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    }) || "0.00"}
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span>Materials Subtotal</span>
-                  <span className="p-2">
-                    $
-                    {selectedProject.totalMaterialCost?.toLocaleString(
-                      undefined,
-                      {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      },
-                    ) || "0"}
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span>Subcontractors Subtotal</span>
-                  <span className="p-2">
-                    $
-                    {selectedProject.totalSubcontractorCost?.toLocaleString(
-                      undefined,
-                      {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      },
-                    ) || "0"}
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span>Labor Cost Subtotal</span>
-                  <span className="p-2">
-                    $
-                    {selectedProject.totalLaborCost?.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    }) || "0"}
-                  </span>
-                </div>
-              </div>
-              <div className="flex flex-col space-y-2">
-                <div className="flex flex-col">
-                  <span>Total Expense</span>
-                  <span className="rounded bg-red-100 p-2 font-semibold text-red-800">
-                    $
-                    {selectedProject.totalProjectCost?.toLocaleString(
-                      undefined,
-                      {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      },
-                    ) || "0"}
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span>Remaining Budget</span>
-                  <span className="rounded bg-yellow-100 p-2 font-semibold text-yellow-800">
-                    $
-                    {(
-                      (selectedProject.budget || 0) -
-                      (selectedProject.totalProjectCost || 0)
-                    ).toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </span>
-                </div>
-              </div>
-            </div>
+            {/* MATERIALS SECTION */}
+            <MaterialSection
+              session={session}
+              selectedProject={selectedProject}
+              materials={materials}
+              materialsSearchTerm={materialsSearchTerm}
+              setMaterialsSearchTerm={setMaterialsSearchTerm}
+              handleCreateMaterial={handleCreateMaterial}
+              newMaterial={newMaterial}
+              setNewMaterial={setNewMaterial}
+              editableMaterialId={editableMaterialId}
+              editMaterialData={editMaterialData}
+              handleMaterialChange={handleMaterialChange}
+              handleMaterialEditToggle={handleMaterialEditToggle}
+              updateMaterial={updateMaterial}
+              deleteMaterial={deleteMaterial}
+              toggleMaterialDetails={toggleMaterialDetails}
+              showMaterialDetails={showMaterialDetails}
+              materialsPage={materialsPage}
+              materialsTotalPages={materialsTotalPages}
+              handleMaterialPageChange={handleMaterialPageChange}
+            />
 
-            {/* Form to update the project's budget */}
-            <form onSubmit={handleUpdateBudget} className="mt-6 space-y-2">
-              <label className="block text-sm font-semibold text-gray-700">
-                Update Budget
-              </label>
-              <input
-                type="number"
-                value={newBudget}
-                onChange={(e) => setNewBudget(parseFloat(e.target.value))}
-                className="w-full rounded border px-4 py-2 text-sm"
-              />
-              <button
-                type="submit"
-                className="w-full rounded bg-green-600 px-4 py-2 text-sm font-bold text-white hover:bg-green-700"
-              >
-                Save Budget
-              </button>
-            </form>
-          </div>
-        )}
+            {/* SUBCONTRACTORS SECTION */}
+            <SubcontractorSection
+              session={session}
+              selectedProject={selectedProject}
+              subcontractors={subcontractors}
+              subSearchTerm={subSearchTerm}
+              setSubSearchTerm={setSubSearchTerm}
+              handleCreateSubcontractor={handleCreateSubcontractor}
+              newSubcontractor={newSubcontractor}
+              setNewSubcontractor={setNewSubcontractor}
+              editableSubcontractorId={editableSubcontractorId}
+              editSubcontractorData={editSubcontractorData}
+              handleSubChange={handleSubChange}
+              handleSubEditToggle={handleSubEditToggle}
+              updateSubcontractor={updateSubcontractor}
+              deleteSubcontractor={deleteSubcontractor}
+              toggleSubDetails={toggleSubDetails}
+              showSubDetails={showSubDetails}
+              subPage={subPage}
+              subTotalPages={subTotalPages}
+              handleSubPageChange={handleSubPageChange}
+            />
 
-        {/* MATERIALS SECTION */}
-        {selectedProject && (
-          <div className="mb-10">
-            {/* Title & Search */}
-            <div className="mb-2 flex flex-col space-y-2 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
-              <h2 className="text-2xl font-bold">
-                Materials for {selectedProject.code} (Total: {materials.length})
-              </h2>
-
-              {/* ================================
-                  STYLED SEARCH for MATERIALS
-              =================================*/}
-              <div className="relative mb-2 w-full sm:mb-0 sm:w-64">
-                <label
-                  htmlFor="materialsSearch"
-                  className="mb-1 block text-sm font-semibold text-gray-700"
-                >
-                  Search Materials
-                </label>
-                <div className="relative">
-                  <input
-                    id="materialsSearch"
-                    type="text"
-                    value={materialsSearchTerm}
-                    onChange={(e) => setMaterialsSearchTerm(e.target.value)}
-                    placeholder="Type to filter materials..."
-                    className="w-full rounded-md border border-gray-300 py-2 pl-3 pr-10 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                  <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                    <svg
-                      className="h-5 w-5"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M21 21l-6-6M17 9a8 8 0 11-16 0 8 8 0 0116 0z" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* CREATE NEW MATERIAL */}
-            <form onSubmit={handleCreateMaterial} className="mb-6 space-y-4">
-              <div className="flex flex-col md:flex-row md:space-x-4">
-                <div className="w-full md:w-1/2">
-                  <label className="block text-sm font-semibold text-gray-700">
-                    Type
-                  </label>
-                  <input
-                    type="text"
-                    name="type"
-                    value={newMaterial.type || ""}
-                    onChange={(e) =>
-                      setNewMaterial({ ...newMaterial, type: e.target.value })
-                    }
-                    placeholder="e.g. Lumber, Paint..."
-                    className="w-full rounded border px-4 py-2 text-sm"
-                    required
-                  />
-                </div>
-                <div className="w-full md:w-1/2">
-                  <label className="block text-sm font-semibold text-gray-700">
-                    Description
-                  </label>
-                  <textarea
-                    name="description"
-                    value={newMaterial.description || ""}
-                    onChange={(e) =>
-                      setNewMaterial({
-                        ...newMaterial,
-                        description: e.target.value,
-                      })
-                    }
-                    placeholder="Short description"
-                    className="w-full rounded border px-4 py-2 text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col md:flex-row md:space-x-4">
-                <div className="w-full md:w-1/2">
-                  <label className="block text-sm font-semibold text-gray-700">
-                    Unit of Measurement
-                  </label>
-                  <select
-                    name="unitOfMeasurement"
-                    value={newMaterial.unitOfMeasurement || ""}
-                    onChange={(e) =>
-                      setNewMaterial({
-                        ...newMaterial,
-                        unitOfMeasurement: e.target.value,
-                      })
-                    }
-                    className="w-full rounded border px-4 py-2 text-sm"
-                  >
-                    <option value="">(Select one)</option>
-                    {unitOptions.map((unit) => (
-                      <option key={unit} value={unit}>
-                        {unit}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="w-full md:w-1/2">
-                  <label className="block text-sm font-semibold text-gray-700">
-                    Quantity Ordered
-                  </label>
-                  <input
-                    type="number"
-                    name="quantityOrdered"
-                    value={newMaterial.quantityOrdered || ""}
-                    onChange={(e) =>
-                      setNewMaterial({
-                        ...newMaterial,
-                        quantityOrdered: parseFloat(e.target.value),
-                      })
-                    }
-                    placeholder="0"
-                    className="w-full rounded border px-4 py-2 text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col md:flex-row md:space-x-4">
-                <div className="w-full md:w-1/2">
-                  <label className="block text-sm font-semibold text-gray-700">
-                    Cost Per Unit
-                  </label>
-                  <input
-                    type="number"
-                    name="costPerUnit"
-                    step="any"
-                    value={newMaterial.costPerUnit || ""}
-                    onChange={(e) =>
-                      setNewMaterial({
-                        ...newMaterial,
-                        costPerUnit: parseFloat(e.target.value),
-                      })
-                    }
-                    placeholder="0.00"
-                    className="w-full rounded border px-4 py-2 text-sm"
-                  />
-                </div>
-                <div className="w-full md:w-1/2">
-                  <label className="block text-sm font-semibold text-gray-700">
-                    Status
-                  </label>
-                  <select
-                    name="status"
-                    value={newMaterial.status || ""}
-                    onChange={(e) =>
-                      setNewMaterial({ ...newMaterial, status: e.target.value })
-                    }
-                    className="w-full rounded border px-4 py-2 text-sm"
-                  >
-                    <option value="">Select Status</option>
-                    <option value="ordered">Ordered</option>
-                    <option value="received">Received</option>
-                    <option value="delivered">Delivered</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex flex-col md:flex-row md:space-x-4">
-                <div className="w-full md:w-1/2">
-                  <label className="block text-sm font-semibold text-gray-700">
-                    Supplier Name
-                  </label>
-                  <input
-                    type="text"
-                    name="supplierName"
-                    value={newMaterial.supplierName || ""}
-                    onChange={(e) =>
-                      setNewMaterial({
-                        ...newMaterial,
-                        supplierName: e.target.value,
-                      })
-                    }
-                    placeholder="Supplier..."
-                    className="w-full rounded border px-4 py-2 text-sm"
-                  />
-                </div>
-                <div className="w-full md:w-1/2">
-                  <label className="block text-sm font-semibold text-gray-700">
-                    Supplier Contact
-                  </label>
-                  <textarea
-                    name="supplierContact"
-                    value={newMaterial.supplierContact || ""}
-                    onChange={(e) =>
-                      setNewMaterial({
-                        ...newMaterial,
-                        supplierContact: e.target.value,
-                      })
-                    }
-                    placeholder="Supplier contact..."
-                    className="w-full rounded border px-4 py-2 text-sm"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full rounded bg-blue-500 px-4 py-2 text-sm font-bold text-white hover:bg-blue-600"
-              >
-                Create Material
-              </button>
-            </form>
-
-            {materials.length > 0 ? (
-              <div className="space-y-4">
-                {materials.map((material) => (
-                  <div
-                    key={material.id}
-                    className="rounded bg-white p-4 shadow"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-xl font-bold">{material.type}</div>
-                        <p className="text-gray-600">{material.description}</p>
-                      </div>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => toggleMaterialDetails(material.id)}
-                          className="rounded bg-gray-300 p-2 hover:bg-gray-400"
-                        >
-                          {showMaterialDetails[material.id] ? (
-                            <FaEyeSlash />
-                          ) : (
-                            <FaEye />
-                          )}
-                        </button>
-                        {["admin", "lead", "owner"].includes(
-                          session?.user.role as string,
-                        ) && (
-                          <button
-                            onClick={() =>
-                              handleMaterialEditToggle(material.id)
-                            }
-                            className="rounded bg-blue-500 p-2 text-white hover:bg-blue-600"
-                          >
-                            <FaEdit />
-                          </button>
-                        )}
-                        {["admin", "lead", "owner"].includes(
-                          session?.user.role as string,
-                        ) && (
-                          <button
-                            onClick={() => deleteMaterial(material.id)}
-                            className="rounded bg-red-500 p-2 text-white hover:bg-red-600"
-                          >
-                            <FaTrashAlt />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    {showMaterialDetails[material.id] && (
-                      <div className="mt-4 space-y-1 text-sm text-gray-600">
-                        {material.unitOfMeasurement && (
-                          <p>Unit: {material.unitOfMeasurement}</p>
-                        )}
-                        {material.quantityOrdered !== undefined && (
-                          <p>Quantity: {material.quantityOrdered}</p>
-                        )}
-                        {material.costPerUnit !== undefined && (
-                          <p>
-                            Cost/Unit: $
-                            {(material.costPerUnit ?? 0).toLocaleString(
-                              undefined,
-                              {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              },
-                            )}
-                          </p>
-                        )}
-                        {material.totalCost !== undefined && (
-                          <p>
-                            Total Cost: $
-                            {material.totalCost.toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </p>
-                        )}
-                        {material.supplierName && (
-                          <p>Supplier: {material.supplierName}</p>
-                        )}
-                        {material.supplierContact && (
-                          <p>Contact: {material.supplierContact}</p>
-                        )}
-                        {material.status && <p>Status: {material.status}</p>}
-
-                        {/* Show created/modified info */}
-                        <hr className="my-2" />
-                        <p>
-                          Created By:{" "}
-                          {material.createdBy
-                            ? `${material.createdBy.firstName ?? ""} ${
-                                material.createdBy.lastName ?? ""
-                              } (${material.createdBy.nickname ?? ""})`
-                            : "N/A"}
-                        </p>
-                        <p>
-                          Created At:{" "}
-                          {material.createdAt
-                            ? new Date(material.createdAt).toLocaleString()
-                            : "N/A"}
-                        </p>
-                        <p>
-                          Last Modified By:{" "}
-                          {material.lastModifiedBy
-                            ? `${material.lastModifiedBy.firstName ?? ""} ${
-                                material.lastModifiedBy.lastName ?? ""
-                              } (${material.lastModifiedBy.nickname ?? ""})`
-                            : "N/A"}
-                        </p>
-                        <p>
-                          Last Modified At:{" "}
-                          {material.lastModifiedAt
-                            ? new Date(material.lastModifiedAt).toLocaleString()
-                            : "N/A"}
-                        </p>
-                      </div>
-                    )}
-
-                    {editableMaterialId === material.id && (
-                      <form
-                        onSubmit={(e) => updateMaterial(material.id, e)}
-                        className="mt-4 space-y-2 text-sm"
-                      >
-                        <input
-                          type="text"
-                          name="type"
-                          value={editMaterialData[material.id]?.type || ""}
-                          onChange={(e) => handleMaterialChange(e, material.id)}
-                          placeholder="Type"
-                          className="w-full rounded border px-4 py-2"
-                          required
-                        />
-                        <textarea
-                          name="description"
-                          value={
-                            editMaterialData[material.id]?.description || ""
-                          }
-                          onChange={(e) => handleMaterialChange(e, material.id)}
-                          placeholder="Description"
-                          className="w-full rounded border px-4 py-2"
-                        />
-                        <select
-                          name="unitOfMeasurement"
-                          value={
-                            editMaterialData[material.id]?.unitOfMeasurement ||
-                            ""
-                          }
-                          onChange={(e) => handleMaterialChange(e, material.id)}
-                          className="w-full rounded border px-4 py-2"
-                        >
-                          <option value="">(Select Unit)</option>
-                          {unitOptions.map((unit) => (
-                            <option key={unit} value={unit}>
-                              {unit}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          type="number"
-                          name="quantityOrdered"
-                          value={
-                            editMaterialData[material.id]?.quantityOrdered || ""
-                          }
-                          onChange={(e) => handleMaterialChange(e, material.id)}
-                          placeholder="Quantity"
-                          className="w-full rounded border px-4 py-2"
-                        />
-                        <input
-                          type="number"
-                          name="costPerUnit"
-                          step="any"
-                          value={
-                            editMaterialData[material.id]?.costPerUnit || ""
-                          }
-                          onChange={(e) => handleMaterialChange(e, material.id)}
-                          placeholder="Cost Per Unit"
-                          className="w-full rounded border px-4 py-2"
-                        />
-                        <select
-                          name="status"
-                          value={editMaterialData[material.id]?.status || ""}
-                          onChange={(e) => handleMaterialChange(e, material.id)}
-                          className="w-full rounded border px-4 py-2"
-                        >
-                          <option value="">Select Status</option>
-                          <option value="ordered">Ordered</option>
-                          <option value="received">Received</option>
-                          <option value="delivered">Delivered</option>
-                        </select>
-                        <button
-                          type="submit"
-                          className="w-full rounded bg-green-500 px-4 py-2 text-sm font-bold text-white hover:bg-green-600"
-                        >
-                          Save Changes
-                        </button>
-                      </form>
-                    )}
-                  </div>
-                ))}
-                <div className="flex justify-center space-x-2">
-                  <button
-                    onClick={() => handleMaterialPageChange(materialsPage - 1)}
-                    disabled={materialsPage === 1}
-                    className={`rounded px-4 py-2 ${
-                      materialsPage === 1
-                        ? "bg-gray-300"
-                        : "bg-blue-500 text-white"
-                    }`}
-                  >
-                    Previous
-                  </button>
-                  <button
-                    onClick={() => handleMaterialPageChange(materialsPage + 1)}
-                    disabled={materialsPage === materialsTotalPages}
-                    className={`rounded px-4 py-2 ${
-                      materialsPage === materialsTotalPages
-                        ? "bg-gray-300"
-                        : "bg-blue-500 text-white"
-                    }`}
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <p>No materials found.</p>
-            )}
-          </div>
-        )}
-
-        {/* SUBCONTRACTORS SECTION */}
-        {selectedProject && (
-          <div className="mb-10">
-            {/* Title & Search */}
-            <div className="mb-2 flex flex-col space-y-2 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
-              <h2 className="text-2xl font-bold">
-                Subcontractors for {selectedProject.code} (Total:{" "}
-                {subcontractors.length})
-              </h2>
-
-              {/* ================================
-                  STYLED SEARCH for SUBCONTRACTORS
-              =================================*/}
-              <div className="relative mb-2 w-full sm:mb-0 sm:w-64">
-                <label
-                  htmlFor="subSearch"
-                  className="mb-1 block text-sm font-semibold text-gray-700"
-                >
-                  Search Subcontractors
-                </label>
-                <div className="relative">
-                  <input
-                    id="subSearch"
-                    type="text"
-                    value={subSearchTerm}
-                    onChange={(e) => setSubSearchTerm(e.target.value)}
-                    placeholder="Type to filter subcontractors..."
-                    className="w-full rounded-md border border-gray-300 py-2 pl-3 pr-10 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                  <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                    <svg
-                      className="h-5 w-5"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M21 21l-6-6M17 9a8 8 0 11-16 0 8 8 0 0116 0z" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* CREATE NEW SUBCONTRACTOR */}
-            <form
-              onSubmit={handleCreateSubcontractor}
-              className="mb-6 space-y-4"
-            >
-              <div className="flex flex-col md:flex-row md:space-x-4">
-                <div className="w-full md:w-1/2">
-                  <label className="block text-sm font-semibold text-gray-700">
-                    Name
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={newSubcontractor.name || ""}
-                    onChange={(e) =>
-                      setNewSubcontractor({
-                        ...newSubcontractor,
-                        name: e.target.value,
-                      })
-                    }
-                    placeholder="Subcontractor Name"
-                    className="w-full rounded border px-4 py-2 text-sm"
-                    required
-                  />
-                </div>
-                <div className="w-full md:w-1/2">
-                  <label className="block text-sm font-semibold text-gray-700">
-                    Expertise
-                  </label>
-                  <textarea
-                    name="expertise"
-                    value={newSubcontractor.expertise || ""}
-                    onChange={(e) =>
-                      setNewSubcontractor({
-                        ...newSubcontractor,
-                        expertise: e.target.value,
-                      })
-                    }
-                    placeholder="e.g. Plumbing, Electrical..."
-                    className="w-full rounded border px-4 py-2 text-sm"
-                  />
-                </div>
-              </div>
-              <div className="flex flex-col md:flex-row md:space-x-4">
-                <div className="w-full md:w-1/2">
-                  <label className="block text-sm font-semibold text-gray-700">
-                    Contact Info
-                  </label>
-                  <textarea
-                    name="contactInfo"
-                    value={newSubcontractor.contactInfo || ""}
-                    onChange={(e) =>
-                      setNewSubcontractor({
-                        ...newSubcontractor,
-                        contactInfo: e.target.value,
-                      })
-                    }
-                    placeholder="Contact details..."
-                    className="w-full rounded border px-4 py-2 text-sm"
-                  />
-                </div>
-                <div className="w-full md:w-1/2">
-                  <label className="block text-sm font-semibold text-gray-700">
-                    Agreed Cost
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
-                    name="agreedCost"
-                    value={newSubcontractor.agreedCost || ""}
-                    onChange={(e) =>
-                      setNewSubcontractor({
-                        ...newSubcontractor,
-                        agreedCost: parseFloat(e.target.value),
-                      })
-                    }
-                    placeholder="0.00"
-                    className="w-full rounded border px-4 py-2 text-sm"
-                  />
-                </div>
-              </div>
-              <button
-                type="submit"
-                className="w-full rounded bg-blue-500 px-4 py-2 text-sm font-bold text-white hover:bg-blue-600"
-              >
-                Create Subcontractor
-              </button>
-            </form>
-
-            {subcontractors.length > 0 ? (
-              <div className="space-y-4">
-                {subcontractors.map((sub) => (
-                  <div key={sub.id} className="rounded bg-white p-4 shadow">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-xl font-bold">{sub.name}</div>
-                        <p className="text-gray-600">{sub.expertise}</p>
-                      </div>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => toggleSubDetails(sub.id)}
-                          className="rounded bg-gray-300 p-2 hover:bg-gray-400"
-                        >
-                          {showSubDetails[sub.id] ? <FaEyeSlash /> : <FaEye />}
-                        </button>
-                        {["admin", "lead", "owner"].includes(
-                          session?.user.role as string,
-                        ) && (
-                          <button
-                            onClick={() => handleSubEditToggle(sub.id)}
-                            className="rounded bg-blue-500 p-2 text-white hover:bg-blue-600"
-                          >
-                            <FaEdit />
-                          </button>
-                        )}
-                        {["admin", "lead", "owner"].includes(
-                          session?.user.role as string,
-                        ) && (
-                          <button
-                            onClick={() => deleteSubcontractor(sub.id)}
-                            className="rounded bg-red-500 p-2 text-white hover:bg-red-600"
-                          >
-                            <FaTrashAlt />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    {showSubDetails[sub.id] && (
-                      <div className="mt-4 space-y-1 text-sm text-gray-600">
-                        {sub.contactInfo && <p>Contact: {sub.contactInfo}</p>}
-                        {sub.agreedCost !== undefined && (
-                          <p>
-                            Agreed Cost: $
-                            {sub.agreedCost.toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </p>
-                        )}
-                        {sub.totalCost !== undefined && (
-                          <p>
-                            Total Cost: $
-                            {sub.totalCost.toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </p>
-                        )}
-
-                        {/* Show created/modified info */}
-                        <hr className="my-2" />
-                        <p>
-                          Created By:{" "}
-                          {sub.createdBy
-                            ? `${sub.createdBy.firstName ?? ""} ${
-                                sub.createdBy.lastName ?? ""
-                              } (${sub.createdBy.nickname ?? ""})`
-                            : "N/A"}
-                        </p>
-                        <p>
-                          Created At:{" "}
-                          {sub.createdAt
-                            ? new Date(sub.createdAt).toLocaleString()
-                            : "N/A"}
-                        </p>
-                        <p>
-                          Last Modified By:{" "}
-                          {sub.lastModifiedBy
-                            ? `${sub.lastModifiedBy.firstName ?? ""} ${
-                                sub.lastModifiedBy.lastName ?? ""
-                              } (${sub.lastModifiedBy.nickname ?? ""})`
-                            : "N/A"}
-                        </p>
-                        <p>
-                          Last Modified At:{" "}
-                          {sub.lastModifiedAt
-                            ? new Date(sub.lastModifiedAt).toLocaleString()
-                            : "N/A"}
-                        </p>
-                      </div>
-                    )}
-
-                    {editableSubcontractorId === sub.id && (
-                      <form
-                        onSubmit={(e) => updateSubcontractor(sub.id, e)}
-                        className="mt-4 space-y-2 text-sm"
-                      >
-                        <input
-                          type="text"
-                          name="name"
-                          value={editSubcontractorData[sub.id]?.name || ""}
-                          onChange={(e) => handleSubChange(e, sub.id)}
-                          placeholder="Name"
-                          className="w-full rounded border px-4 py-2"
-                          required
-                        />
-                        <textarea
-                          name="expertise"
-                          value={editSubcontractorData[sub.id]?.expertise || ""}
-                          onChange={(e) => handleSubChange(e, sub.id)}
-                          placeholder="Expertise"
-                          className="w-full rounded border px-4 py-2"
-                        />
-                        <textarea
-                          name="contactInfo"
-                          value={
-                            editSubcontractorData[sub.id]?.contactInfo || ""
-                          }
-                          onChange={(e) => handleSubChange(e, sub.id)}
-                          placeholder="Contact Info"
-                          className="w-full rounded border px-4 py-2"
-                        />
-                        <input
-                          type="number"
-                          name="agreedCost"
-                          step="any"
-                          value={
-                            editSubcontractorData[sub.id]?.agreedCost || ""
-                          }
-                          onChange={(e) => handleSubChange(e, sub.id)}
-                          placeholder="Agreed Cost"
-                          className="w-full rounded border px-4 py-2"
-                        />
-                        <button
-                          type="submit"
-                          className="w-full rounded bg-green-500 px-4 py-2 text-sm font-bold text-white hover:bg-green-600"
-                        >
-                          Save Changes
-                        </button>
-                      </form>
-                    )}
-                  </div>
-                ))}
-                <div className="flex justify-center space-x-2">
-                  <button
-                    onClick={() => handleSubPageChange(subPage - 1)}
-                    disabled={subPage === 1}
-                    className={`rounded px-4 py-2 ${
-                      subPage === 1 ? "bg-gray-300" : "bg-blue-500 text-white"
-                    }`}
-                  >
-                    Previous
-                  </button>
-                  <button
-                    onClick={() => handleSubPageChange(subPage + 1)}
-                    disabled={subPage === subTotalPages}
-                    className={`rounded px-4 py-2 ${
-                      subPage === subTotalPages
-                        ? "bg-gray-300"
-                        : "bg-blue-500 text-white"
-                    }`}
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <p>No subcontractors found.</p>
-            )}
-          </div>
-        )}
-
-        {/* LABOR COSTS SECTION */}
-        {selectedProject && (
-          <div className="mb-10">
-            {/* Title & Search */}
-            <div className="mb-2 flex flex-col space-y-2 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
-              <h2 className="text-2xl font-bold">
-                Labor Costs for {selectedProject.code} (Total:{" "}
-                {laborCosts.length})
-              </h2>
-
-              {/* ================================
-                  STYLED SEARCH for LABOR
-              =================================*/}
-              <div className="relative mb-2 w-full sm:mb-0 sm:w-64">
-                <label
-                  htmlFor="laborSearch"
-                  className="mb-1 block text-sm font-semibold text-gray-700"
-                >
-                  Search Employees
-                </label>
-                <div className="relative">
-                  <input
-                    id="laborSearch"
-                    type="text"
-                    value={laborSearchTerm}
-                    onChange={(e) => setLaborSearchTerm(e.target.value)}
-                    placeholder="Type to filter employees..."
-                    className="w-full rounded-md border border-gray-300 py-2 pl-3 pr-10 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                  <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                    <svg
-                      className="h-5 w-5"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M21 21l-6-6M17 9a8 8 0 11-16 0 8 8 0 0116 0z" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <form onSubmit={handleCreateLaborCost} className="mb-6 space-y-4">
-              <div className="flex flex-col md:flex-row md:space-x-4">
-                <div className="w-full md:w-1/2">
-                  <label className="block text-sm font-semibold text-gray-700">
-                    Employee Name
-                  </label>
-                  <input
-                    type="text"
-                    name="employeeName"
-                    value={newLaborCost.employeeName || ""}
-                    onChange={(e) =>
-                      setNewLaborCost({
-                        ...newLaborCost,
-                        employeeName: e.target.value,
-                      })
-                    }
-                    placeholder="Employee Name"
-                    className="w-full rounded border px-4 py-2 text-sm"
-                    required
-                  />
-                </div>
-                <div className="w-full md:w-1/2">
-                  <label className="block text-sm font-semibold text-gray-700">
-                    Role
-                  </label>
-                  <textarea
-                    name="role"
-                    value={newLaborCost.role || ""}
-                    onChange={(e) =>
-                      setNewLaborCost({
-                        ...newLaborCost,
-                        role: e.target.value,
-                      })
-                    }
-                    placeholder="Carpenter, Manager, etc."
-                    className="w-full rounded border px-4 py-2 text-sm"
-                  />
-                </div>
-              </div>
-              <div className="flex flex-col md:flex-row md:space-x-4">
-                <div className="w-full md:w-1/2">
-                  <label className="block text-sm font-semibold text-gray-700">
-                    Hours Worked
-                  </label>
-                  <input
-                    type="number"
-                    name="hoursWorked"
-                    step="any"
-                    value={newLaborCost.hoursWorked || ""}
-                    onChange={(e) =>
-                      setNewLaborCost({
-                        ...newLaborCost,
-                        hoursWorked: parseFloat(e.target.value),
-                      })
-                    }
-                    placeholder="0"
-                    className="w-full rounded border px-4 py-2 text-sm"
-                    required
-                  />
-                </div>
-                <div className="w-full md:w-1/2">
-                  <label className="block text-sm font-semibold text-gray-700">
-                    Hourly Rate
-                  </label>
-                  <input
-                    type="number"
-                    name="hourlyRate"
-                    step="any"
-                    value={newLaborCost.hourlyRate || ""}
-                    onChange={(e) =>
-                      setNewLaborCost({
-                        ...newLaborCost,
-                        hourlyRate: parseFloat(e.target.value),
-                      })
-                    }
-                    placeholder="35.00"
-                    className="w-full rounded border px-4 py-2 text-sm"
-                  />
-                </div>
-              </div>
-              <button
-                type="submit"
-                className="w-full rounded bg-blue-500 px-4 py-2 text-sm font-bold text-white hover:bg-blue-600"
-              >
-                Create Labor Cost Entry
-              </button>
-            </form>
-
-            {laborCosts.length > 0 ? (
-              <div className="space-y-4">
-                {laborCosts.map((lab) => (
-                  <div key={lab.id} className="rounded bg-white p-4 shadow">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-xl font-bold">
-                          {lab.employeeName}
-                        </div>
-                        <p className="text-gray-600">{lab.role}</p>
-                      </div>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => toggleLaborDetails(lab.id)}
-                          className="rounded bg-gray-300 p-2 hover:bg-gray-400"
-                        >
-                          {showLaborDetails[lab.id] ? (
-                            <FaEyeSlash />
-                          ) : (
-                            <FaEye />
-                          )}
-                        </button>
-                        {["admin", "lead", "owner"].includes(
-                          session?.user.role as string,
-                        ) && (
-                          <button
-                            onClick={() => handleLaborEditToggle(lab.id)}
-                            className="rounded bg-blue-500 p-2 text-white hover:bg-blue-600"
-                          >
-                            <FaEdit />
-                          </button>
-                        )}
-                        {["admin", "lead", "owner"].includes(
-                          session?.user.role as string,
-                        ) && (
-                          <button
-                            onClick={() => deleteLaborCost(lab.id)}
-                            className="rounded bg-red-500 p-2 text-white hover:bg-red-600"
-                          >
-                            <FaTrashAlt />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    {showLaborDetails[lab.id] && (
-                      <div className="mt-4 space-y-1 text-sm text-gray-600">
-                        <p>Hours Worked: {lab.hoursWorked}</p>
-                        <p>
-                          Hourly Rate: $
-                          {lab.hourlyRate.toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
-                        </p>
-                        <p>
-                          Total Cost: $
-                          {lab.totalCost.toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
-                        </p>
-
-                        {/* Show created/modified info */}
-                        <hr className="my-2" />
-                        <p>
-                          Created By:{" "}
-                          {lab.createdBy
-                            ? `${lab.createdBy.firstName ?? ""} ${
-                                lab.createdBy.lastName ?? ""
-                              } (${lab.createdBy.nickname ?? ""})`
-                            : "N/A"}
-                        </p>
-                        <p>
-                          Created At:{" "}
-                          {lab.createdAt
-                            ? new Date(lab.createdAt).toLocaleString()
-                            : "N/A"}
-                        </p>
-                        <p>
-                          Last Modified By:{" "}
-                          {lab.lastModifiedBy
-                            ? `${lab.lastModifiedBy.firstName ?? ""} ${
-                                lab.lastModifiedBy.lastName ?? ""
-                              } (${lab.lastModifiedBy.nickname ?? ""})`
-                            : "N/A"}
-                        </p>
-                        <p>
-                          Last Modified At:{" "}
-                          {lab.lastModifiedAt
-                            ? new Date(lab.lastModifiedAt).toLocaleString()
-                            : "N/A"}
-                        </p>
-                      </div>
-                    )}
-
-                    {editableLaborCostId === lab.id && (
-                      <form
-                        onSubmit={(e) => updateLaborCost(lab.id, e)}
-                        className="mt-4 space-y-2 text-sm"
-                      >
-                        <input
-                          type="text"
-                          name="employeeName"
-                          value={editLaborCostData[lab.id]?.employeeName || ""}
-                          onChange={(e) => handleLaborChange(e, lab.id)}
-                          placeholder="Employee Name"
-                          className="w-full rounded border px-4 py-2"
-                          required
-                        />
-                        <textarea
-                          name="role"
-                          value={editLaborCostData[lab.id]?.role || ""}
-                          onChange={(e) => handleLaborChange(e, lab.id)}
-                          placeholder="Role"
-                          className="w-full rounded border px-4 py-2"
-                        />
-                        <input
-                          type="number"
-                          name="hoursWorked"
-                          step="any"
-                          value={editLaborCostData[lab.id]?.hoursWorked || ""}
-                          onChange={(e) => handleLaborChange(e, lab.id)}
-                          placeholder="Hours Worked"
-                          className="w-full rounded border px-4 py-2"
-                          required
-                        />
-                        <input
-                          type="number"
-                          name="hourlyRate"
-                          step="any"
-                          value={editLaborCostData[lab.id]?.hourlyRate || ""}
-                          onChange={(e) => handleLaborChange(e, lab.id)}
-                          placeholder="Hourly Rate"
-                          className="w-full rounded border px-4 py-2"
-                        />
-                        <button
-                          type="submit"
-                          className="w-full rounded bg-green-500 px-4 py-2 text-sm font-bold text-white hover:bg-green-600"
-                        >
-                          Save Changes
-                        </button>
-                      </form>
-                    )}
-                  </div>
-                ))}
-                <div className="flex justify-center space-x-2">
-                  <button
-                    onClick={() => handleLaborPageChange(laborPage - 1)}
-                    disabled={laborPage === 1}
-                    className={`rounded px-4 py-2 ${
-                      laborPage === 1 ? "bg-gray-300" : "bg-blue-500 text-white"
-                    }`}
-                  >
-                    Previous
-                  </button>
-                  <button
-                    onClick={() => handleLaborPageChange(laborPage + 1)}
-                    disabled={laborPage === laborTotalPages}
-                    className={`rounded px-4 py-2 ${
-                      laborPage === laborTotalPages
-                        ? "bg-gray-300"
-                        : "bg-blue-500 text-white"
-                    }`}
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <p>No labor cost entries found.</p>
-            )}
-          </div>
+            {/* LABOR COSTS SECTION */}
+            <LaborCostSection
+              session={session}
+              selectedProject={selectedProject}
+              laborCosts={laborCosts}
+              laborSearchTerm={laborSearchTerm}
+              setLaborSearchTerm={setLaborSearchTerm}
+              handleCreateLaborCost={handleCreateLaborCost}
+              newLaborCost={newLaborCost}
+              setNewLaborCost={setNewLaborCost}
+              editableLaborCostId={editableLaborCostId}
+              editLaborCostData={editLaborCostData}
+              handleLaborChange={handleLaborChange}
+              handleLaborEditToggle={handleLaborEditToggle}
+              updateLaborCost={updateLaborCost}
+              deleteLaborCost={deleteLaborCost}
+              toggleLaborDetails={toggleLaborDetails}
+              showLaborDetails={showLaborDetails}
+              laborPage={laborPage}
+              laborTotalPages={laborTotalPages}
+              handleLaborPageChange={handleLaborPageChange}
+            />
+          </>
         )}
       </div>
     </div>
