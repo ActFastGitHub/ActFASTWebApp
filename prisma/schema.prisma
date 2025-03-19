@@ -74,6 +74,8 @@ model Profile {
 
   laborCostsCreated  LaborCost[] @relation("LaborCostCreatedBy")
   laborCostsModified LaborCost[] @relation("LaborCostModifiedBy")
+
+  OfficeSupplyModified OfficeSupply[] @relation("OfficeSupplyModifiedBy")
 }
 
 model Location {
@@ -270,4 +272,19 @@ model LaborCost {
 
   createdBy      Profile? @relation("LaborCostCreatedBy", fields: [createdById], references: [nickname])
   lastModifiedBy Profile? @relation("LaborCostModifiedBy", fields: [lastModifiedById], references: [nickname])
+}
+
+model OfficeSupply {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  description String?
+  category    String?  
+  status String?  
+  quantity Int?  
+  statusUpdatedAt DateTime?  
+  lastUpdatedById String?
+  lastUpdatedBy   Profile? @relation("OfficeSupplyModifiedBy", fields: [lastUpdatedById], references: [nickname])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
