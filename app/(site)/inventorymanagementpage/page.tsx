@@ -37,7 +37,8 @@ type EditSupplyData = {
   [id: string]: Partial<OfficeSupply>;
 };
 
-// 1) Helper: color-coded badges
+// Color-coded status badges.
+// Removed "received" & added "out-of-stock" in red.
 function getStatusBadge(status: string | undefined) {
   if (!status) {
     return (
@@ -67,13 +68,14 @@ function getStatusBadge(status: string | undefined) {
           Ordered
         </span>
       );
-    case "received":
+    case "out-of-stock":
       return (
-        <span className="rounded bg-purple-100 px-2 py-1 text-xs font-bold text-purple-800">
-          Received
+        <span className="rounded bg-red-100 px-2 py-1 text-xs font-bold text-red-800">
+          Out of Stock
         </span>
       );
     default:
+      // fallback if new statuses appear
       return (
         <span className="rounded bg-gray-100 px-2 py-1 text-xs font-bold text-gray-800">
           {status}
@@ -93,16 +95,19 @@ export default function InventoryManagement() {
   const [showDetails, setShowDetails] = useState<{ [key: string]: boolean }>(
     {},
   );
+
   const [newSupply, setNewSupply] = useState<Partial<OfficeSupply>>({});
   const [editableSupplyId, setEditableSupplyId] = useState<string | null>(null);
   const [editSupplyData, setEditSupplyData] = useState<EditSupplyData>({});
 
+  // Redirect if not logged in
   useEffect(() => {
     if (status !== "loading" && !session) {
       router.push("/login");
     }
   }, [session, status, router]);
 
+  // Fetch supplies
   async function fetchSupplies(currentPage = 1) {
     try {
       const response = await axios.get("/api/officesupply", {
@@ -125,6 +130,7 @@ export default function InventoryManagement() {
     }
   }
 
+  // Re-fetch whenever searchTerm or page changes
   useEffect(() => {
     if (session?.user.email) {
       fetchSupplies(page);
@@ -137,6 +143,7 @@ export default function InventoryManagement() {
     }
   }
 
+  // Create new supply
   async function handleCreateSupply(e: FormEvent) {
     e.preventDefault();
     try {
@@ -154,10 +161,12 @@ export default function InventoryManagement() {
     }
   }
 
+  // Toggle details
   function toggleSupplyDetails(id: string) {
     setShowDetails((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
+  // Delete supply
   async function deleteSupply(id: string) {
     try {
       await axios.delete(`/api/officesupply/${id}`);
@@ -169,6 +178,7 @@ export default function InventoryManagement() {
     }
   }
 
+  // Edit supply
   function handleSupplyEditToggle(id: string) {
     setEditableSupplyId((prev) => (prev === id ? null : id));
     if (!editSupplyData[id]) {
@@ -210,6 +220,16 @@ export default function InventoryManagement() {
       toast.error("Error updating supply.");
     }
   }
+
+  // --- Separate the items by status. ---
+  // "Out of Stock" at top, then In Stock, Low, Ordered, No Status, etc.
+  const outOfStockSupplies = supplies.filter(
+    (s) => s.status === "out-of-stock",
+  );
+  const inStockSupplies = supplies.filter((s) => s.status === "in-stock");
+  const lowStockSupplies = supplies.filter((s) => s.status === "low");
+  const orderedSupplies = supplies.filter((s) => s.status === "ordered");
+  const noStatusSupplies = supplies.filter((s) => !s.status || s.status === "");
 
   return (
     <div className="relative min-h-screen bg-gray-100">
@@ -303,7 +323,8 @@ export default function InventoryManagement() {
                 <option value="in-stock">In Stock</option>
                 <option value="low">Running Low</option>
                 <option value="ordered">Ordered</option>
-                <option value="received">Received</option>
+                {/* Removed "received", added "out-of-stock" */}
+                <option value="out-of-stock">Out of Stock</option>
               </select>
             </div>
             <div>
@@ -333,199 +354,246 @@ export default function InventoryManagement() {
           </form>
         </div>
 
-        {/* Supply list */}
-        <div className="space-y-4">
-          <h2 className="text-xl font-bold">Office Supplies</h2>
-          {supplies.length === 0 ? (
-            <p>No office supplies found.</p>
-          ) : (
-            supplies.map((supply) => {
-              const isLowQuantity =
-                typeof supply.quantity === "number" && supply.quantity < 5;
+        {/* 
+          Separate sections for each status category. 
+          Out-of-stock on top, then In Stock, Low, Ordered, No status, etc.
+        */}
 
-              return (
-                <div
-                  key={supply.id}
-                  className={`rounded bg-white p-4 shadow ${isLowQuantity ? "border-l-4 border-yellow-400" : ""}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-lg font-bold">{supply.name}</div>
-                      <div className="text-sm text-gray-600">
-                        {supply.category
-                          ? `Category: ${supply.category}`
-                          : "No category"}
-                      </div>
-                    </div>
+        {/* OUT OF STOCK */}
+        <SectionHeader title="Out of Stock Items" />
+        {outOfStockSupplies.length === 0 ? (
+          <p className="mb-6 text-sm italic">No out of stock items.</p>
+        ) : (
+          outOfStockSupplies.map((supply) =>
+            renderSupplyCard(supply)
+          )
+        )}
 
-                    <div className="flex items-center space-x-2">
-                      {/* Color-coded status badge */}
-                      {getStatusBadge(supply.status)}
+        {/* IN STOCK */}
+        <SectionHeader title="In Stock Items" />
+        {inStockSupplies.length === 0 ? (
+          <p className="mb-6 text-sm italic">No in-stock items.</p>
+        ) : (
+          inStockSupplies.map((supply) => renderSupplyCard(supply))
+        )}
 
-                      <button
-                        onClick={() => toggleSupplyDetails(supply.id)}
-                        className="rounded bg-gray-300 p-2 hover:bg-gray-400"
-                      >
-                        {showDetails[supply.id] ? <FaEyeSlash /> : <FaEye />}
-                      </button>
+        {/* LOW STOCK */}
+        <SectionHeader title="Low Stock Items" />
+        {lowStockSupplies.length === 0 ? (
+          <p className="mb-6 text-sm italic">No low stock items.</p>
+        ) : (
+          lowStockSupplies.map((supply) => renderSupplyCard(supply))
+        )}
 
-                      {["admin", "lead", "owner"].includes(
-                        (session?.user as any)?.role ?? "",
-                      ) && (
-                        <>
-                          <button
-                            onClick={() => handleSupplyEditToggle(supply.id)}
-                            className="rounded bg-blue-500 p-2 text-white hover:bg-blue-600"
-                          >
-                            <FaEdit />
-                          </button>
-                          <button
-                            onClick={() => deleteSupply(supply.id)}
-                            className="rounded bg-red-500 p-2 text-white hover:bg-red-600"
-                          >
-                            <FaTrashAlt />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
+        {/* ORDERED */}
+        <SectionHeader title="Ordered Items" />
+        {orderedSupplies.length === 0 ? (
+          <p className="mb-6 text-sm italic">No ordered items.</p>
+        ) : (
+          orderedSupplies.map((supply) => renderSupplyCard(supply))
+        )}
 
-                  {/* Additional "low quantity" warning */}
-                  {isLowQuantity && (
-                    <div className="mt-2 flex items-center gap-1 text-sm text-yellow-700">
-                      <FaExclamationTriangle />
-                      <span>
-                        Quantity is below 5. Consider reordering soon!
-                      </span>
-                    </div>
-                  )}
+        {/* NO STATUS */}
+        <SectionHeader title="No Status Items" />
+        {noStatusSupplies.length === 0 ? (
+          <p className="mb-6 text-sm italic">No items without a status.</p>
+        ) : (
+          noStatusSupplies.map((supply) => renderSupplyCard(supply))
+        )}
 
-                  {/* Expanded details */}
-                  {showDetails[supply.id] && (
-                    <div className="mt-3 space-y-1 text-sm text-gray-700">
-                      {supply.description && (
-                        <p>Description: {supply.description}</p>
-                      )}
-                      {typeof supply.quantity === "number" && (
-                        <p>Quantity: {supply.quantity}</p>
-                      )}
-                      {supply.statusUpdatedAt && (
-                        <p>
-                          Status Updated At:{" "}
-                          {new Date(supply.statusUpdatedAt).toLocaleString()}
-                        </p>
-                      )}
-                      <hr className="my-2" />
-                      <p>
-                        Last Updated By:{" "}
-                        {supply.lastUpdatedBy
-                          ? `${supply.lastUpdatedBy.firstName ?? ""} ${
-                              supply.lastUpdatedBy.lastName ?? ""
-                            } (${supply.lastUpdatedBy.nickname ?? ""})`
-                          : "N/A"}
-                      </p>
-                      <p>
-                        Created At:{" "}
-                        {supply.createdAt
-                          ? new Date(supply.createdAt).toLocaleString()
-                          : "N/A"}
-                      </p>
-                      <p>
-                        Updated At:{" "}
-                        {supply.updatedAt
-                          ? new Date(supply.updatedAt).toLocaleString()
-                          : "N/A"}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Edit form */}
-                  {editableSupplyId === supply.id && (
-                    <form
-                      onSubmit={(e) => updateSupply(supply.id, e)}
-                      className="mt-4 space-y-2 text-sm"
-                    >
-                      <input
-                        type="text"
-                        name="name"
-                        value={editSupplyData[supply.id]?.name || ""}
-                        onChange={(e) => handleSupplyChange(e, supply.id)}
-                        placeholder="Name"
-                        className="w-full rounded border px-4 py-2"
-                        required
-                      />
-                      <textarea
-                        name="description"
-                        value={editSupplyData[supply.id]?.description || ""}
-                        onChange={(e) => handleSupplyChange(e, supply.id)}
-                        placeholder="Description"
-                        className="w-full rounded border px-4 py-2"
-                      />
-                      <input
-                        type="text"
-                        name="category"
-                        value={editSupplyData[supply.id]?.category || ""}
-                        onChange={(e) => handleSupplyChange(e, supply.id)}
-                        placeholder="Category"
-                        className="w-full rounded border px-4 py-2"
-                      />
-                      <select
-                        name="status"
-                        value={editSupplyData[supply.id]?.status || ""}
-                        onChange={(e) => handleSupplyChange(e, supply.id)}
-                        className="w-full rounded border px-4 py-2"
-                      >
-                        <option value="">Select Status</option>
-                        <option value="in-stock">In Stock</option>
-                        <option value="low">Running Low</option>
-                        <option value="ordered">Ordered</option>
-                        <option value="received">Received</option>
-                      </select>
-                      <input
-                        type="number"
-                        name="quantity"
-                        value={editSupplyData[supply.id]?.quantity || ""}
-                        onChange={(e) => handleSupplyChange(e, supply.id)}
-                        placeholder="Quantity"
-                        className="w-full rounded border px-4 py-2"
-                      />
-
-                      <button
-                        type="submit"
-                        className="w-full rounded bg-green-500 px-4 py-2 text-sm font-bold text-white hover:bg-green-600"
-                      >
-                        Save Changes
-                      </button>
-                    </form>
-                  )}
-                </div>
-              );
-            })
-          )}
-          {totalPages > 1 && (
-            <div className="mt-4 flex justify-center space-x-3">
-              <button
-                onClick={() => handlePageChange(page - 1)}
-                disabled={page === 1}
-                className={`rounded px-4 py-2 ${
-                  page === 1 ? "bg-gray-300" : "bg-blue-500 text-white"
-                }`}
-              >
-                Previous
-              </button>
-              <button
-                onClick={() => handlePageChange(page + 1)}
-                disabled={page === totalPages}
-                className={`rounded px-4 py-2 ${
-                  page === totalPages ? "bg-gray-300" : "bg-blue-500 text-white"
-                }`}
-              >
-                Next
-              </button>
-            </div>
-          )}
-        </div>
+        {/* Pagination controls (still applying to entire fetch) */}
+        {totalPages > 1 && (
+          <div className="mt-4 flex justify-center space-x-3">
+            <button
+              onClick={() => handlePageChange(page - 1)}
+              disabled={page === 1}
+              className={`rounded px-4 py-2 ${
+                page === 1 ? "bg-gray-300" : "bg-blue-500 text-white"
+              }`}
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => handlePageChange(page + 1)}
+              disabled={page === totalPages}
+              className={`rounded px-4 py-2 ${
+                page === totalPages ? "bg-gray-300" : "bg-blue-500 text-white"
+              }`}
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
+
+  // Reusable heading for each section
+  function SectionHeader({ title }: { title: string }) {
+    return (
+      <h2 className="mt-8 mb-3 text-xl font-bold">
+        {title}
+      </h2>
+    );
+  }
+
+  // Reusable card rendering function
+  function renderSupplyCard(supply: OfficeSupply) {
+    const canEditOrDelete = ["admin", "lead", "owner"].includes(
+      (session?.user as any)?.role ?? "",
+    );
+    const isLowQuantity =
+      typeof supply.quantity === "number" && supply.quantity < 5;
+
+    return (
+      <div
+        key={supply.id}
+        className={`mb-4 rounded bg-white p-4 shadow ${
+          isLowQuantity ? "border-l-4 border-yellow-400" : ""
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-lg font-bold">{supply.name}</div>
+            <div className="text-sm text-gray-600">
+              {supply.category ? `Category: ${supply.category}` : "No category"}
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            {getStatusBadge(supply.status)}
+
+            <button
+              onClick={() => toggleSupplyDetails(supply.id)}
+              className="rounded bg-gray-300 p-2 hover:bg-gray-400"
+            >
+              {showDetails[supply.id] ? <FaEyeSlash /> : <FaEye />}
+            </button>
+
+            {canEditOrDelete && (
+              <>
+                <button
+                  onClick={() => handleSupplyEditToggle(supply.id)}
+                  className="rounded bg-blue-500 p-2 text-white hover:bg-blue-600"
+                >
+                  <FaEdit />
+                </button>
+                <button
+                  onClick={() => deleteSupply(supply.id)}
+                  className="rounded bg-red-500 p-2 text-white hover:bg-red-600"
+                >
+                  <FaTrashAlt />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Low quantity highlight */}
+        {isLowQuantity && (
+          <div className="mt-2 flex items-center gap-1 text-sm text-yellow-700">
+            <FaExclamationTriangle />
+            <span>Quantity is below 5. Consider reordering soon!</span>
+          </div>
+        )}
+
+        {/* Show details */}
+        {showDetails[supply.id] && (
+          <div className="mt-3 space-y-1 text-sm text-gray-700">
+            {supply.description && <p>Description: {supply.description}</p>}
+            {typeof supply.quantity === "number" && (
+              <p>Quantity: {supply.quantity}</p>
+            )}
+            {supply.statusUpdatedAt && (
+              <p>
+                Status Updated At:{" "}
+                {new Date(supply.statusUpdatedAt).toLocaleString()}
+              </p>
+            )}
+            <hr className="my-2" />
+            <p>
+              Last Updated By:{" "}
+              {supply.lastUpdatedBy
+                ? `${supply.lastUpdatedBy.firstName ?? ""} ${
+                    supply.lastUpdatedBy.lastName ?? ""
+                  } (${supply.lastUpdatedBy.nickname ?? ""})`
+                : "N/A"}
+            </p>
+            <p>
+              Created At:{" "}
+              {supply.createdAt
+                ? new Date(supply.createdAt).toLocaleString()
+                : "N/A"}
+            </p>
+            <p>
+              Updated At:{" "}
+              {supply.updatedAt
+                ? new Date(supply.updatedAt).toLocaleString()
+                : "N/A"}
+            </p>
+          </div>
+        )}
+
+        {/* Edit form */}
+        {editableSupplyId === supply.id && (
+          <form
+            onSubmit={(e) => updateSupply(supply.id, e)}
+            className="mt-4 space-y-2 text-sm"
+          >
+            <input
+              type="text"
+              name="name"
+              value={editSupplyData[supply.id]?.name || ""}
+              onChange={(e) => handleSupplyChange(e, supply.id)}
+              placeholder="Name"
+              className="w-full rounded border px-4 py-2"
+              required
+            />
+            <textarea
+              name="description"
+              value={editSupplyData[supply.id]?.description || ""}
+              onChange={(e) => handleSupplyChange(e, supply.id)}
+              placeholder="Description"
+              className="w-full rounded border px-4 py-2"
+            />
+            <input
+              type="text"
+              name="category"
+              value={editSupplyData[supply.id]?.category || ""}
+              onChange={(e) => handleSupplyChange(e, supply.id)}
+              placeholder="Category"
+              className="w-full rounded border px-4 py-2"
+            />
+            <select
+              name="status"
+              value={editSupplyData[supply.id]?.status || ""}
+              onChange={(e) => handleSupplyChange(e, supply.id)}
+              className="w-full rounded border px-4 py-2"
+            >
+              <option value="">Select Status</option>
+              <option value="in-stock">In Stock</option>
+              <option value="low">Running Low</option>
+              <option value="ordered">Ordered</option>
+              <option value="out-of-stock">Out of Stock</option>
+            </select>
+            <input
+              type="number"
+              name="quantity"
+              value={editSupplyData[supply.id]?.quantity || ""}
+              onChange={(e) => handleSupplyChange(e, supply.id)}
+              placeholder="Quantity"
+              className="w-full rounded border px-4 py-2"
+            />
+
+            <button
+              type="submit"
+              className="w-full rounded bg-green-500 px-4 py-2 text-sm font-bold text-white hover:bg-green-600"
+            >
+              Save Changes
+            </button>
+          </form>
+        )}
+      </div>
+    );
+  }
 }
