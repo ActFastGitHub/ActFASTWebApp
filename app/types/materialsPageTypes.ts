@@ -1,4 +1,4 @@
-// materialsPageTypes.ts
+// app/types/materialsPageTypes.ts
 
 export type Project = {
   id: string;
@@ -18,6 +18,7 @@ export type ProfileInfo = {
 
 export type Material = {
   id: string;
+  projectCode: string;
   type: string;
   description?: string;
   unitOfMeasurement?: string;
@@ -35,6 +36,7 @@ export type Material = {
 
 export type Subcontractor = {
   id: string;
+  projectCode: string;
   name: string;
   expertise?: string;
   contactInfo?: string;
@@ -48,6 +50,7 @@ export type Subcontractor = {
 
 export type LaborCost = {
   id: string;
+  projectCode: string;
   employeeName: string;
   role?: string;
   hoursWorked: number;

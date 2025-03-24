@@ -1,3 +1,5 @@
+// app/components/materialsPage/LaborCostSection.tsx
+
 'use client'
 
 import React, { ChangeEvent, FormEvent } from "react";
