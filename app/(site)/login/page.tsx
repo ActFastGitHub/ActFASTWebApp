@@ -164,7 +164,7 @@ export default function Login() {
                       setData({ ...data, password: e.target.value })
                     }
                   />
-                  <a className="mt-4 text-[12px] text-blue-500" href="#">
+                  <a className="mt-4 text-[12px] text-blue-500" href="/forgot">
                     Forgot-password?
                   </a>
                   <button

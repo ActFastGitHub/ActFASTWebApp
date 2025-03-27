@@ -1,5 +1,8 @@
 // app/types/materialsPageTypes.ts
 
+/** -------------------
+ * Types
+ --------------------*/
 export type Project = {
   id: string;
   code: string;

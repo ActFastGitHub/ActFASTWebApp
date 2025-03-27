@@ -1,4 +1,4 @@
-// app\api\user\profile\[id]\route.tsx
+// app/api/user/profile/[id]/route.tsx
 
 import prisma from "@/app/libs/prismadb";
 import { NextResponse } from "next/server";
@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 export async function GET(request: Request, { params }: { params: { id: string } }) {
     try {
         const { id } = params;
-		
+
         const profile = await prisma.profile.findUnique({
             where: {
                 userEmail: id,
@@ -30,3 +30,4 @@ export async function GET(request: Request, { params }: { params: { id: string }
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
+

@@ -17,7 +17,10 @@ model User {
   hashedPassword String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
-  isDeleted      Boolean   @default(false)
+
+  // (NEW) for password reset
+  passwordResetToken   String?
+  passwordResetExpires DateTime?
 
   accounts Account[]
   Profile  Profile?
@@ -56,11 +59,12 @@ model Profile {
   role           String?
   driversLicense String?
   active         Boolean?
+  isDeleted      Boolean  @default(false)
 
   userEmail String @unique @map("userEmail")
-  user      User   @relation(fields: [userEmail], references: [email])
+  user      User   @relation(fields: [userEmail], references: [email], onDelete: Cascade)
 
-  location Location?
+  location Location? @relation("ProfileToLocation")
 
   boxesModified Box[]  @relation("LastModifiedProfile")
   itemsAdded    Item[] @relation("AddedByProfile")
@@ -83,18 +87,18 @@ model Location {
   lng       Float
   lat       Float
   address   Address?
-  profile   Profile  @relation(fields: [profileId], references: [id])
-  profileId String   @unique @db.ObjectId
+  profile   Profile? @relation("ProfileToLocation", fields: [profileId], references: [id], onDelete: Cascade)
+  profileId String?  @unique @db.ObjectId
 }
 
 model Address {
-  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
   fullAddress     String
   pointOfInterest String
   city            String
   country         String
-  location        Location @relation(fields: [locationId], references: [id])
-  locationId      String   @unique @db.ObjectId
+  location        Location? @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  locationId      String?   @unique @db.ObjectId
 }
 
 model Box {
@@ -151,6 +155,7 @@ model Project {
   dateAttended      String?
   lockBoxCode       String?
   notes             String?
+  allowanceTable    Json?
 
   materials Material[] @relation("ProjectMaterials")
 
@@ -275,15 +280,15 @@ model LaborCost {
 }
 
 model OfficeSupply {
-  id          String  @id @default(auto()) @map("_id") @db.ObjectId
-  name        String
-  description String?
-  category    String?  
-  status String?  
-  quantity Int?  
-  statusUpdatedAt DateTime?  
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
+  name            String
+  description     String?
+  category        String?
+  status          String?
+  quantity        Int?
+  statusUpdatedAt DateTime?
   lastUpdatedById String?
-  lastUpdatedBy   Profile? @relation("OfficeSupplyModifiedBy", fields: [lastUpdatedById], references: [nickname])
+  lastUpdatedBy   Profile?  @relation("OfficeSupplyModifiedBy", fields: [lastUpdatedById], references: [nickname])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

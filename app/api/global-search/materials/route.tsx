@@ -1,4 +1,6 @@
-// api/global-search/materials/route.tsx    
+// api/global-search/materials/route.tsx
+
+export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import prisma from "@/app/libs/prismadb";

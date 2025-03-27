@@ -1,5 +1,7 @@
 // api/global-search/subcontractors/route.tsx
 
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 import prisma from "@/app/libs/prismadb";
 

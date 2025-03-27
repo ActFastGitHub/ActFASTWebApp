@@ -20,14 +20,15 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET!,
 });
 
+// ------------------- POST: Create a Profile -------------------
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
 
   if (!session) {
-    return NextResponse.json({
-      message: "Unauthorized access",
-      status: 401,
-    });
+    return NextResponse.json(
+      { message: "Unauthorized access", status: 401 },
+      { status: 401 },
+    );
   } else {
     try {
       const body = await request.json();
@@ -199,28 +200,26 @@ export async function POST(request: Request) {
         },
       });
 
-      return NextResponse.json({
-        userProfile,
-        status: 200,
-      });
+      return NextResponse.json({ userProfile, status: 200 });
     } catch (error: any) {
       const { code = 500, message = "Internal server error" } = error as APIErr;
-      return NextResponse.json({
-        status: code,
-        error: message,
-      });
+      return NextResponse.json(
+        { status: code, error: message },
+        { status: code },
+      );
     }
   }
 }
 
+// ------------------- PATCH: Update a Profile -------------------
 export async function PATCH(request: Request) {
   const session = await getServerSession(authOptions);
 
   if (!session) {
-    return NextResponse.json({
-      message: "Unauthorized access",
-      status: 401,
-    });
+    return NextResponse.json(
+      { message: "Unauthorized access", status: 401 },
+      { status: 401 },
+    );
   } else {
     try {
       const body = await request.json();
@@ -237,6 +236,9 @@ export async function PATCH(request: Request) {
         role,
         driversLicense,
         active,
+
+        // (NEW) If admin wants to change the user's email
+        newEmail,
       } = body;
 
       // Validate the image
@@ -329,6 +331,45 @@ export async function PATCH(request: Request) {
         };
       }
 
+      // 1) Fetch the existing Profile (with user)
+      const existingProfile = await prisma.profile.findUnique({
+        where: { id },
+        include: { user: true },
+      });
+      if (!existingProfile || !existingProfile.user) {
+        throw { code: 404, message: "Profile not found" };
+      }
+
+      // 2) If the current user is admin & a newEmail is provided, update the user's email
+      if (session.user.role === "admin" && newEmail) {
+        // Check if the newEmail is used by someone else
+        const existingEmailUser = await prisma.user.findUnique({
+          where: { email: newEmail },
+        });
+        if (
+          existingEmailUser &&
+          existingEmailUser.id !== existingProfile.user.id
+        ) {
+          throw {
+            code: 400,
+            message: "That email is already in use by another user.",
+          };
+        }
+
+        // Update the User table
+        await prisma.user.update({
+          where: { id: existingProfile.user.id },
+          data: { email: newEmail },
+        });
+
+        // Update the Profile.userEmail to match
+        await prisma.profile.update({
+          where: { id },
+          data: { userEmail: newEmail },
+        });
+      }
+
+      // 3) Build the rest of the Profile update data
       const updateData: Partial<Prisma.ProfileUpdateInput> = {
         lastName,
         firstName,
@@ -363,55 +404,50 @@ export async function PATCH(request: Request) {
         updateData.image = cloudinaryResponse.secure_url;
       }
 
+      // 4) Perform the final Profile update
       const updatedUserProfile = await updateProfile(id, updateData);
 
-      return NextResponse.json({
-        updatedUserProfile,
-        status: 200,
-      });
+      return NextResponse.json({ updatedUserProfile, status: 200 });
     } catch (error: any) {
       const { code = 500, message = "Internal server error" } = error as APIErr;
-      return NextResponse.json({
-        status: code,
-        error: message,
-      });
+      return NextResponse.json(
+        { status: code, error: message },
+        { status: code },
+      );
     }
   }
 }
 
-export async function GET(request: Request) {
+// ------------------- GET: All Profiles -------------------
+export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session) {
-    return NextResponse.json({
-      message: "Unauthorized access",
-      status: 401,
-    });
-  } else {
-    try {
-      const profiles = await prisma.profile.findMany({
-        include: {
-          location: {
-            include: {
-              address: true,
-            },
+    return NextResponse.json(
+      { message: "Unauthorized access" },
+      { status: 401 },
+    );
+  }
+  try {
+    const profiles = await prisma.profile.findMany({
+      include: {
+        location: {
+          include: {
+            address: true,
           },
         },
-      });
+      },
+    });
 
-      if (!profiles) {
-        return NextResponse.json(
-          { error: "No profile found" },
-          { status: 404 },
-        );
-      }
-
-      return NextResponse.json(profiles, { status: 200 });
-    } catch (error) {
-      console.error("Error fetching profile:", error);
-      return NextResponse.json(
-        { error: "Internal server error" },
-        { status: 500 },
-      );
+    if (!profiles) {
+      return NextResponse.json({ error: "No profile found" }, { status: 404 });
     }
+
+    return NextResponse.json(profiles, { status: 200 });
+  } catch (error) {
+    console.error("Error fetching profiles:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }
