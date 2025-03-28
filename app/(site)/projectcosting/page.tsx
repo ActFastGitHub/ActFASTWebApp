@@ -18,6 +18,7 @@ import ProjectBudgetCard from "@/app/components/materialsPage/ProjectBudgetCard"
 import MaterialSection from "@/app/components/materialsPage/MaterialsSection";
 import SubcontractorSection from "@/app/components/materialsPage/SubcontractorSection";
 import LaborCostSection from "@/app/components/materialsPage/LaborCostSection";
+import SpreadsheetSection from "@/app/components/materialsPage/SpreadSheetSection";
 
 const ProjectCostManagement = () => {
   const { data: session, status } = useSession();
@@ -28,7 +29,9 @@ const ProjectCostManagement = () => {
    */
   const [projects, setProjects] = useState<Types.Project[]>([]);
   const [projectFilter, setProjectFilter] = useState("");
-  const [selectedProject, setSelectedProject] = useState<Types.Project | null>(null);
+  const [selectedProject, setSelectedProject] = useState<Types.Project | null>(
+    null,
+  );
   const [newBudget, setNewBudget] = useState<number>(0);
 
   // For the Headless UI Combobox typing
@@ -53,9 +56,8 @@ const ProjectCostManagement = () => {
   const [editableMaterialId, setEditableMaterialId] = useState<string | null>(
     null,
   );
-  const [editMaterialData, setEditMaterialData] = useState<Types.EditMaterialData>(
-    {},
-  );
+  const [editMaterialData, setEditMaterialData] =
+    useState<Types.EditMaterialData>({});
   const [showMaterialDetails, setShowMaterialDetails] = useState<{
     [key: string]: boolean;
   }>({});
@@ -63,7 +65,9 @@ const ProjectCostManagement = () => {
   /**
    * State: Subcontractors
    */
-  const [subcontractors, setSubcontractors] = useState<Types.Subcontractor[]>([]);
+  const [subcontractors, setSubcontractors] = useState<Types.Subcontractor[]>(
+    [],
+  );
   const [subPage, setSubPage] = useState(1);
   const [subTotalPages, setSubTotalPages] = useState(1);
   const [subSearchTerm, setSubSearchTerm] = useState("");
@@ -86,13 +90,14 @@ const ProjectCostManagement = () => {
   const [laborPage, setLaborPage] = useState(1);
   const [laborTotalPages, setLaborTotalPages] = useState(1);
   const [laborSearchTerm, setLaborSearchTerm] = useState("");
-  const [newLaborCost, setNewLaborCost] = useState<Partial<Types.LaborCost>>({});
+  const [newLaborCost, setNewLaborCost] = useState<Partial<Types.LaborCost>>(
+    {},
+  );
   const [editableLaborCostId, setEditableLaborCostId] = useState<string | null>(
     null,
   );
-  const [editLaborCostData, setEditLaborCostData] = useState<Types.EditLaborCostData>(
-    {},
-  );
+  const [editLaborCostData, setEditLaborCostData] =
+    useState<Types.EditLaborCostData>({});
   const [showLaborDetails, setShowLaborDetails] = useState<{
     [key: string]: boolean;
   }>({});
@@ -638,7 +643,7 @@ const ProjectCostManagement = () => {
    */
   const [globalMaterials, setGlobalMaterials] = useState<Types.Material[]>([]);
   const [globalSubcontractors, setGlobalSubcontractors] = useState<
-  Types.Subcontractor[]
+    Types.Subcontractor[]
   >([]);
   const [globalLabor, setGlobalLabor] = useState<Types.LaborCost[]>([]);
 
@@ -913,6 +918,8 @@ const ProjectCostManagement = () => {
 
         {selectedProject && (
           <>
+            {/* SPREADSHEET SECTION */}
+            <SpreadsheetSection selectedProject={selectedProject} />
             {/* PROJECT BUDGET / SUMMARY */}
             <ProjectBudgetCard
               selectedProject={selectedProject}
@@ -997,4 +1004,3 @@ const ProjectCostManagement = () => {
 };
 
 export default ProjectCostManagement;
-

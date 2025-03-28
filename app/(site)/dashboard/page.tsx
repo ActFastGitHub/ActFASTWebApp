@@ -214,7 +214,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                 </Link>
-                <Link href="/materialspage">
+                <Link href="/projectcosting">
                   <div className="block rounded-lg bg-red-500 p-4 text-white shadow-lg transition duration-200 ease-in-out hover:bg-red-700">
                     <div className="flex items-center">
                       <div className="mr-4">
@@ -235,7 +235,7 @@ export default function Dashboard() {
                       </div>
                       <div>
                         <h2 className="mb-1 text-lg font-semibold">
-                          Project Materials (PROTOTYPE)
+                          Project Costing (Final Repairs)
                         </h2>
                         <p className="text-sm text-gray-200">This is the Final Repairs project costing and management system.</p>
                       </div>
@@ -291,7 +291,7 @@ export default function Dashboard() {
                       </div>
                       <div>
                         <h2 className="mb-1 text-lg font-semibold">
-                          Inventory Management (PROTOTYPE)
+                          Inventory Management
                         </h2>
                         <p className="text-sm text-gray-200">Management ActFast inventory and office supplies.</p>
                       </div>

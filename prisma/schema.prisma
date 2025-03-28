@@ -79,7 +79,8 @@ model Profile {
   laborCostsCreated  LaborCost[] @relation("LaborCostCreatedBy")
   laborCostsModified LaborCost[] @relation("LaborCostModifiedBy")
 
-  OfficeSupplyModified OfficeSupply[] @relation("OfficeSupplyModifiedBy")
+  OfficeSupplyModified OfficeSupply[]     @relation("OfficeSupplyModifiedBy")
+  SpreadsheetModified  SpreadsheetEntry[] @relation("SpreadsheetModifiedBy")
 }
 
 model Location {
@@ -155,9 +156,9 @@ model Project {
   dateAttended      String?
   lockBoxCode       String?
   notes             String?
-  allowanceTable    Json?
 
-  materials Material[] @relation("ProjectMaterials")
+  materials          Material[]         @relation("ProjectMaterials")
+  spreadsheetEntries SpreadsheetEntry[] @relation("ProjectSpreadsheets")
 
   // Overview
   nrList        String?
@@ -289,6 +290,23 @@ model OfficeSupply {
   statusUpdatedAt DateTime?
   lastUpdatedById String?
   lastUpdatedBy   Profile?  @relation("OfficeSupplyModifiedBy", fields: [lastUpdatedById], references: [nickname])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SpreadsheetEntry {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  projectCode String @unique
+  // Add a named relation to match what's on `Project`
+  project     Project @relation("ProjectSpreadsheets", fields: [projectCode], references: [code])
+
+  // The 2D "spreadsheet" data:
+  data Json @default("[]")
+
+  // Track who last updated:
+  lastUpdatedById String?
+  lastUpdatedBy   Profile? @relation("SpreadsheetModifiedBy", fields: [lastUpdatedById], references: [nickname])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
