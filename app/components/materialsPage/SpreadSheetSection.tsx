@@ -30,6 +30,7 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
   const [copyStatus, setCopyStatus] = useState<null | string>(null);
   const [lastUpdatedBy, setLastUpdatedBy] = useState<string>("");
 
+  // Fetch existing spreadsheet data
   useEffect(() => {
     if (!selectedProject?.code) {
       setSpreadsheet({ columns: [], rows: [] });
@@ -55,7 +56,7 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
       .finally(() => setIsLoading(false));
   }, [selectedProject?.code]);
 
-  // Save the entire spreadsheet object
+  // Save entire spreadsheet
   const handleSave = async () => {
     if (!selectedProject?.code) return;
     setIsSaving(true);
@@ -64,7 +65,7 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
         projectCode: selectedProject.code,
         data: spreadsheet,
       });
-      // Optionally refetch to get updated lastUpdatedBy
+      // Optionally refetch for updated lastUpdatedBy
       const res = await axios.get("/api/projects/spreadsheet", {
         params: { projectCode: selectedProject.code },
       });
@@ -122,7 +123,7 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
     }));
   };
 
-  // Update cell
+  // Update a single cell
   const handleCellChange = (rowIndex: number, colIndex: number, value: string) => {
     setSpreadsheet((prev) => {
       const newRows = [...prev.rows];
@@ -133,7 +134,7 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
     });
   };
 
-  // Calculate allowance for a single row
+  // Calculate row allowance = sum(row) * 0.6
   const calculateAllowance = (row: string[]): number => {
     const sum = row.reduce((acc, cellVal) => {
       const parsed = parseFloat(cellVal.replace(/[^0-9.\-]/g, ""));
@@ -142,7 +143,7 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
     return sum * 0.6;
   };
 
-  // Build tab-delimited for copy
+  // Copy entire table to clipboard
   const getTabDelimitedData = (): string => {
     const headerCells = [...spreadsheet.columns, "Allowance"];
     const headerLine = headerCells.join("\t");
@@ -158,8 +159,6 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
 
     return [headerLine, ...rowLines].join("\n");
   };
-
-  // Copy entire table to clipboard
   const handleCopyData = async () => {
     try {
       const tsvString = getTabDelimitedData();
@@ -173,11 +172,77 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
     }
   };
 
+  // (NEW) PASTE FROM CLIPBOARD, preserving blank fields
+  const handlePasteData = async () => {
+    try {
+      const raw = await navigator.clipboard.readText();
+      if (raw == null) return;
+
+      // Split lines by newline (preserve blank fields, do not filter them out)
+      const lines = raw.split(/\r?\n/);
+      if (lines.length === 0) return;
+
+      // First line => columns
+      const newColumns = lines[0].split("\t");
+
+      // Build row arrays
+      const newRows: string[][] = [];
+      for (let i = 1; i < lines.length; i++) {
+        const rowStr = lines[i];
+        // If it's an empty last line, skip
+        if (!rowStr && i === lines.length - 1) {
+          continue;
+        }
+        const rowCells = rowStr.split("\t");
+
+        // Fill or slice to match newColumns length
+        while (rowCells.length < newColumns.length) {
+          rowCells.push("");
+        }
+        if (rowCells.length > newColumns.length) {
+          rowCells.splice(newColumns.length);
+        }
+        newRows.push(rowCells);
+      }
+
+      setSpreadsheet({
+        columns: newColumns,
+        rows: newRows,
+      });
+      setCopyStatus("Pasted from clipboard!");
+      setTimeout(() => setCopyStatus(null), 2000);
+    } catch (err) {
+      console.error("Paste from clipboard error:", err);
+      setCopyStatus("Failed to paste.");
+      setTimeout(() => setCopyStatus(null), 2000);
+    }
+  };
+
+  // (NEW) Summation logic for columns after the first column
+  // We'll produce "null" for column index 0, so it doesn't show a total.
+  const columnTotals = spreadsheet.columns.map((_, colIndex) => {
+    if (colIndex === 0) {
+      return null; // skip the first column
+    }
+    let sum = 0;
+    for (const row of spreadsheet.rows) {
+      const val = parseFloat(row[colIndex].replace(/[^0-9.\-]/g, ""));
+      if (!isNaN(val)) sum += val;
+    }
+    return sum;
+  });
+
+  // Sum of all row allowances
+  const totalAllowance = spreadsheet.rows.reduce(
+    (acc, row) => acc + calculateAllowance(row),
+    0,
+  );
+
   if (!selectedProject?.code) return null;
 
   return (
     <div className="mb-8 rounded bg-white p-4 shadow">
-      {/* (CHANGED) Collapsible header */}
+      {/* Collapsible header */}
       <div
         onClick={handleToggle}
         className="mb-4 flex cursor-pointer items-center justify-between"
@@ -224,6 +289,15 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
                 >
                   {isSaving ? "Saving..." : "Save Spreadsheet"}
                 </button>
+
+                {/* Paste button */}
+                <button
+                  onClick={handlePasteData}
+                  className="rounded bg-purple-500 px-3 py-2 text-sm font-semibold text-white hover:bg-purple-600"
+                >
+                  Paste Data
+                </button>
+
                 <button
                   onClick={handleCopyData}
                   className="rounded bg-orange-500 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-600"
@@ -235,7 +309,6 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
                 )}
               </div>
 
-              {/* Render the table */}
               <div className="overflow-x-auto">
                 <table className="w-full border text-sm">
                   <thead>
@@ -298,6 +371,40 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
                       );
                     })}
                   </tbody>
+
+                  {/* Footer Row for Totals */}
+                  <tfoot>
+                    <tr className="border-t bg-gray-50">
+                      {columnTotals.map((colSum, colIndex) => {
+                        // If null => first column => skip total
+                        if (colSum === null) {
+                          return <td key={colIndex} className="p-2" />;
+                        }
+                        return (
+                          <td
+                            key={colIndex}
+                            className="p-2 text-right font-semibold text-blue-700"
+                          >
+                            $
+                            {colSum.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </td>
+                        );
+                      })}
+                      {/* Total for the allowance column */}
+                      <td className="p-2 text-right font-semibold text-blue-700">
+                        $
+                        {totalAllowance.toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </td>
+                      {/* No totals needed for the "Action" column */}
+                      <td className="p-2" />
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             </>
