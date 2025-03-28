@@ -14,13 +14,13 @@ type Props = {
 };
 
 export default function SpreadsheetSection({ selectedProject }: Props) {
-  // Store the entire data { columns, rows } from the DB
   const [spreadsheet, setSpreadsheet] = useState<SpreadsheetPayload>({
     columns: [],
     rows: [],
   });
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<null | string>(null);
   const [lastUpdatedBy, setLastUpdatedBy] = useState<string>("");
 
   useEffect(() => {
@@ -57,7 +57,7 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
         projectCode: selectedProject.code,
         data: spreadsheet,
       });
-      // optionally refetch to get updated lastUpdatedBy
+      // Optionally refetch to get updated lastUpdatedBy
       const res = await axios.get("/api/projects/spreadsheet", {
         params: { projectCode: selectedProject.code },
       });
@@ -102,7 +102,6 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
   // Add a new row
   const handleAddRow = () => {
     const colCount = spreadsheet.columns.length;
-    // a row with empty strings for each column
     const newRow = new Array(colCount).fill("");
     setSpreadsheet((prev) => ({
       columns: prev.columns,
@@ -142,6 +141,41 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
     return sum * 0.6;
   };
 
+  // Build a tab-delimited string for columns + rows, including the allowance
+  const getTabDelimitedData = (): string => {
+    // 1) Prepare a header line with all column names + "Allowance"
+    const headerCells = [...spreadsheet.columns, "Allowance"];
+    const headerLine = headerCells.join("\t");
+
+    // 2) For each row, we join all user cells + the allowance value
+    const rowLines = spreadsheet.rows.map((row) => {
+      const allowance = calculateAllowance(row);
+      const allowanceStr = allowance.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+      // e.g. row = ["5000", "2000"], new cells = ["5000", "2000", "3000.00"]
+      return [...row, allowanceStr].join("\t");
+    });
+
+    // Combine them with line breaks
+    return [headerLine, ...rowLines].join("\n");
+  };
+
+  // Copy the entire table (including allowance column) to the clipboard
+  const handleCopyData = async () => {
+    try {
+      const tsvString = getTabDelimitedData();
+      await navigator.clipboard.writeText(tsvString);
+      setCopyStatus("Copied to clipboard!");
+      setTimeout(() => setCopyStatus(null), 2000); // Clear msg after 2s
+    } catch (err) {
+      console.error("Clipboard error:", err);
+      setCopyStatus("Failed to copy.");
+      setTimeout(() => setCopyStatus(null), 2000);
+    }
+  };
+
   if (!selectedProject?.code) return null;
 
   return (
@@ -159,7 +193,7 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
         <p>Loading spreadsheet data...</p>
       ) : (
         <>
-          <div className="mb-4 flex space-x-2">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
             <button
               onClick={handleAddRow}
               className="rounded bg-blue-500 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-600"
@@ -179,6 +213,15 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
             >
               {isSaving ? "Saving..." : "Save Spreadsheet"}
             </button>
+            <button
+              onClick={handleCopyData}
+              className="rounded bg-orange-500 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-600"
+            >
+              Copy Data
+            </button>
+            {copyStatus && (
+              <span className="text-sm text-gray-700">{copyStatus}</span>
+            )}
           </div>
 
           {/* Render the table */}
@@ -186,10 +229,8 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
             <table className="w-full border text-sm">
               <thead>
                 <tr className="border-b bg-gray-100">
-                  {/* Each column => column name + rename field + "delete col" */}
                   {spreadsheet.columns.map((colName, colIndex) => (
                     <th key={colIndex} className="p-2 text-left align-top">
-                      {/* Rename input */}
                       <input
                         type="text"
                         value={colName}
@@ -232,7 +273,6 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
                           />
                         </td>
                       ))}
-                      {/* Render read-only allowance cell */}
                       <td className="border p-2 text-right font-semibold text-blue-700">
                         $
                         {allowance.toLocaleString(undefined, {
@@ -240,7 +280,6 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
                           maximumFractionDigits: 2,
                         })}
                       </td>
-                      {/* Row delete */}
                       <td className="p-2">
                         <button
                           onClick={() => handleDeleteRow(rowIndex)}
