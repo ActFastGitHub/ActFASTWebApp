@@ -50,6 +50,7 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
           const lu = res.data.lastUpdatedBy;
           const fullName = `${lu.firstName ?? ""} ${lu.lastName ?? ""}`.trim();
           setLastUpdatedBy(fullName || lu.nickname || "");
+          
         }
       })
       .catch((err) => console.error("Spreadsheet GET error:", err))
