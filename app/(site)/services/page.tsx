@@ -5,6 +5,7 @@ import Navbar from "@/app/components/siteNavBar";
 import Modal from "@/app/components/modal";
 import { motion, useAnimation } from "framer-motion";
 import { useInView } from "react-intersection-observer";
+import Footer from "@/app/components/footer";
 
 type IntervalId = ReturnType<typeof setInterval>;
 
@@ -658,6 +659,8 @@ export default function ServicesPage() {
 
       {/* Modal (if needed) */}
       {isMounted && <Modal showModal={showModal} onClose={handleCloseModal} />}
+      <Footer />
     </div>
+    
   );
 }
