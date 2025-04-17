@@ -70,7 +70,7 @@ export default function Home() {
         <HeroSection onPortalClick={handlePortalClick} />
         <ServicesSection />
         <AboutSection />
-        <VideoSection videos={videoList} />
+        {/* <VideoSection videos={videoList} /> */}
         <TestimonialsSection />
         <Footer />
       </div>
