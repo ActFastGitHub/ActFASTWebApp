@@ -156,9 +156,7 @@ function TableOfContents({
 
       {/* Mobile Overlay Menu */}
       {isOpen && (
-        <div
-          className="fixed left-0 top-0 z-50 flex h-screen w-screen flex-col bg-black/90 p-6 md:hidden"
-        >
+        <div className="fixed left-0 top-0 z-50 flex h-screen w-screen flex-col bg-black/90 p-6 md:hidden">
           <button
             onClick={() => setIsOpen(false)}
             className="absolute right-4 top-4 text-2xl text-white"
@@ -661,6 +659,5 @@ export default function ServicesPage() {
       {isMounted && <Modal showModal={showModal} onClose={handleCloseModal} />}
       <Footer />
     </div>
-    
   );
 }

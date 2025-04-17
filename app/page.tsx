@@ -8,6 +8,7 @@ import HeroSection from "@/app/components/heroSection";
 import ServicesSection from "@/app/components/servicesSection";
 import AboutSection from "@/app/components/aboutSection";
 import TestimonialsSection from "@/app/components/testimonialSection";
+import VideoSection from "@/app/components/VideoSection";
 import Footer from "@/app/components/footer";
 import Modal from "@/app/components/modal";
 import { useSession } from "next-auth/react";
@@ -40,12 +41,36 @@ export default function Home() {
     setShowModal(false);
   };
 
+  const videoList = [
+    {
+      title: "Client Testimonial – Family Restoration",
+      embedUrl: "https://www.youtube.com/embed/0aC4SnM3HDI?si=Up6QQoim1Zvm8ZXW",
+    },
+    {
+      title: "Before & After: Water Damage Repair",
+      embedUrl: "https://www.youtube.com/embed/0aC4SnM3HDI?si=KCczt_koGhYYoeEY",
+    },
+    {
+      title: "Project Highlight: Basement Renovation",
+      embedUrl: "https://www.youtube.com/embed/0aC4SnM3HDI?si=KCczt_koGhYYoeEY",
+    },
+    {
+      title: "Project Highlight: Basement Renovation AAAA",
+      embedUrl: "https://www.youtube.com/embed/0aC4SnM3HDI?si=KCczt_koGhYYoeEY",
+    },
+    {
+      title: "Project Highlight: Basement Renovation BBBB",
+      embedUrl: "https://www.youtube.com/embed/0aC4SnM3HDI?si=KCczt_koGhYYoeEY",
+    },
+  ];
+
   return (
     <div className="relative">
       <div className={`${showModal ? "blur-sm" : ""}`}>
         <HeroSection onPortalClick={handlePortalClick} />
         <ServicesSection />
         <AboutSection />
+        <VideoSection videos={videoList} />
         <TestimonialsSection />
         <Footer />
       </div>

@@ -28,7 +28,7 @@ const projects = [
       "/images/Projects/Agas/After/After (5).jpg",
       "/images/Projects/Agas/After/After (6).jpg",
     ],
-  }
+  },
   // Add more projects as needed
 ];
 
@@ -50,7 +50,7 @@ const FeaturedPage: React.FC = () => {
   const handleCloseModal = () => setShowModal(false);
 
   return (
-    <div className="bg-gray-900 min-h-screen py-16">
+    <div className="min-h-screen bg-gray-900 py-16">
       <Navbar onPortalClick={handlePortalClick} />
       <div className="container mx-auto mt-6 px-6">
         <motion.h1
@@ -66,7 +66,9 @@ const FeaturedPage: React.FC = () => {
         >
           Featured Projects
         </motion.h1>
-        <div className={`grid gap-12 ${projects.length === 1 ? "justify-center" : projects.length === 2 ? "md:grid-cols-2" : "md:grid-cols-2 lg:grid-cols-3"}`}>
+        <div
+          className={`grid gap-12 ${projects.length === 1 ? "justify-center" : projects.length === 2 ? "md:grid-cols-2" : "md:grid-cols-2 lg:grid-cols-3"}`}
+        >
           {projects.map((project, index) => (
             <FeaturedProject key={index} {...project} />
           ))}
