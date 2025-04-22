@@ -29,6 +29,7 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
   const [isSaving, setIsSaving] = useState(false);
   const [copyStatus, setCopyStatus] = useState<null | string>(null);
   const [lastUpdatedBy, setLastUpdatedBy] = useState<string>("");
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
 
   // Fetch existing spreadsheet data
   useEffect(() => {
@@ -52,6 +53,9 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
           setLastUpdatedBy(fullName || lu.nickname || "");
           
         }
+        if (res.data?.lastUpdatedAt) {
+          setLastUpdatedAt(new Date(res.data.lastUpdatedAt).toLocaleString());
+        }
       })
       .catch((err) => console.error("Spreadsheet GET error:", err))
       .finally(() => setIsLoading(false));
@@ -74,6 +78,9 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
         const lu = res.data.lastUpdatedBy;
         const fullName = `${lu.firstName ?? ""} ${lu.lastName ?? ""}`.trim();
         setLastUpdatedBy(fullName || lu.nickname || "");
+      }
+      if (res.data?.lastUpdatedAt) {
+        setLastUpdatedAt(new Date(res.data.lastUpdatedAt).toLocaleString());
       }
     } catch (error) {
       console.error("Spreadsheet POST error:", error);
@@ -263,6 +270,11 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
           {lastUpdatedBy && (
             <p className="mb-4 text-sm text-gray-500">
               Last updated by: <strong>{lastUpdatedBy}</strong>
+              {lastUpdatedAt && (
+                <>
+                  {" "}on <strong>{lastUpdatedAt}</strong>
+                </>
+              )}
             </p>
           )}
 

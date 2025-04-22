@@ -79,9 +79,9 @@ export default function Dashboard() {
               <h2 className="pt-20 text-2xl font-bold">Sidebar</h2>
               {/* Add sidebar items here */}
               <ul>
-                <li>Item 1</li>
-                <li>Item 2</li>
-                <li>Item 3</li>
+                <li>(For Future Content)</li>
+                <li>(For Future Content)</li>
+                <li>(For Future Content)</li>
               </ul>
             </div>
           </div>

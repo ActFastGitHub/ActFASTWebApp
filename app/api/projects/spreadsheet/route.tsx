@@ -32,12 +32,14 @@ export async function GET(request: Request) {
       return NextResponse.json({
         data: { columns: [], rows: [] },
         lastUpdatedBy: null,
+        lastUpdatedAt: null
       });
     }
 
     return NextResponse.json({
       data: entry.data,
       lastUpdatedBy: entry.lastUpdatedBy,
+      lastUpdatedAt: entry.updatedAt
     });
   } catch (error) {
     console.error("Spreadsheet GET error:", error);
