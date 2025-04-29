@@ -9,14 +9,13 @@ interface StickyContactButtonsProps {
   show: boolean;
 }
 
-/* ---------- 1. button definitions ---------- */
+/* ----- button definitions -------------------------------- */
 type ButtonConfig = {
   id: string;
   href: string;
   label: string;
   bg: string;
   icon: string;
-  rotate: number;
   layoutId?: string;
 };
 
@@ -27,8 +26,7 @@ const BUTTONS: readonly ButtonConfig[] = [
     label: "Call Us",
     bg: "bg-red-700",
     icon: PhoneIcon.src,
-    rotate: 4,
-    layoutId: "call-button",
+    layoutId: "call-button", // morphs from hero CTA
   },
   {
     id: "email",
@@ -36,11 +34,26 @@ const BUTTONS: readonly ButtonConfig[] = [
     label: "Email Us",
     bg: "bg-blue-600",
     icon: MailIcon.src,
-    rotate: -4,
   },
 ] as const;
 
-/* ---------- 2. component ---------- */
+/* ----- helper animation variants ------------------------- */
+const pillVariants = {
+  collapsed: { width: 48, scale: 1, boxShadow: "0px 2px 4px rgba(0,0,0,0.25)" },
+  expanded:  { width: 152, scale: 1.02, boxShadow: "0px 6px 12px rgba(0,0,0,0.30)" },
+};
+
+const iconVariants = {
+  collapsed: { scale: 1 },
+  expanded:  { scale: 1.12 },
+};
+
+const textVariants = {
+  collapsed: { opacity: 0, x: -8 },
+  expanded:  { opacity: 1, x: 0 },
+};
+
+/* ----- component ----------------------------------------- */
 const StickyContactButtons: React.FC<StickyContactButtonsProps> = ({ show }) => (
   <AnimatePresence>
     {show && (
@@ -52,49 +65,39 @@ const StickyContactButtons: React.FC<StickyContactButtonsProps> = ({ show }) => 
         exit={{ opacity: 0, x: 96 }}
         transition={{ type: "spring", stiffness: 260, damping: 25 }}
       >
-        {BUTTONS.map(
-          ({ id, href, label, bg, icon, rotate, layoutId }) => (
-            <Link href={href} key={id} legacyBehavior>
-              <motion.a
-                {...(layoutId ? { layoutId } : {})}
-                /* --- parent pill --- */
-                className={`group flex h-12 w-12 overflow-hidden rounded-full ${bg} text-white shadow-lg`}
-                variants={{
-                  collapsed: { width: 48, rotate: 0 },
-                  expanded:  { width: 160, rotate },
-                }}
-                initial="collapsed"
-                whileHover="expanded"
-                whileTap="expanded"
-                transition={{ type: "spring", stiffness: 300, damping: 20 }}
-              >
-                {/* icon */}
+        {BUTTONS.map(({ id, href, label, bg, icon, layoutId }) => (
+          <Link href={href} key={id} legacyBehavior>
+            <motion.a
+              {...(layoutId ? { layoutId } : {})}
+              className={`group flex items-center overflow-hidden rounded-full ${bg} text-white`}
+              style={{ height: 48 }}                     /* lock height */
+              variants={pillVariants}
+              initial="collapsed"
+              whileHover="expanded"
+              whileTap="expanded"
+              transition={{ type: "spring", stiffness: 300, damping: 22 }}
+            >
+              {/* icon wrapper keeps icon centered always */}
+              <div className="grid h-12 w-12 place-items-center flex-none">
                 <motion.img
                   src={icon}
                   alt={label}
-                  className="m-auto h-6 w-6"
-                  variants={{
-                    collapsed: { scale: 1 },
-                    expanded:  { scale: 1.15 },
-                  }}
+                  className="h-6 w-6"
+                  variants={iconVariants}
                   transition={{ duration: 0.2 }}
                 />
+              </div>
 
-                {/* label */}
-                <motion.span
-                  className="ml-2 mr-4 whitespace-nowrap font-semibold"
-                  variants={{
-                    collapsed: { opacity: 0, x: -8 },
-                    expanded:  { opacity: 1, x: 0 },
-                  }}
-                  transition={{ duration: 0.2 }}
-                >
-                  {label}
-                </motion.span>
-              </motion.a>
-            </Link>
-          ),
-        )}
+              <motion.span
+                className="mr-4 whitespace-nowrap font-semibold"
+                variants={textVariants}
+                transition={{ duration: 0.25 }}
+              >
+                {label}
+              </motion.span>
+            </motion.a>
+          </Link>
+        ))}
       </motion.div>
     )}
   </AnimatePresence>
