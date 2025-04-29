@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { useInView } from "react-intersection-observer";
 
 // Components
 import HeroSection from "@/app/components/heroSection";
@@ -10,6 +11,7 @@ import AboutSection from "@/app/components/aboutSection";
 import TestimonialsSection from "@/app/components/testimonialSection";
 import VideoSection from "@/app/components/VideoSection";
 import Footer from "@/app/components/footer";
+import StickyContactButtons from "@/app/components/stickyContactButtons";
 import Modal from "@/app/components/modal";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -64,10 +66,16 @@ export default function Home() {
     },
   ];
 
+  const { ref: heroRef, inView: heroInView } = useInView({
+    threshold: 0.2, // 20 % visible counts as “in view”
+  });
+
   return (
     <div className="relative">
       <div className={`${showModal ? "blur-sm" : ""}`}>
-        <HeroSection onPortalClick={handlePortalClick} />
+        <section ref={heroRef}>
+          <HeroSection onPortalClick={handlePortalClick} />
+        </section>
         <ServicesSection />
         <AboutSection />
         {/* <VideoSection videos={videoList} /> */}
@@ -75,6 +83,7 @@ export default function Home() {
         <Footer />
       </div>
       {isMounted && <Modal showModal={showModal} onClose={handleCloseModal} />}
+      <StickyContactButtons show={!heroInView} />
     </div>
   );
 }
