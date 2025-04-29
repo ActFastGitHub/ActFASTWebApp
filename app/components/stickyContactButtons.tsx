@@ -9,7 +9,7 @@ interface StickyContactButtonsProps {
   show: boolean;
 }
 
-/* ---------- 1.  Strongly-typed config ----------------- */
+/* ---------- 1. button definitions ---------- */
 type ButtonConfig = {
   id: string;
   href: string;
@@ -17,7 +17,7 @@ type ButtonConfig = {
   bg: string;
   icon: string;
   rotate: number;
-  layoutId?: string;            // 👈 optional
+  layoutId?: string;
 };
 
 const BUTTONS: readonly ButtonConfig[] = [
@@ -28,7 +28,7 @@ const BUTTONS: readonly ButtonConfig[] = [
     bg: "bg-red-700",
     icon: PhoneIcon.src,
     rotate: 4,
-    layoutId: "call-button",    // morph target shared with hero CTA
+    layoutId: "call-button",
   },
   {
     id: "email",
@@ -37,11 +37,10 @@ const BUTTONS: readonly ButtonConfig[] = [
     bg: "bg-blue-600",
     icon: MailIcon.src,
     rotate: -4,
-    // layoutId not needed here
   },
 ] as const;
 
-/* ---------- 2.  Component ------------------------------ */
+/* ---------- 2. component ---------- */
 const StickyContactButtons: React.FC<StickyContactButtonsProps> = ({ show }) => (
   <AnimatePresence>
     {show && (
@@ -53,36 +52,49 @@ const StickyContactButtons: React.FC<StickyContactButtonsProps> = ({ show }) => 
         exit={{ opacity: 0, x: 96 }}
         transition={{ type: "spring", stiffness: 260, damping: 25 }}
       >
-        {BUTTONS.map(({ id, href, label, bg, icon, rotate, layoutId }) => (
-          <Link href={href} key={id} legacyBehavior>
-            <motion.a
-              {...(layoutId ? { layoutId } : {})}
-              className={`group flex h-12 w-12 overflow-hidden rounded-full ${bg} shadow-lg text-white`}
-              initial={{ width: 48 }}             // circle
-              whileHover={{ width: 160, rotate }} // pill expands & tilts
-              transition={{ type: "spring", stiffness: 300, damping: 20 }}
-            >
-              {/* icon */}
-              <motion.img
-                src={icon}
-                alt={label}
-                className="m-auto h-6 w-6"
-                initial={false}
-                whileHover={{ scale: 1.15 }}
-              />
-
-              {/* label */}
-              <motion.span
-                className="ml-2 mr-4 hidden whitespace-nowrap font-semibold group-hover:block"
-                initial={{ opacity: 0, x: -8 }}
-                whileHover={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.2 }}
+        {BUTTONS.map(
+          ({ id, href, label, bg, icon, rotate, layoutId }) => (
+            <Link href={href} key={id} legacyBehavior>
+              <motion.a
+                {...(layoutId ? { layoutId } : {})}
+                /* --- parent pill --- */
+                className={`group flex h-12 w-12 overflow-hidden rounded-full ${bg} text-white shadow-lg`}
+                variants={{
+                  collapsed: { width: 48, rotate: 0 },
+                  expanded:  { width: 160, rotate },
+                }}
+                initial="collapsed"
+                whileHover="expanded"
+                whileTap="expanded"
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
               >
-                {label}
-              </motion.span>
-            </motion.a>
-          </Link>
-        ))}
+                {/* icon */}
+                <motion.img
+                  src={icon}
+                  alt={label}
+                  className="m-auto h-6 w-6"
+                  variants={{
+                    collapsed: { scale: 1 },
+                    expanded:  { scale: 1.15 },
+                  }}
+                  transition={{ duration: 0.2 }}
+                />
+
+                {/* label */}
+                <motion.span
+                  className="ml-2 mr-4 whitespace-nowrap font-semibold"
+                  variants={{
+                    collapsed: { opacity: 0, x: -8 },
+                    expanded:  { opacity: 1, x: 0 },
+                  }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {label}
+                </motion.span>
+              </motion.a>
+            </Link>
+          ),
+        )}
       </motion.div>
     )}
   </AnimatePresence>
