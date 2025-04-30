@@ -11,9 +11,7 @@ import Modal  from "@/app/components/modal";
 import { motion, useAnimation } from "framer-motion";
 import { useInView } from "react-intersection-observer";
 
-/* ------------------------------------------------------------------ */
-/* 1️⃣  Data (add more projects as needed)                             */
-/* ------------------------------------------------------------------ */
+/* ============ 1 .  data  (add more later) ============ */
 const projects = [
   {
     title: "Agas Fire Restoration",
@@ -36,86 +34,31 @@ const projects = [
       "/images/Projects/Agas/After/After (6).jpg",
     ],
   },
-  {
-    title: "Agas Fire Restoration",
-    description:
-      "Complete rebuild of a house totally destroyed by fire—restored better than new.",
-    before: [
-      "/images/Projects/Agas/Before/Before (1).jpg",
-      "/images/Projects/Agas/Before/Before (2).jpg",
-      "/images/Projects/Agas/Before/Before (3).jpg",
-      "/images/Projects/Agas/Before/Before (4).jpg",
-      "/images/Projects/Agas/Before/Before (5).jpg",
-      "/images/Projects/Agas/Before/Before (6).jpg",
-    ],
-    after: [
-      "/images/Projects/Agas/After/After (1).jpg",
-      "/images/Projects/Agas/After/After (2).jpg",
-      "/images/Projects/Agas/After/After (3).jpg",
-      "/images/Projects/Agas/After/After (4).jpg",
-      "/images/Projects/Agas/After/After (5).jpg",
-      "/images/Projects/Agas/After/After (6).jpg",
-    ],
-  },
-  {
-    title: "Agas Fire Restoration",
-    description:
-      "Complete rebuild of a house totally destroyed by fire—restored better than new.",
-    before: [
-      "/images/Projects/Agas/Before/Before (1).jpg",
-      "/images/Projects/Agas/Before/Before (2).jpg",
-      "/images/Projects/Agas/Before/Before (3).jpg",
-      "/images/Projects/Agas/Before/Before (4).jpg",
-      "/images/Projects/Agas/Before/Before (5).jpg",
-      "/images/Projects/Agas/Before/Before (6).jpg",
-    ],
-    after: [
-      "/images/Projects/Agas/After/After (1).jpg",
-      "/images/Projects/Agas/After/After (2).jpg",
-      "/images/Projects/Agas/After/After (3).jpg",
-      "/images/Projects/Agas/After/After (4).jpg",
-      "/images/Projects/Agas/After/After (5).jpg",
-      "/images/Projects/Agas/After/After (6).jpg",
-    ],
-  },
-  // — add more project objects here —
 ];
 
-/* ------------------------------------------------------------------ */
-/* 2️⃣  Light-box hook (unchanged API)                                 */
-/* ------------------------------------------------------------------ */
+/* ============ 2 .  light-box hook (unchanged) ============ */
 function useLightbox() {
-  const [viewer, setViewer] = useState<{ imgs: string[]; idx: number } | null>(
-    null,
-  );
+  const [viewer, setViewer] = useState<{ imgs: string[]; idx: number } | null>(null);
 
   const open  = (imgs: string[], idx: number) => setViewer({ imgs, idx });
   const close = () => setViewer(null);
-  const next  = () =>
-    setViewer((v) => v && { ...v, idx: (v.idx + 1) % v.imgs.length });
-  const prev  = () =>
-    setViewer((v) => v && { ...v, idx: (v.idx - 1 + v.imgs.length) % v.imgs.length });
+  const next  = () => setViewer(v => v && { ...v, idx: (v.idx + 1) % v.imgs.length });
+  const prev  = () => setViewer(v => v && { ...v, idx: (v.idx - 1 + v.imgs.length) % v.imgs.length });
 
-  /* keyboard */
-  const onKey = useCallback(
-    (e: KeyboardEvent) => {
-      if (!viewer) return;
-      if (e.key === "Escape") close();
-      if (e.key === "ArrowRight") next();
-      if (e.key === "ArrowLeft") prev();
-    },
-    [viewer],
-  );
-  useEffect(() => {
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onKey]);
+  /* keys */
+  const onKey = useCallback((e: KeyboardEvent) => {
+    if (!viewer) return;
+    if (e.key === "Escape") close();
+    if (e.key === "ArrowRight") next();
+    if (e.key === "ArrowLeft")  prev();
+  }, [viewer]);
+  useEffect(() => { window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey); }, [onKey]);
 
   /* swipe */
   const startX = useRef<number | null>(null);
-  const onStart = (x: number) => (startX.current = x);
-  const onEnd = (x: number) => {
-    if (startX.current === null || !viewer) return;
+  const touchStart = (x: number) => (startX.current = x);
+  const touchEnd   = (x: number) => {
+    if (!viewer || startX.current === null) return;
     const dx = x - startX.current;
     if (Math.abs(dx) > 50) (dx < 0 ? next() : prev());
     startX.current = null;
@@ -125,129 +68,62 @@ function useLightbox() {
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
       onClick={close}
-      onPointerDown={(e) => onStart(e.clientX)}
-      onPointerUp={(e) => onEnd(e.clientX)}
+      onPointerDown={e => touchStart(e.clientX)}
+      onPointerUp={e => touchEnd(e.clientX)}
     >
-      {/* close btn */}
-      <button
-        className="absolute right-4 top-4 z-10 rounded bg-black/60 p-2 text-white backdrop-blur-md"
-        onClick={close}
-      >
-        ✕
-      </button>
-      {/* mobile arrows */}
-      <button
-        className="absolute left-2 top-1/2 z-10 hidden -translate-y-1/2 rounded bg-black/60 p-2 text-white md:block md:hidden"
-        onClick={(e) => {
-          e.stopPropagation();
-          prev();
-        }}
-      >
-        ◀
-      </button>
-      <button
-        className="absolute right-2 top-1/2 z-10 hidden -translate-y-1/2 rounded bg-black/60 p-2 text-white md:block md:hidden"
-        onClick={(e) => {
-          e.stopPropagation();
-          next();
-        }}
-      >
-        ▶
-      </button>
-
+      <button className="absolute right-4 top-4 rounded bg-black/60 p-2 text-white" onClick={close}>✕</button>
       <img
         src={viewer.imgs[viewer.idx]}
-        alt=""
         className="max-h-full max-w-full object-contain"
-        onClick={(e) => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
+        alt=""
       />
     </div>
   );
-
   return { open, overlay };
 }
 
-/* ------------------------------------------------------------------ */
-/* 3️⃣  Helper: interleave before/after arrays                         */
-/* ------------------------------------------------------------------ */
-function interleave(a: string[], b: string[]) {
-  const out: string[] = [];
-  const max = Math.max(a.length, b.length);
-  for (let i = 0; i < max; i++) {
-    if (i < a.length) out.push(a[i]);
-    if (i < b.length) out.push(b[i]);
-  }
-  return out;
-}
+/* helper: B0 A0 B1 A1 … */
+const interleave = (a: string[], b: string[]) =>
+  a.flatMap((v, i) => (b[i] ? [v, b[i]] : [v])).concat(b.slice(a.length));
 
-/* ------------------------------------------------------------------ */
-/* 4️⃣  Project section (wide / responsive)                            */
-/* ------------------------------------------------------------------ */
-function ProjectSection({
-  project,
-  idx,
-  open,
-}: {
-  project: typeof projects[number];
-  idx: number;
+/* ============ 3 .  responsive project block ============ */
+function Project({ project, idx, open }: {
+  project: typeof projects[number]; idx: number;
   open: (imgs: string[], i: number) => void;
 }) {
-  const { ref, inView } = useInView({ threshold: 0.2 });
-  const controls = useAnimation();
-  useEffect(() => { controls.start(inView ? "visible" : "hidden"); }, [inView, controls]);
+  const slides = interleave(project.before, project.after);
+  const { ref, inView } = useInView({ threshold: .2 });
+  const anim = useAnimation();
+  useEffect(() => { anim.start(inView ? "visible" : "hidden"); }, [inView, anim]);
 
-  const allSlides = interleave(project.before, project.after);
-
-  const isEven = idx % 2 === 0;
+  const rowDir = idx % 2 === 0 ? "lg:flex-row" : "lg:flex-row-reverse";
 
   return (
-    <section
-      ref={ref}
-      className="mx-auto mb-20 max-w-6xl px-4 md:px-6 lg:px-8"
-    >
-      <div
-        className={`flex flex-col items-center ${
-          isEven ? "lg:flex-row" : "lg:flex-row-reverse"
-        } lg:space-x-8`}
-      >
-        {/* carousel */}
+    <section ref={ref} className="mx-auto mb-20 max-w-6xl px-4 md:px-6 lg:px-8">
+      <div className={`flex flex-col items-center ${rowDir} lg:space-x-8`}>
         <motion.div
-          initial="hidden"
-          animate={controls}
-          variants={{ visible: { opacity: 1, x: 0 }, hidden: { opacity: 0, x: isEven ? -50 : 50 } }}
-          transition={{ duration: 0.5 }}
-          className="w-full flex-shrink-0 lg:w-1/2"
+          variants={{ hidden:{ opacity:0, x: idx%2?50:-50 }, visible:{ opacity:1,x:0 }}}
+          initial="hidden" animate={anim} transition={{ duration:.5 }}
+          className="w-full lg:w-1/2"
         >
-          <Swiper
-            navigation
-            pagination={{ clickable: true }}
-            modules={[Navigation, Pagination]}
-            className="aspect-video w-full rounded-lg shadow-lg"
-          >
-            {allSlides.map((src, i) => (
+          <Swiper navigation pagination={{ clickable:true }} modules={[Navigation,Pagination]}
+                  className="aspect-video w-full rounded-lg shadow-lg">
+            {slides.map((src,i)=>(
               <SwiperSlide key={src}>
-                <img
-                  src={src}
-                  alt={`${project.title} slide`}
-                  className="h-full w-full cursor-pointer object-cover"
-                  onClick={() => open(allSlides, i)}
-                />
+                <img src={src} alt="" className="h-full w-full object-cover cursor-pointer"
+                     onClick={()=>open(slides,i)}/>
               </SwiperSlide>
             ))}
           </Swiper>
         </motion.div>
 
-        {/* text */}
         <motion.div
-          initial="hidden"
-          animate={controls}
-          variants={{ visible: { opacity: 1, y: 0 }, hidden: { opacity: 0, y: 50 } }}
-          transition={{ duration: 0.5, delay: 0.2 }}
+          variants={{ hidden:{ opacity:0, y:50 }, visible:{ opacity:1, y:0 }}}
+          initial="hidden" animate={anim} transition={{ duration:.5, delay:.2 }}
           className="mt-6 w-full lg:mt-0 lg:w-1/2"
         >
-          <h2 className="mb-3 text-2xl font-bold text-white md:text-3xl">
-            {project.title}
-          </h2>
+          <h2 className="mb-3 text-2xl font-bold text-white md:text-3xl">{project.title}</h2>
           <p className="text-gray-200">{project.description}</p>
         </motion.div>
       </div>
@@ -255,40 +131,28 @@ function ProjectSection({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* 5️⃣  Page                                                           */
-/* ------------------------------------------------------------------ */
+/* ============ 4 .  page =========================================== */
 export default function FeaturedPage() {
-  const [mounted, setMounted] = useState(false);
-  const [showModal, setShowModal] = useState(false);
+  const [mounted,setMounted] = useState(false);
+  const [showModal,setShowModal] = useState(false);
   const lightbox = useLightbox();
 
-  const { ref, inView } = useInView({ threshold: 0.2 });
-  const controls = useAnimation();
-  useEffect(() => { controls.start(inView ? "visible" : "hidden"); }, [inView, controls]);
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(()=>{ setMounted(true); }, []);
 
   return (
-    <div className="min-h-screen bg-gray-900 pb-16">
+    <div className="min-h-screen bg-gray-900 pb-16 pt-24">{/* pt-24 replaces h1 mt-24 */}
       {lightbox.overlay}
-      <Navbar onPortalClick={() => setShowModal(true)} />
+      <Navbar onPortalClick={()=>setShowModal(true)} />
 
-      <motion.h1
-        ref={ref}
-        className="mx-auto mt-24 mb-14 max-w-6xl px-4 text-center text-4xl font-extrabold text-white lg:text-6xl"
-        initial="hidden"
-        animate={controls}
-        variants={{ visible: { opacity: 1, y: 10 }, hidden: { opacity: 0, y: 50 } }}
-        transition={{ duration: 0.5 }}
-      >
+      <h1 className="mx-auto mb-14 max-w-6xl px-4 text-center text-4xl font-extrabold text-white lg:text-6xl">
         Featured Projects
-      </motion.h1>
+      </h1>
 
-      {projects.map((p, i) => (
-        <ProjectSection key={i} project={p} idx={i} open={lightbox.open} />
+      {projects.map((p,i)=>(
+        <Project key={i} project={p} idx={i} open={lightbox.open}/>
       ))}
 
-      {mounted && <Modal showModal={showModal} onClose={() => setShowModal(false)} />}
+      {mounted && <Modal showModal={showModal} onClose={()=>setShowModal(false)}/>}
     </div>
   );
 }
