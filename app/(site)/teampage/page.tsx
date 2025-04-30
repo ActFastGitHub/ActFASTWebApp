@@ -23,7 +23,7 @@ function useDoubleTapToTop() {
   useEffect(() => {
     const handler = (e: TouchEvent) => {
       const now = Date.now();
-      if (last.current && now - last.current < 500) {
+      if (last.current && now - last.current < 200) {
         window.scrollTo({ top: 0, behavior: "smooth" });
         e.preventDefault();
       }
