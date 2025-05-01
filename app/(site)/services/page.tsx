@@ -1,9 +1,13 @@
-/* app/[your-path]/ServicesPage.tsx */
-
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
-import Image from "next/image"; // for the call icon
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  ReactNode,
+} from "react";
+import Image from "next/image";
 import Navbar from "@/app/components/siteNavBar";
 import Modal from "@/app/components/modal";
 import Footer from "@/app/components/footer";
@@ -12,54 +16,107 @@ import { useInView } from "react-intersection-observer";
 import phoneIcon from "@/app/images/phone-icon.svg";
 
 /* ------------------------------------------------------------------ */
-/* 1️⃣  Hook: fetch every file inside /public/images/<folder>/        */
+/* 0️⃣  Light-box hook                                                */
+/* ------------------------------------------------------------------ */
+type Viewer = { imgs: string[]; idx: number } | null;
+
+function useLightbox() {
+  const [viewer, setViewer] = useState<Viewer>(null);
+
+  const open = (imgs: string[], idx: number) => setViewer({ imgs, idx });
+  const close = () => setViewer(null);
+  const next = () =>
+    setViewer((v) => v && { ...v, idx: (v.idx + 1) % v.imgs.length });
+  const prev = () =>
+    setViewer(
+      (v) => v && { ...v, idx: (v.idx - 1 + v.imgs.length) % v.imgs.length },
+    );
+
+  /* Esc + arrows */
+  const onKey = useCallback(
+    (e: KeyboardEvent) => {
+      if (!viewer) return;
+      if (e.key === "Escape") close();
+      if (e.key === "ArrowRight") next();
+      if (e.key === "ArrowLeft") prev();
+    },
+    [viewer],
+  );
+  useEffect(() => {
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onKey]);
+
+  /* overlay JSX */
+  const overlay: ReactNode = viewer && (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
+      onClick={close}
+    >
+      <button
+        className="absolute right-4 top-4 rounded bg-black/60 p-2 text-white"
+        onClick={close}
+      >
+        ✕
+      </button>
+      <img
+        src={viewer.imgs[viewer.idx]}
+        alt=""
+        onClick={(e) => e.stopPropagation()}
+        className="max-h-full max-w-full object-contain"
+      />
+    </div>
+  );
+
+  return { open, overlay };
+}
+
+/* ------------------------------------------------------------------ */
+/* 1️⃣  Read /public/images/<folder>                                  */
 /* ------------------------------------------------------------------ */
 function useFolderImages(folder: string) {
   const [imgs, setImgs] = useState<string[]>([]);
-
   useEffect(() => {
     let cancel = false;
     (async () => {
       try {
         const res = await fetch(`/api/images?folder=${folder}`);
         if (!cancel && res.ok) setImgs(await res.json());
-      } catch {
-        /* ignore */
-      }
+      } catch {}
     })();
     return () => {
       cancel = true;
     };
   }, [folder]);
-
   return imgs;
 }
 
 /* ------------------------------------------------------------------ */
-/* 2️⃣  Simple auto-scroll carousel reused for every service          */
+/* 2️⃣  Auto-scroll carousel (clickable)                              */
 /* ------------------------------------------------------------------ */
 type IntervalId = ReturnType<typeof setInterval>;
 
-function ImageCarousel({ images }: { images: string[] }) {
-  const [current, setCurrent] = useState(0);
-  const timer = useRef<IntervalId | null>(null);
+function ImageCarousel({
+  images,
+  onImageClick,
+}: {
+  images: string[];
+  onImageClick?: (idx: number) => void;
+}) {
+  const [cur, setCur] = useState(0);
+  const t = useRef<IntervalId | null>(null);
 
   useEffect(() => {
-    if (!images.length) return; // early exit returns void
-
-    timer.current = setInterval(
-      () => setCurrent((i) => (i + 1) % images.length),
-      3000,
-    );
-
+    if (!images.length) return;
+    t.current = setInterval(() => setCur((i) => (i + 1) % images.length), 3000);
     return () => {
-      if (timer.current) clearInterval(timer.current);
-    }; // ✔ cleanup only
+      if (t.current) clearInterval(t.current);
+    };
   }, [images]);
 
-  const jump = (dir: number) => {
-    if (timer.current) clearInterval(timer.current);
-    setCurrent((i) => (i + dir + images.length) % images.length);
+  const jump = (d: number) => {
+    if (t.current) clearInterval(t.current);
+    setCur((i) => (i + d + images.length) % images.length);
   };
 
   return (
@@ -68,13 +125,14 @@ function ImageCarousel({ images }: { images: string[] }) {
         <div
           key={src}
           className={`absolute inset-0 transition-opacity duration-700 ${
-            i === current ? "opacity-100" : "opacity-0"
+            i === cur ? "opacity-100" : "opacity-0"
           }`}
         >
           <img
             src={src}
             alt=""
-            className="h-full w-full object-cover object-center"
+            onClick={() => onImageClick?.(i)}
+            className="h-full w-full cursor-pointer object-cover object-center"
           />
         </div>
       ))}
@@ -100,7 +158,7 @@ function ImageCarousel({ images }: { images: string[] }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* 3️⃣  Desktop & mobile Services menu                                */
+/* 3️⃣  Desktop & mobile “Services Menu” sidebar                      */
 /* ------------------------------------------------------------------ */
 function TableOfContents({ onJump }: { onJump: (id: string) => void }) {
   const [open, setOpen] = useState(false);
@@ -112,7 +170,6 @@ function TableOfContents({ onJump }: { onJump: (id: string) => void }) {
     ["general-repairs", "General Repairs"],
     ["contents-restoration", "Contents Restoration"],
   ];
-
   const click = (id: string) => {
     onJump(id);
     setOpen(false);
@@ -136,7 +193,7 @@ function TableOfContents({ onJump }: { onJump: (id: string) => void }) {
         </div>
       </div>
 
-      {/* mobile toggle */}
+      {/* mobile toggle button */}
       <button
         onClick={() => setOpen(!open)}
         className="fixed bottom-4 right-4 z-20 block rounded-md bg-black/70 px-4 py-2 text-sm font-semibold text-white shadow-lg backdrop-blur-sm md:hidden"
@@ -175,81 +232,85 @@ function TableOfContents({ onJump }: { onJump: (id: string) => void }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* 4️⃣  Main page                                                     */
+/* 4️⃣  PAGE COMPONENT                                                */
 /* ------------------------------------------------------------------ */
 export default function ServicesPage() {
+  /* navbar modal */
   const [mounted, setMounted] = useState(false);
   const [showModal, setShowModal] = useState(false);
+
+  /* intro animation */
   const { ref, inView } = useInView({ threshold: 0.2 });
   const controls = useAnimation();
-
   useEffect(() => setMounted(true), []);
   useEffect(() => {
     controls.start(inView ? "visible" : "hidden");
-  }, [controls, inView]);
+  }, [inView, controls]);
 
   const fade = (dir: "left" | "right" | "up" | "down" = "up") => {
-    const delta = {
-      left: [-50, 0],
-      right: [50, 0],
-      up: [0, -50],
-      down: [0, 50],
-    }[dir] as [number, number];
+    const d = { left: [-50, 0], right: [50, 0], up: [0, -50], down: [0, 50] }[
+      dir
+    ] as [number, number];
     return {
-      hidden: { opacity: 0, x: delta[0], y: delta[1] },
-      visible: { opacity: 1, x: 0, y: 0 },
+      hidden: { opacity: 0, x: d[0], y: d[1] },
+      visible: { opacity: 1 },
     };
   };
 
   /* image folders */
-  const waterDamage = useFolderImages("WaterDamage");
-  const fireDamage = useFolderImages("FireDamage");
+  const water = useFolderImages("WaterDamage");
+  const fire = useFolderImages("FireDamage");
   const mold = useFolderImages("MoldRemediation");
   const asbestos = useFolderImages("AsbestosAbatement");
   const repairs = useFolderImages("GeneralRepairs");
   const contents = useFolderImages("ContentsRestoration");
+
+  /* light-box */
+  const lightbox = useLightbox();
 
   const jump = (id: string) =>
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
   return (
     <div className="relative bg-gray-900 text-white">
-      {/* navbar */}
+      {lightbox.overlay}
+
+      {/* fixed navbar */}
       <div className="fixed left-0 top-0 z-50 w-full bg-gray-900">
         <Navbar onPortalClick={() => setShowModal(true)} />
       </div>
 
-      {/* table of contents */}
       <TableOfContents onJump={jump} />
 
       <main className="container mx-auto px-4 pb-16 pt-28 md:pl-52 md:pt-36">
-        {/* intro */}
+        {/* --------------- intro --------------- */}
         <section id="intro" ref={ref} className="mb-12">
           <motion.h1
             className="mb-6 text-4xl font-extrabold md:text-5xl"
+            variants={fade("up")}
             initial="hidden"
             animate={controls}
-            variants={fade("up")}
             transition={{ duration: 0.5 }}
           >
             Our Services
           </motion.h1>
           <motion.p
             className="max-w-3xl text-lg leading-relaxed text-gray-200"
+            variants={fade("up")}
             initial="hidden"
             animate={controls}
-            variants={fade("up")}
             transition={{ duration: 0.5, delay: 0.2 }}
           >
-            At ActFast Restoration&nbsp;&amp;&nbsp;Repairs we handle insurance
-            claims for water, fire, mold, asbestos, repairs, and contents
-            restoration across Metro Vancouver and Surrey. We respond fast and
-            restore your property efficiently.
+            At ActFast Restoration & Repairs we handle insurance claims for
+            water, fire, mold, asbestos, repairs, and contents restoration
+            across Metro Vancouver and Surrey. We respond fast and restore your
+            property efficiently.
           </motion.p>
         </section>
 
-        {/* service blocks */}
+        {/* --------------- blocks --------------- */}
         <ServiceBlock
+          open={lightbox.open}
           id="water-damage"
           num={1}
           title="Water Damage Restoration 🚰"
@@ -264,11 +325,12 @@ export default function ServicesPage() {
             "Mold Prevention",
             "Sewage Cleanup",
           ]}
-          images={waterDamage}
+          images={water}
           cta="Call Us Now for 24/7 Water Damage Restoration!"
         />
 
         <ServiceBlock
+          open={lightbox.open}
           id="fire-damage"
           num={2}
           title="Fire Damage Restoration 🔥"
@@ -283,11 +345,12 @@ export default function ServicesPage() {
             "Odor Neutralization",
             "Structural Repairs",
           ]}
-          images={fireDamage}
+          images={fire}
           cta="Get Your Property Restored After Fire Damage Today!"
         />
 
         <ServiceBlock
+          open={lightbox.open}
           id="mold-remediation"
           num={3}
           title="Mold Remediation 🦠"
@@ -307,6 +370,7 @@ export default function ServicesPage() {
         />
 
         <ServiceBlock
+          open={lightbox.open}
           id="asbestos-abatement"
           num={4}
           title="Asbestos Abatement ⚠️"
@@ -326,6 +390,7 @@ export default function ServicesPage() {
         />
 
         <ServiceBlock
+          open={lightbox.open}
           id="general-repairs"
           num={5}
           title="General Repairs & Renovations 🛠"
@@ -345,6 +410,7 @@ export default function ServicesPage() {
         />
 
         <ServiceBlock
+          open={lightbox.open}
           id="contents-restoration"
           num={6}
           title="Contents Restoration & Pack-Out Services 📦"
@@ -364,12 +430,12 @@ export default function ServicesPage() {
           cta="Need Pack-Out or Storage? Call Us Today!"
         />
 
-        {/* final CTA */}
+        {/* --------------- final CTA --------------- */}
         <section id="final-cta">
           <motion.div
             className="rounded bg-red-700 p-6 text-center md:mx-auto md:max-w-4xl"
-            initial="hidden"
             whileInView="visible"
+            initial="hidden"
             viewport={{ once: true }}
             variants={fade("up")}
             transition={{ duration: 0.5 }}
@@ -420,6 +486,7 @@ function ServiceBlock({
   services,
   images,
   cta,
+  open,
 }: {
   id: string;
   num: number;
@@ -428,8 +495,9 @@ function ServiceBlock({
   services: string[];
   images: string[];
   cta: string;
+  open: (imgs: string[], idx: number) => void;
 }) {
-  const fadeVariant = (dir: "left" | "right") => ({
+  const fade = (dir: "left" | "right") => ({
     hidden: { opacity: 0, x: dir === "left" ? -50 : 50 },
     visible: { opacity: 1, x: 0 },
   });
@@ -439,20 +507,23 @@ function ServiceBlock({
       <div className="grid gap-8 md:grid-cols-2 md:items-center">
         <motion.div
           className="overflow-hidden rounded-lg shadow-xl"
+          variants={fade("left")}
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          variants={fadeVariant("left")}
           transition={{ duration: 0.5 }}
         >
-          <ImageCarousel images={images} />
+          <ImageCarousel
+            images={images}
+            onImageClick={(i) => open(images, i)}
+          />
         </motion.div>
 
         <motion.div
+          variants={fade("right")}
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          variants={fadeVariant("right")}
           transition={{ duration: 0.5 }}
         >
           <h2 className="mb-4 text-2xl font-bold">
@@ -474,7 +545,6 @@ function ServiceBlock({
             </ul>
           </div>
 
-          {/* CTA with icon */}
           <motion.a
             href="tel:+1-604-518-5129"
             className="inline-flex items-center gap-2 rounded bg-red-600 px-5 py-3 font-bold text-white transition-all duration-300 hover:bg-red-500"
