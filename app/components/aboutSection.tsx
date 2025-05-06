@@ -116,9 +116,9 @@ export default function AboutSection() {
   const aboutImages = useFolderImages("About");
   const lightbox     = useLightbox(aboutImages);
 
-  const { ref, inView } = useInView({ threshold: 0.2 });
+  const { ref, inView } = useInView({ threshold: 0.2, triggerOnce: true });
   const controls = useAnimation();
-  useEffect(() => { controls.start(inView ? "visible" : "hidden"); }, [controls, inView]);
+  useEffect(() => { if (inView) controls.start("visible"); }, [inView, controls]);
 
   return (
     <section className="bg-gray-800 py-12" ref={ref}>

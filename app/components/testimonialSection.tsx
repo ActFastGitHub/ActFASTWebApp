@@ -121,10 +121,7 @@ interface PlaceDetailsData {
 const TestimonialsSection: React.FC = () => {
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
 
-  const { ref, inView } = useInView({
-    triggerOnce: false,
-    threshold: 0.2,
-  });
+  const { ref, inView } = useInView({ threshold: 0.2, triggerOnce: true });
 
   const controls = useAnimation();
 
@@ -156,13 +153,7 @@ const TestimonialsSection: React.FC = () => {
     fetchReviews();
   }, []);
 
-  useEffect(() => {
-    if (inView) {
-      controls.start("visible");
-    } else {
-      controls.start("hidden");
-    }
-  }, [controls, inView]);
+  useEffect(() => { if (inView) controls.start("visible"); }, [inView, controls]);
 
   return (
     <section className="py-12 bg-gray-800" ref={ref}>

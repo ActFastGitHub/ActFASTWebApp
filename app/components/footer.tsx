@@ -10,20 +10,11 @@ import instagramIcon from "@/app/images/instagramIcon.png";
 import AFlogo from "@/app/images/actfast-logo.jpg";
 
 const Footer: React.FC = () => {
-  const { ref, inView } = useInView({
-    triggerOnce: false,
-    threshold: 0.2,
-  });
+  const { ref, inView } = useInView({ threshold: 0.2, triggerOnce: true });
 
   const controls = useAnimation();
 
-  useEffect(() => {
-    if (inView) {
-      controls.start("visible");
-    } else {
-      controls.start("hidden");
-    }
-  }, [controls, inView]);
+  useEffect(() => { if (inView) controls.start("visible"); }, [inView, controls]);
 
   return (
     <footer className="bg-gray-800 py-8 text-white">

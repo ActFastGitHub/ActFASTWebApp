@@ -96,12 +96,12 @@ function useLightbox() {
 /* 2️⃣  Services section                                              */
 /* ------------------------------------------------------------------ */
 export default function ServicesSection() {
-  const { ref, inView } = useInView({ threshold: 0.2 });
+  const { ref, inView } = useInView({ threshold: 0.2, triggerOnce: true });
   const controls = useAnimation();
   const lightbox = useLightbox();
 
   const [imagesByFolder, setImagesByFolder] = useState<Record<string, string[]>>({});
-  useEffect(() => { controls.start(inView ? "visible" : "hidden"); }, [inView, controls]);
+  useEffect(() => { if (inView) controls.start("visible"); }, [inView, controls]);
 
   /* fetch all folders once */
   useEffect(() => {
