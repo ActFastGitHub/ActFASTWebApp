@@ -10,23 +10,61 @@ import { motion, useAnimation } from "framer-motion";
 import { useInView } from "react-intersection-observer";
 
 import MissionImage from "@/app/images/mission.jpg";
-import VisionImage  from "@/app/images/vision.jpg";
+import VisionImage from "@/app/images/vision.jpg";
 
 /* ------------------------------------------------------------------ */
 /* 1️⃣  fetch every file in /public/images/About/                      */
 /* ------------------------------------------------------------------ */
+// function useFolderImages(folder: string) {
+//   const [imgs, setImgs] = React.useState<string[]>([]);
+//   useEffect(() => {
+//     let cancel = false;
+//     (async () => {
+//       try {
+//         const res = await fetch(`/api/images?folder=${folder}`);
+//         if (!cancel && res.ok) setImgs(await res.json());
+//       } catch {}
+//     })();
+//     return () => { cancel = true; };
+//   }, [folder]);
+//   return imgs;
+// }
+
 function useFolderImages(folder: string) {
   const [imgs, setImgs] = React.useState<string[]>([]);
+
   useEffect(() => {
     let cancel = false;
-    (async () => {
+
+    const fetchImages = async (attempt = 1) => {
       try {
-        const res = await fetch(`/api/images?folder=${folder}`);
-        if (!cancel && res.ok) setImgs(await res.json());
-      } catch {}
-    })();
-    return () => { cancel = true; };
+        const res = await fetch(`/api/images?folder=${folder}`, {
+          cache: "no-store",
+        });
+        if (!res.ok) throw new Error("Failed to fetch images");
+        const data = await res.json();
+        if (!cancel) setImgs(data);
+
+        // preload images
+        data.forEach((src: string) => {
+          const img = new Image();
+          img.src = src;
+        });
+      } catch (err) {
+        if (attempt < 3) {
+          setTimeout(() => fetchImages(attempt + 1), 1000); // retry after 1s
+        } else {
+          console.error("Image fetch failed after 3 attempts", err);
+        }
+      }
+    };
+
+    fetchImages();
+    return () => {
+      cancel = true;
+    };
   }, [folder]);
+
   return imgs;
 }
 
@@ -35,21 +73,27 @@ function useFolderImages(folder: string) {
 /* ------------------------------------------------------------------ */
 function useLightbox(imgs: string[]) {
   const [open, setOpen] = React.useState(false);
-  const [idx,  setIdx]  = React.useState(0);
+  const [idx, setIdx] = React.useState(0);
 
   const next = () => setIdx((i) => (i + 1) % imgs.length);
   const prev = () => setIdx((i) => (i - 1 + imgs.length) % imgs.length);
 
-  const show = (i: number) => { setIdx(i); setOpen(true); };
+  const show = (i: number) => {
+    setIdx(i);
+    setOpen(true);
+  };
   const hide = () => setOpen(false);
 
   /* ---- keyboard ---- */
-  const onKey = useCallback((e: KeyboardEvent) => {
-    if (!open) return;
-    if (e.key === "Escape") hide();
-    if (e.key === "ArrowRight") next();
-    if (e.key === "ArrowLeft")  prev();
-  }, [open]);
+  const onKey = useCallback(
+    (e: KeyboardEvent) => {
+      if (!open) return;
+      if (e.key === "Escape") hide();
+      if (e.key === "ArrowRight") next();
+      if (e.key === "ArrowLeft") prev();
+    },
+    [open],
+  );
   useEffect(() => {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -86,13 +130,19 @@ function useLightbox(imgs: string[]) {
       {/* arrows (mobile only) */}
       <button
         className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded bg-black/60 p-2 text-white md:hidden"
-        onClick={(e) => { e.stopPropagation(); prev(); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          prev();
+        }}
       >
         ◀
       </button>
       <button
         className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded bg-black/60 p-2 text-white md:hidden"
-        onClick={(e) => { e.stopPropagation(); next(); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          next();
+        }}
       >
         ▶
       </button>
@@ -101,7 +151,7 @@ function useLightbox(imgs: string[]) {
         src={imgs[idx]}
         alt=""
         className="max-h-full max-w-full object-contain"
-        onClick={(e) => e.stopPropagation()}   /* don't close on image tap */
+        onClick={(e) => e.stopPropagation()} /* don't close on image tap */
       />
     </div>
   );
@@ -114,11 +164,13 @@ function useLightbox(imgs: string[]) {
 /* ------------------------------------------------------------------ */
 export default function AboutSection() {
   const aboutImages = useFolderImages("About");
-  const lightbox     = useLightbox(aboutImages);
+  const lightbox = useLightbox(aboutImages);
 
   const { ref, inView } = useInView({ threshold: 0.2, triggerOnce: true });
   const controls = useAnimation();
-  useEffect(() => { if (inView) controls.start("visible"); }, [inView, controls]);
+  useEffect(() => {
+    if (inView) controls.start("visible");
+  }, [inView, controls]);
 
   return (
     <section className="bg-gray-800 py-12" ref={ref}>
@@ -128,7 +180,10 @@ export default function AboutSection() {
           className="mb-8 text-center text-5xl font-bold text-white"
           initial="hidden"
           animate={controls}
-          variants={{ visible: { opacity: 1, y: 0 }, hidden: { opacity: 0, y: -50 } }}
+          variants={{
+            visible: { opacity: 1, y: 0 },
+            hidden: { opacity: 0, y: -50 },
+          }}
           transition={{ duration: 0.5 }}
         >
           About Us
@@ -155,7 +210,10 @@ export default function AboutSection() {
                       onClick={() => lightbox.show(i)}
                       initial={{ opacity: 0 }}
                       animate={controls}
-                      variants={{ visible: { opacity: 1 }, hidden: { opacity: 0 } }}
+                      variants={{
+                        visible: { opacity: 1 },
+                        hidden: { opacity: 0 },
+                      }}
                       transition={{ duration: 0.8 }}
                     />
                   </SwiperSlide>
@@ -172,13 +230,16 @@ export default function AboutSection() {
             className="w-full lg:w-1/2 lg:pl-8"
             initial="hidden"
             animate={controls}
-            variants={{ visible: { opacity: 1, x: 0 }, hidden: { opacity: 0, x: 50 } }}
+            variants={{
+              visible: { opacity: 1, x: 0 },
+              hidden: { opacity: 0, x: 50 },
+            }}
             transition={{ duration: 0.5, delay: 0.2 }}
           >
             <p className="mb-4 text-gray-600">
               We are a restoration and repairs company dedicated to providing
-              top-notch services. Our experienced team restores your home to
-              its former glory—specialising in water, fire, and mold damage plus
+              top-notch services. Our experienced team restores your home to its
+              former glory—specialising in water, fire, and mold damage plus
               general repairs.
             </p>
             <p className="text-gray-600">
@@ -196,7 +257,10 @@ export default function AboutSection() {
             className="flex w-full flex-col items-center lg:w-1/2"
             initial="hidden"
             animate={controls}
-            variants={{ visible: { opacity: 1, y: 0 }, hidden: { opacity: 0, y: 50 } }}
+            variants={{
+              visible: { opacity: 1, y: 0 },
+              hidden: { opacity: 0, y: 50 },
+            }}
             transition={{ duration: 0.5, delay: 0.4 }}
           >
             <div className="relative flex flex-col items-center rounded-lg bg-gray-100 p-6 pt-20 shadow-lg">
@@ -223,7 +287,10 @@ export default function AboutSection() {
             className="mt-12 flex w-full flex-col items-center lg:mt-6 lg:w-1/2"
             initial="hidden"
             animate={controls}
-            variants={{ visible: { opacity: 1, y: 0 }, hidden: { opacity: 0, y: 50 } }}
+            variants={{
+              visible: { opacity: 1, y: 0 },
+              hidden: { opacity: 0, y: 50 },
+            }}
             transition={{ duration: 0.5, delay: 0.6 }}
           >
             <div className="relative flex flex-col items-center rounded-lg bg-gray-100 p-6 pt-20 shadow-lg">
@@ -238,7 +305,8 @@ export default function AboutSection() {
                 <h3 className="mb-2 text-xl font-semibold">Our Vision</h3>
                 <p className="px-4 text-gray-600 sm:px-8 md:px-12 lg:px-4">
                   To be the leading restoration company known for innovation,
-                  reliability, and excellence—setting new standards for the industry.
+                  reliability, and excellence—setting new standards for the
+                  industry.
                 </p>
               </div>
             </div>
