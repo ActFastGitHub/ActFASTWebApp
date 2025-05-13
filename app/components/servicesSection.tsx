@@ -10,45 +10,125 @@ import "swiper/css/navigation";
 import { motion, useAnimation } from "framer-motion";
 import { useInView } from "react-intersection-observer";
 
-/* ---------- service list (folder-only) ---------- */
-type Service = { title: string; description: string; folder: string };
+/* ------------------------------------------------------------------ */
+/* 🔧 helpers – no more monster arrays!                                */
+/* ------------------------------------------------------------------ */
+type Service = {
+  title: string;
+  description: string;
+  folder: string;
+  images: string[];
+};
 
+/** Build an array like ["/images/WaterDamage/Water (1).jpg", …] */
+const gen = (folder: string, prefix: string, count: number): string[] =>
+  Array.from(
+    { length: count },
+    (_, i) => `/images/${folder}/${prefix} (${i + 1}).jpg`,
+  );
+
+/** Factory so each service definition is one clean line. */
+const makeService = (
+  title: string,
+  description: string,
+  folder: string,
+  prefix: string,
+  count: number,
+): Service => ({
+  title,
+  description,
+  folder,
+  images: gen(folder, prefix, count),
+});
+
+/* ------------------------------------------------------------------ */
+/* 📋 services list (concise)                                          */
+/* ------------------------------------------------------------------ */
 const services: readonly Service[] = [
-  { title: "Water Damage Restoration", description: "Rapid extraction, structural drying, and full repairs after a flood.", folder: "WaterDamage" },
-  { title: "Fire Damage Restoration",  description: "Soot removal, odor elimination, and complete rebuild after fire loss.", folder: "FireDamage" },
-  { title: "Mold Remediation",         description: "Certified inspection, containment, and safe removal of mold colonies.", folder: "MoldRemediation" },
-  { title: "Asbestos Abatement",       description: "Licensed testing and removal to keep your home free of asbestos hazards.", folder: "AsbestosAbatement" },
-  { title: "General Repairs",          description: "Skilled carpentry, drywall, and finishing to restore any part of your home.", folder: "GeneralRepairs" },
-  { title: "Contents Restoration",     description: "Pack-out, specialist cleaning, storage, and insurance coordination.", folder: "ContentsRestoration" },
+  makeService(
+    "Water Damage Restoration",
+    "Rapid extraction, structural drying, and full repairs after a flood.",
+    "WaterDamage",
+    "Water",
+    45,
+  ),
+  makeService(
+    "Fire Damage Restoration",
+    "Soot removal, odor elimination, and complete rebuild after fire loss.",
+    "FireDamage",
+    "Fire",
+    52,
+  ),
+  makeService(
+    "Mold Remediation",
+    "Certified inspection, containment, and safe removal of mold colonies.",
+    "MoldRemediation",
+    "Mold",
+    31,
+  ),
+  makeService(
+    "Asbestos Abatement",
+    "Licensed testing and removal to keep your home free of asbestos hazards.",
+    "AsbestosAbatement",
+    "Asbestos",
+    10,
+  ),
+  makeService(
+    "General Repairs",
+    "Skilled carpentry, drywall, and finishing to restore any part of your home.",
+    "GeneralRepairs",
+    "Repairs",
+    12,
+  ),
+  makeService(
+    "Contents Restoration",
+    "Pack-out, specialist cleaning, storage, and insurance coordination.",
+    "ContentsRestoration",
+    "Contents",
+    35,
+  ),
 ];
 
 /* ------------------------------------------------------------------ */
-/* 1️⃣  Light-box helper                                              */
+/* Lightbox for viewing images fullscreen                            */
 /* ------------------------------------------------------------------ */
 function useLightbox() {
-  const [viewer, setViewer] = useState<{ imgs: string[]; idx: number } | null>(null);
+  const [viewer, setViewer] = useState<{ imgs: string[]; idx: number } | null>(
+    null,
+  );
 
-  const open  = (imgs: string[], idx: number) => setViewer({ imgs, idx });
+  const open = (imgs: string[], idx: number) => setViewer({ imgs, idx });
   const close = () => setViewer(null);
-  const next  = () => viewer && setViewer({ ...viewer, idx: (viewer.idx + 1) % viewer.imgs.length });
-  const prev  = () => viewer && setViewer({ ...viewer, idx: (viewer.idx - 1 + viewer.imgs.length) % viewer.imgs.length });
+  const next = () =>
+    viewer &&
+    setViewer({ ...viewer, idx: (viewer.idx + 1) % viewer.imgs.length });
+  const prev = () =>
+    viewer &&
+    setViewer({
+      ...viewer,
+      idx: (viewer.idx - 1 + viewer.imgs.length) % viewer.imgs.length,
+    });
 
-  /* keyboard */
-  const onKey = useCallback((e: KeyboardEvent) => {
-    if (!viewer) return;
-    if (e.key === "Escape") close();
-    if (e.key === "ArrowRight") next();
-    if (e.key === "ArrowLeft")  prev();
-  }, [viewer]);
+  const onKey = useCallback(
+    (e: KeyboardEvent) => {
+      if (!viewer) return;
+      if (e.key === "Escape") close();
+      if (e.key === "ArrowRight") next();
+      if (e.key === "ArrowLeft") prev();
+    },
+    [viewer],
+  );
+
   useEffect(() => {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onKey]);
 
-  /* swipe */
   const startX = useRef<number | null>(null);
-  const onTouchStart = (e: React.TouchEvent) => { startX.current = e.touches[0].clientX; };
-  const onTouchEnd   = (e: React.TouchEvent) => {
+  const onTouchStart = (e: React.TouchEvent) => {
+    startX.current = e.touches[0].clientX;
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
     if (startX.current === null || !viewer) return;
     const dx = e.changedTouches[0].clientX - startX.current;
     if (Math.abs(dx) > 50) (dx < 0 ? next : prev)();
@@ -62,24 +142,30 @@ function useLightbox() {
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
-      {/* close */}
-      <button className="absolute right-4 top-4 z-10 rounded bg-black/60 p-2 text-white backdrop-blur-md" onClick={close}>
+      <button
+        className="absolute right-4 top-4 z-10 rounded bg-black/60 p-2 text-white backdrop-blur-md"
+        onClick={close}
+      >
         ✕
       </button>
-      {/* arrows (mobile-only) */}
       <button
         className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded bg-black/60 p-2 text-white md:hidden"
-        onClick={(e) => { e.stopPropagation(); prev(); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          prev();
+        }}
       >
         ◀
       </button>
       <button
         className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded bg-black/60 p-2 text-white md:hidden"
-        onClick={(e) => { e.stopPropagation(); next(); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          next();
+        }}
       >
         ▶
       </button>
-
       <img
         src={viewer.imgs[viewer.idx]}
         alt=""
@@ -93,31 +179,16 @@ function useLightbox() {
 }
 
 /* ------------------------------------------------------------------ */
-/* 2️⃣  Services section                                              */
+/* Main component                                                     */
 /* ------------------------------------------------------------------ */
 export default function ServicesSection() {
   const { ref, inView } = useInView({ threshold: 0.2, triggerOnce: true });
   const controls = useAnimation();
   const lightbox = useLightbox();
 
-  const [imagesByFolder, setImagesByFolder] = useState<Record<string, string[]>>({});
-  useEffect(() => { if (inView) controls.start("visible"); }, [inView, controls]);
-
-  /* fetch all folders once */
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const entries = await Promise.all(
-        services.map(async (svc) => {
-          const res  = await fetch(`/api/images?folder=${svc.folder}`);
-          const list = (await res.json()) as string[];
-          return [svc.folder, list] as const;
-        }),
-      );
-      if (!cancelled) setImagesByFolder(Object.fromEntries(entries));
-    })();
-    return () => { cancelled = true; };
-  }, []);
+    if (inView) controls.start("visible");
+  }, [inView, controls]);
 
   return (
     <section ref={ref} className="bg-gray-800 py-12">
@@ -126,7 +197,10 @@ export default function ServicesSection() {
         <motion.h2
           initial="hidden"
           animate={controls}
-          variants={{ visible: { opacity: 1, y: 0 }, hidden: { opacity: 0, y: -50 } }}
+          variants={{
+            visible: { opacity: 1, y: 0 },
+            hidden: { opacity: 0, y: -50 },
+          }}
           transition={{ duration: 0.5 }}
           className="mb-8 text-center text-5xl font-bold text-white"
         >
@@ -140,58 +214,62 @@ export default function ServicesSection() {
           pagination={{ clickable: true }}
           modules={[Pagination, Navigation]}
           breakpoints={{
-            640:  { slidesPerView: 1 },
-            768:  { slidesPerView: 2 },
+            640: { slidesPerView: 1 },
+            768: { slidesPerView: 2 },
             1024: { slidesPerView: 3 },
             1280: { slidesPerView: 4 },
           }}
         >
-          {services.map((svc, idx) => {
-            const imgs = imagesByFolder[svc.folder] ?? [];
-            return (
-              <SwiperSlide key={svc.title}>
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  initial="hidden"
-                  animate={controls}
-                  variants={{ visible: { opacity: 1, y: 0 }, hidden: { opacity: 0, y: 50 } }}
-                  transition={{ duration: 0.5, delay: idx * 0.2 }}
-                  className="mx-auto max-w-xs rounded bg-white p-6 text-center shadow-2xl"
-                >
-                  {/* nested flip swiper */}
-                  {imgs.length ? (
-                    <Swiper
-                      effect="flip"
-                      grabCursor
-                      navigation
-                      pagination={false}
-                      modules={[EffectFlip, Navigation]}
-                      className="mySwiper mb-4"
-                    >
-                      {imgs.map((src, i) => (
-                        <SwiperSlide key={src}>
-                          <img
-                            src={src}
-                            alt={svc.title}
-                            className="h-64 w-full cursor-pointer rounded object-cover object-center"
-                            onClick={() => lightbox.open(imgs, i)}
-                          />
-                        </SwiperSlide>
-                      ))}
-                    </Swiper>
-                  ) : (
-                    <div className="mb-4 flex h-64 items-center justify-center rounded bg-gray-100 text-sm text-gray-500">
-                      Loading…
-                    </div>
-                  )}
+          {services.map((svc, idx) => (
+            <SwiperSlide key={svc.title}>
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                initial="hidden"
+                animate={controls}
+                variants={{
+                  visible: { opacity: 1, y: 0 },
+                  hidden: { opacity: 0, y: 50 },
+                }}
+                transition={{ duration: 0.5, delay: idx * 0.2 }}
+                className="mx-auto max-w-xs rounded bg-white p-6 text-center shadow-2xl"
+              >
+                {/* nested flip swiper */}
+                {svc.images.length ? (
+                  <Swiper
+                    effect="flip"
+                    grabCursor
+                    navigation
+                    pagination={false}
+                    modules={[EffectFlip, Navigation]}
+                    className="mySwiper mb-4"
+                  >
+                    {svc.images.map((src, i) => (
+                      <SwiperSlide key={src}>
+                        <img
+                          src={src}
+                          alt={svc.title}
+                          className="h-64 w-full cursor-pointer rounded object-cover object-center"
+                          onClick={() => lightbox.open(svc.images, i)}
+                          onError={(e) => {
+                            e.currentTarget.src = "/images/fallback.jpg";
+                            e.currentTarget.classList.add("opacity-20");
+                          }}
+                        />
+                      </SwiperSlide>
+                    ))}
+                  </Swiper>
+                ) : (
+                  <div className="mb-4 flex h-64 items-center justify-center rounded bg-gray-100 text-sm text-gray-500">
+                    No images.
+                  </div>
+                )}
 
-                  <h3 className="mb-2 text-xl font-semibold">{svc.title}</h3>
-                  <p className="text-gray-600">{svc.description}</p>
-                </motion.div>
-              </SwiperSlide>
-            );
-          })}
+                <h3 className="mb-2 text-xl font-semibold">{svc.title}</h3>
+                <p className="text-gray-600">{svc.description}</p>
+              </motion.div>
+            </SwiperSlide>
+          ))}
         </Swiper>
       </div>
     </section>

@@ -16,6 +16,25 @@ import { useInView } from "react-intersection-observer";
 import phoneIcon from "@/app/images/phone-icon.svg";
 
 /* ------------------------------------------------------------------ */
+/* 🔧 helper to build ["/images/WaterDamage/Water (1).jpg", …]        */
+/* ------------------------------------------------------------------ */
+const gen = (folder: string, prefix: string, count: number): string[] =>
+  Array.from(
+    { length: count },
+    (_, i) => `/images/${folder}/${prefix} (${i + 1}).jpg`,
+  );
+
+/* ------------------------------------------------------------------ */
+/* 📁 static image arrays                                             */
+/* ------------------------------------------------------------------ */
+const water     = gen("WaterDamage",       "Water",    45);
+const fire      = gen("FireDamage",        "Fire",     52);
+const mold      = gen("MoldRemediation",   "Mold",     31);
+const asbestos  = gen("AsbestosAbatement", "Asbestos", 10);
+const repairs   = gen("GeneralRepairs",    "Repairs",  12);
+const contents  = gen("ContentsRestoration","Contents",35);
+
+/* ------------------------------------------------------------------ */
 /* 0️⃣  Light-box hook                                                */
 /* ------------------------------------------------------------------ */
 type Viewer = { imgs: string[]; idx: number } | null;
@@ -69,26 +88,6 @@ function useLightbox() {
   );
 
   return { open, overlay };
-}
-
-/* ------------------------------------------------------------------ */
-/* 1️⃣  Read /public/images/<folder>                                  */
-/* ------------------------------------------------------------------ */
-function useFolderImages(folder: string) {
-  const [imgs, setImgs] = useState<string[]>([]);
-  useEffect(() => {
-    let cancel = false;
-    (async () => {
-      try {
-        const res = await fetch(`/api/images?folder=${folder}`);
-        if (!cancel && res.ok) setImgs(await res.json());
-      } catch {}
-    })();
-    return () => {
-      cancel = true;
-    };
-  }, [folder]);
-  return imgs;
 }
 
 /* ------------------------------------------------------------------ */
@@ -257,17 +256,8 @@ export default function ServicesPage() {
     };
   };
 
-  /* image folders */
-  const water = useFolderImages("WaterDamage");
-  const fire = useFolderImages("FireDamage");
-  const mold = useFolderImages("MoldRemediation");
-  const asbestos = useFolderImages("AsbestosAbatement");
-  const repairs = useFolderImages("GeneralRepairs");
-  const contents = useFolderImages("ContentsRestoration");
-
   /* light-box */
   const lightbox = useLightbox();
-
   const jump = (id: string) =>
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
@@ -513,10 +503,7 @@ function ServiceBlock({
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
         >
-          <ImageCarousel
-            images={images}
-            onImageClick={(i) => open(images, i)}
-          />
+          <ImageCarousel images={images} onImageClick={(i) => open(images, i)} />
         </motion.div>
 
         <motion.div

@@ -13,63 +13,25 @@ import MissionImage from "@/app/images/mission.jpg";
 import VisionImage from "@/app/images/vision.jpg";
 
 /* ------------------------------------------------------------------ */
-/* 1️⃣  fetch every file in /public/images/About/                      */
+/* 1️⃣  Hardcoded image paths for About carousel                      */
 /* ------------------------------------------------------------------ */
-// function useFolderImages(folder: string) {
-//   const [imgs, setImgs] = React.useState<string[]>([]);
-//   useEffect(() => {
-//     let cancel = false;
-//     (async () => {
-//       try {
-//         const res = await fetch(`/api/images?folder=${folder}`);
-//         if (!cancel && res.ok) setImgs(await res.json());
-//       } catch {}
-//     })();
-//     return () => { cancel = true; };
-//   }, [folder]);
-//   return imgs;
-// }
-
-function useFolderImages(folder: string) {
-  const [imgs, setImgs] = React.useState<string[]>([]);
-
-  useEffect(() => {
-    let cancel = false;
-
-    const fetchImages = async (attempt = 1) => {
-      try {
-        const res = await fetch(`/api/images?folder=${folder}`, {
-          cache: "no-store",
-        });
-        if (!res.ok) throw new Error("Failed to fetch images");
-        const data = await res.json();
-        if (!cancel) setImgs(data);
-
-        // preload images
-        data.forEach((src: string) => {
-          const img = new Image();
-          img.src = src;
-        });
-      } catch (err) {
-        if (attempt < 3) {
-          setTimeout(() => fetchImages(attempt + 1), 1000); // retry after 1s
-        } else {
-          console.error("Image fetch failed after 3 attempts", err);
-        }
-      }
-    };
-
-    fetchImages();
-    return () => {
-      cancel = true;
-    };
-  }, [folder]);
-
-  return imgs;
-}
+const aboutImages = [
+  "/images/About/image (1).jpg",
+  "/images/About/image (2).jpg",
+  "/images/About/image (3).jpg",
+  "/images/About/image (4).jpg",
+  "/images/About/image (5).jpg",
+  "/images/About/image (6).jpg",
+  "/images/About/image (7).jpg",
+  "/images/About/image (8).jpg",
+  "/images/About/image (9).jpg",
+  "/images/About/image (10).jpg",
+  "/images/About/image (11).jpg",
+  "/images/About/image (12).jpg",
+];
 
 /* ------------------------------------------------------------------ */
-/* 2️⃣  lightweight Lightbox with swipe + arrows + close              */
+/* 2️⃣  Lightbox overlay logic                                        */
 /* ------------------------------------------------------------------ */
 function useLightbox(imgs: string[]) {
   const [open, setOpen] = React.useState(false);
@@ -84,7 +46,6 @@ function useLightbox(imgs: string[]) {
   };
   const hide = () => setOpen(false);
 
-  /* ---- keyboard ---- */
   const onKey = useCallback(
     (e: KeyboardEvent) => {
       if (!open) return;
@@ -92,14 +53,14 @@ function useLightbox(imgs: string[]) {
       if (e.key === "ArrowRight") next();
       if (e.key === "ArrowLeft") prev();
     },
-    [open],
+    [open]
   );
+
   useEffect(() => {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onKey]);
 
-  /* ---- swipe ---- */
   const startX = useRef<number | null>(null);
   const onTouchStart = (e: React.TouchEvent) => {
     startX.current = e.touches[0].clientX;
@@ -111,7 +72,6 @@ function useLightbox(imgs: string[]) {
     startX.current = null;
   };
 
-  /* ---- overlay JSX ---- */
   const overlay = open && (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
@@ -119,39 +79,29 @@ function useLightbox(imgs: string[]) {
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
-      {/* close btn */}
       <button
         className="absolute right-4 top-4 z-10 rounded bg-black/60 p-2 text-white backdrop-blur-md"
         onClick={hide}
       >
         ✕
       </button>
-
-      {/* arrows (mobile only) */}
       <button
         className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded bg-black/60 p-2 text-white md:hidden"
-        onClick={(e) => {
-          e.stopPropagation();
-          prev();
-        }}
+        onClick={(e) => { e.stopPropagation(); prev(); }}
       >
         ◀
       </button>
       <button
         className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded bg-black/60 p-2 text-white md:hidden"
-        onClick={(e) => {
-          e.stopPropagation();
-          next();
-        }}
+        onClick={(e) => { e.stopPropagation(); next(); }}
       >
         ▶
       </button>
-
       <img
         src={imgs[idx]}
         alt=""
         className="max-h-full max-w-full object-contain"
-        onClick={(e) => e.stopPropagation()} /* don't close on image tap */
+        onClick={(e) => e.stopPropagation()}
       />
     </div>
   );
@@ -160,21 +110,21 @@ function useLightbox(imgs: string[]) {
 }
 
 /* ------------------------------------------------------------------ */
-/* 3️⃣  main component                                                */
+/* 3️⃣  AboutSection component                                       */
 /* ------------------------------------------------------------------ */
 export default function AboutSection() {
-  const aboutImages = useFolderImages("About");
   const lightbox = useLightbox(aboutImages);
 
   const { ref, inView } = useInView({ threshold: 0.2, triggerOnce: true });
   const controls = useAnimation();
+
   useEffect(() => {
     if (inView) controls.start("visible");
   }, [inView, controls]);
 
   return (
     <section className="bg-gray-800 py-12" ref={ref}>
-      {lightbox.overlay /* full-screen viewer */}
+      {lightbox.overlay}
       <div className="container mx-auto px-4">
         <motion.h2
           className="mb-8 text-center text-5xl font-bold text-white"
@@ -189,41 +139,35 @@ export default function AboutSection() {
           About Us
         </motion.h2>
 
-        {/* ---------- carousel + text ---------- */}
         <div className="relative mb-12 flex flex-col items-center rounded-lg bg-gray-100 p-6 shadow-2xl lg:flex-row">
           <div className="relative z-0 mb-8 w-full lg:mb-0 lg:w-1/2 lg:pr-8">
-            {!!aboutImages.length ? (
-              <Swiper
-                effect="fade"
-                autoplay={{ delay: 2500, disableOnInteraction: false }}
-                loop
-                navigation={false}
-                modules={[EffectFade, Navigation, Autoplay]}
-                className="h-64 w-full"
-              >
-                {aboutImages.map((src, i) => (
-                  <SwiperSlide key={src}>
-                    <motion.img
-                      src={src}
-                      alt="ActFAST team"
-                      className="h-64 w-full cursor-pointer rounded object-cover"
-                      onClick={() => lightbox.show(i)}
-                      initial={{ opacity: 0 }}
-                      animate={controls}
-                      variants={{
-                        visible: { opacity: 1 },
-                        hidden: { opacity: 0 },
-                      }}
-                      transition={{ duration: 0.8 }}
-                    />
-                  </SwiperSlide>
-                ))}
-              </Swiper>
-            ) : (
-              <div className="flex h-64 w-full items-center justify-center rounded bg-gray-200 text-gray-500">
-                Loading…
-              </div>
-            )}
+            <Swiper
+              effect="fade"
+              autoplay={{ delay: 2500, disableOnInteraction: false }}
+              loop
+              navigation={false}
+              modules={[EffectFade, Navigation, Autoplay]}
+              className="h-64 w-full"
+            >
+              {aboutImages.map((src, i) => (
+                <SwiperSlide key={src}>
+                  <motion.img
+                    src={src}
+                    alt={`About image ${i + 1}`}
+                    className="h-64 w-full cursor-pointer rounded object-cover"
+                    onClick={() => lightbox.show(i)}
+                    onError={(e) => {
+                      e.currentTarget.src = "/images/fallback.jpg";
+                      e.currentTarget.classList.add("opacity-20");
+                    }}
+                    initial={{ opacity: 0 }}
+                    animate={controls}
+                    variants={{ visible: { opacity: 1 }, hidden: { opacity: 0 } }}
+                    transition={{ duration: 0.8 }}
+                  />
+                </SwiperSlide>
+              ))}
+            </Swiper>
           </div>
 
           <motion.div
@@ -249,8 +193,6 @@ export default function AboutSection() {
           </motion.div>
         </div>
 
-        {/* ---------------- mission & vision cards (unchanged) ---------------- */}
-        {/* ... same as before ... */}
         <div className="flex flex-col items-center justify-center lg:flex-row lg:space-x-8">
           {/* Mission Card */}
           <motion.div
@@ -305,8 +247,7 @@ export default function AboutSection() {
                 <h3 className="mb-2 text-xl font-semibold">Our Vision</h3>
                 <p className="px-4 text-gray-600 sm:px-8 md:px-12 lg:px-4">
                   To be the leading restoration company known for innovation,
-                  reliability, and excellence—setting new standards for the
-                  industry.
+                  reliability, and excellence—setting new standards for the industry.
                 </p>
               </div>
             </div>
