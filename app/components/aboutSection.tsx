@@ -13,38 +13,32 @@ import MissionImage from "@/app/images/mission.jpg";
 import VisionImage from "@/app/images/vision.jpg";
 
 /* ------------------------------------------------------------------ */
-/* 1️⃣  Simple list (we only store the *base* filename)               */
+/* ✅ Final image paths with proper extensions                        */
 /* ------------------------------------------------------------------ */
-const IMAGE_COUNT = 12;
-const aboutImages = Array.from(
-  { length: IMAGE_COUNT },
-  (_, i) => `/images/About/image (${i + 1})`, // ← no extension yet
-);
+const aboutImages = [
+  "/images/About/image (1).jpg",
+  "/images/About/image (2).jpg",
+  "/images/About/image (3).jpg",
+  "/images/About/image (4).jpg",
+  "/images/About/image (5).JPG",
+  "/images/About/image (6).JPG",
+  "/images/About/image (7).JPG",
+  "/images/About/image (8).JPG",
+  "/images/About/image (9).JPG",
+  "/images/About/image (10).jpg",
+  "/images/About/image (11).jpg",
+  "/images/About/image (12).jpg",
+];
 
 /* ------------------------------------------------------------------ */
-/* 2️⃣  All extensions we’ll probe, in order of likelihood            */
+/* Lightbox logic                                                     */
 /* ------------------------------------------------------------------ */
-const EXTENSIONS = [
-  "jpg",
-  "JPG",
-  "jpeg",
-  "JPEG",
-  "png",
-  "PNG",
-  "webp",
-  "WEBP",
-] as const;
-
-/* ------------------------------------------------------------------ */
-/* 3️⃣  Lightbox overlay logic                                        */
-/* ------------------------------------------------------------------ */
-function useLightbox(bases: string[]) {
+function useLightbox(images: string[]) {
   const [open, setOpen] = React.useState(false);
   const [idx, setIdx] = React.useState(0);
 
-  const next = () => setIdx((i) => (i + 1) % bases.length);
-  const prev = () => setIdx((i) => (i - 1 + bases.length) % bases.length);
-
+  const next = () => setIdx((i) => (i + 1) % images.length);
+  const prev = () => setIdx((i) => (i - 1 + images.length) % images.length);
   const show = (i: number) => {
     setIdx(i);
     setOpen(true);
@@ -58,7 +52,7 @@ function useLightbox(bases: string[]) {
       if (e.key === "ArrowRight") next();
       if (e.key === "ArrowLeft") prev();
     },
-    [open],
+    [open]
   );
 
   useEffect(() => {
@@ -91,9 +85,7 @@ function useLightbox(bases: string[]) {
         ✕
       </button>
       <img
-        src={`${bases[idx]}.jpg`} // first guess
-        /* ⭐ NEW: same dynamic onError used inside the carousel */
-        onError={(e) => dynamicExtFallback(e.currentTarget)}
+        src={images[idx]}
         alt=""
         className="max-h-full max-w-full object-contain"
         onClick={(e) => e.stopPropagation()}
@@ -105,29 +97,7 @@ function useLightbox(bases: string[]) {
 }
 
 /* ------------------------------------------------------------------ */
-/* 4️⃣  Dynamic extension fallback helper                             */
-/* ------------------------------------------------------------------ */
-function dynamicExtFallback(img: HTMLImageElement) {
-  const base =
-    img.dataset.base ??
-    // strip everything after the last " . " to get the base
-    img.src.replace(/\.[^.]+$/, "");
-  if (!img.dataset.base) img.dataset.base = base;
-
-  const tried = parseInt(img.dataset.extIndex ?? "0", 10);
-  const nextIndex = tried + 1;
-
-  if (nextIndex < EXTENSIONS.length) {
-    img.src = `${base}.${EXTENSIONS[nextIndex]}`;
-    img.dataset.extIndex = String(nextIndex);
-  } else {
-    img.src = "/images/fallback.jpg";
-    img.classList.add("opacity-20");
-  }
-}
-
-/* ------------------------------------------------------------------ */
-/* 5️⃣  AboutSection component                                        */
+/* AboutSection component                                             */
 /* ------------------------------------------------------------------ */
 export default function AboutSection() {
   const lightbox = useLightbox(aboutImages);
@@ -142,7 +112,6 @@ export default function AboutSection() {
     <section className="bg-gray-800 py-12" ref={ref}>
       {lightbox.overlay}
       <div className="container mx-auto px-4">
-        {/* heading */}
         <motion.h2
           className="mb-8 text-center text-5xl font-bold text-white"
           initial="hidden"
@@ -156,9 +125,8 @@ export default function AboutSection() {
           About Us
         </motion.h2>
 
-        {/* outer flex */}
         <div className="relative mb-12 flex flex-col items-center rounded-lg bg-gray-100 p-6 shadow-2xl lg:flex-row">
-          {/* ---------- image carousel ---------- */}
+          {/* Carousel */}
           <div className="relative z-0 mb-8 w-full lg:mb-0 lg:w-1/2 lg:pr-8">
             <Swiper
               effect="fade"
@@ -168,14 +136,13 @@ export default function AboutSection() {
               modules={[EffectFade, Navigation, Autoplay]}
               className="h-64 w-full"
             >
-              {aboutImages.map((base, i) => (
-                <SwiperSlide key={base}>
+              {aboutImages.map((src, i) => (
+                <SwiperSlide key={src}>
                   <motion.img
-                    src={`${base}.jpg`}              /* first attempt */
+                    src={src}
                     alt={`About image ${i + 1}`}
                     className="h-64 w-full cursor-pointer rounded object-cover"
                     onClick={() => lightbox.show(i)}
-                    onError={(e) => dynamicExtFallback(e.currentTarget)} /* ⭐ NEW */
                     initial={{ opacity: 0 }}
                     animate={controls}
                     variants={{
@@ -189,7 +156,7 @@ export default function AboutSection() {
             </Swiper>
           </div>
 
-          {/* ---------- text block ---------- */}
+          {/* Text block */}
           <motion.div
             className="w-full lg:w-1/2 lg:pl-8"
             initial="hidden"
@@ -213,9 +180,9 @@ export default function AboutSection() {
           </motion.div>
         </div>
 
-        {/* ---------- mission & vision cards (unchanged) ---------- */}
+        {/* Mission & Vision Cards */}
         <div className="flex flex-col items-center justify-center lg:flex-row lg:space-x-8">
-          {/* Mission card */}
+          {/* Mission */}
           <motion.div
             className="flex w-full flex-col items-center lg:w-1/2"
             initial="hidden"
@@ -245,7 +212,7 @@ export default function AboutSection() {
             </div>
           </motion.div>
 
-          {/* Vision card */}
+          {/* Vision */}
           <motion.div
             className="mt-12 flex w-full flex-col items-center lg:mt-6 lg:w-1/2"
             initial="hidden"
