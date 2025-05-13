@@ -73,7 +73,7 @@ const SERVICES: readonly Service[] = [
     "Licensed testing and removal to keep your home free of asbestos hazards.",
     "AsbestosAbatement",
     "Asbestos",
-    10,
+    9,
   ),
   makeService(
     "General Repairs",
