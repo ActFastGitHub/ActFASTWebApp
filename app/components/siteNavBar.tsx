@@ -28,7 +28,7 @@ const Navbar: React.FC<NavbarProps> = ({ onPortalClick }) => {
       localStorageAccessCode === envAccessCode &&
       cookieAccessCode === envAccessCode
     ) {
-      router.push("/register");
+      router.push("/login");
     } else {
       if (localStorageAccessCode !== envAccessCode || !cookieAccessCode) {
         localStorage.removeItem("accessCode");
