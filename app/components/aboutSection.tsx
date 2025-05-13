@@ -13,32 +13,37 @@ import MissionImage from "@/app/images/mission.jpg";
 import VisionImage from "@/app/images/vision.jpg";
 
 /* ------------------------------------------------------------------ */
-/* 1️⃣  Hardcoded image paths for About carousel                      */
+/* 1️⃣  Simple list (we only store the *base* filename)               */
 /* ------------------------------------------------------------------ */
-const aboutImages = [
-  "/images/About/image (1).jpg",
-  "/images/About/image (2).jpg",
-  "/images/About/image (3).jpg",
-  "/images/About/image (4).jpg",
-  "/images/About/image (5).jpg",
-  "/images/About/image (6).jpg",
-  "/images/About/image (7).jpg",
-  "/images/About/image (8).jpg",
-  "/images/About/image (9).jpg",
-  "/images/About/image (10).jpg",
-  "/images/About/image (11).jpg",
-  "/images/About/image (12).jpg",
-];
+const IMAGE_COUNT = 12;
+const aboutImages = Array.from(
+  { length: IMAGE_COUNT },
+  (_, i) => `/images/About/image (${i + 1})`, // ← no extension yet
+);
 
 /* ------------------------------------------------------------------ */
-/* 2️⃣  Lightbox overlay logic                                        */
+/* 2️⃣  All extensions we’ll probe, in order of likelihood            */
 /* ------------------------------------------------------------------ */
-function useLightbox(imgs: string[]) {
+const EXTENSIONS = [
+  "jpg",
+  "JPG",
+  "jpeg",
+  "JPEG",
+  "png",
+  "PNG",
+  "webp",
+  "WEBP",
+] as const;
+
+/* ------------------------------------------------------------------ */
+/* 3️⃣  Lightbox overlay logic                                        */
+/* ------------------------------------------------------------------ */
+function useLightbox(bases: string[]) {
   const [open, setOpen] = React.useState(false);
   const [idx, setIdx] = React.useState(0);
 
-  const next = () => setIdx((i) => (i + 1) % imgs.length);
-  const prev = () => setIdx((i) => (i - 1 + imgs.length) % imgs.length);
+  const next = () => setIdx((i) => (i + 1) % bases.length);
+  const prev = () => setIdx((i) => (i - 1 + bases.length) % bases.length);
 
   const show = (i: number) => {
     setIdx(i);
@@ -53,7 +58,7 @@ function useLightbox(imgs: string[]) {
       if (e.key === "ArrowRight") next();
       if (e.key === "ArrowLeft") prev();
     },
-    [open]
+    [open],
   );
 
   useEffect(() => {
@@ -85,20 +90,10 @@ function useLightbox(imgs: string[]) {
       >
         ✕
       </button>
-      <button
-        className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded bg-black/60 p-2 text-white md:hidden"
-        onClick={(e) => { e.stopPropagation(); prev(); }}
-      >
-        ◀
-      </button>
-      <button
-        className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded bg-black/60 p-2 text-white md:hidden"
-        onClick={(e) => { e.stopPropagation(); next(); }}
-      >
-        ▶
-      </button>
       <img
-        src={imgs[idx]}
+        src={`${bases[idx]}.jpg`} // first guess
+        /* ⭐ NEW: same dynamic onError used inside the carousel */
+        onError={(e) => dynamicExtFallback(e.currentTarget)}
         alt=""
         className="max-h-full max-w-full object-contain"
         onClick={(e) => e.stopPropagation()}
@@ -110,14 +105,35 @@ function useLightbox(imgs: string[]) {
 }
 
 /* ------------------------------------------------------------------ */
-/* 3️⃣  AboutSection component                                       */
+/* 4️⃣  Dynamic extension fallback helper                             */
+/* ------------------------------------------------------------------ */
+function dynamicExtFallback(img: HTMLImageElement) {
+  const base =
+    img.dataset.base ??
+    // strip everything after the last " . " to get the base
+    img.src.replace(/\.[^.]+$/, "");
+  if (!img.dataset.base) img.dataset.base = base;
+
+  const tried = parseInt(img.dataset.extIndex ?? "0", 10);
+  const nextIndex = tried + 1;
+
+  if (nextIndex < EXTENSIONS.length) {
+    img.src = `${base}.${EXTENSIONS[nextIndex]}`;
+    img.dataset.extIndex = String(nextIndex);
+  } else {
+    img.src = "/images/fallback.jpg";
+    img.classList.add("opacity-20");
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* 5️⃣  AboutSection component                                        */
 /* ------------------------------------------------------------------ */
 export default function AboutSection() {
   const lightbox = useLightbox(aboutImages);
 
   const { ref, inView } = useInView({ threshold: 0.2, triggerOnce: true });
   const controls = useAnimation();
-
   useEffect(() => {
     if (inView) controls.start("visible");
   }, [inView, controls]);
@@ -126,6 +142,7 @@ export default function AboutSection() {
     <section className="bg-gray-800 py-12" ref={ref}>
       {lightbox.overlay}
       <div className="container mx-auto px-4">
+        {/* heading */}
         <motion.h2
           className="mb-8 text-center text-5xl font-bold text-white"
           initial="hidden"
@@ -139,7 +156,9 @@ export default function AboutSection() {
           About Us
         </motion.h2>
 
+        {/* outer flex */}
         <div className="relative mb-12 flex flex-col items-center rounded-lg bg-gray-100 p-6 shadow-2xl lg:flex-row">
+          {/* ---------- image carousel ---------- */}
           <div className="relative z-0 mb-8 w-full lg:mb-0 lg:w-1/2 lg:pr-8">
             <Swiper
               effect="fade"
@@ -149,20 +168,20 @@ export default function AboutSection() {
               modules={[EffectFade, Navigation, Autoplay]}
               className="h-64 w-full"
             >
-              {aboutImages.map((src, i) => (
-                <SwiperSlide key={src}>
+              {aboutImages.map((base, i) => (
+                <SwiperSlide key={base}>
                   <motion.img
-                    src={src}
+                    src={`${base}.jpg`}              /* first attempt */
                     alt={`About image ${i + 1}`}
                     className="h-64 w-full cursor-pointer rounded object-cover"
                     onClick={() => lightbox.show(i)}
-                    onError={(e) => {
-                      e.currentTarget.src = "/images/fallback.jpg";
-                      e.currentTarget.classList.add("opacity-20");
-                    }}
+                    onError={(e) => dynamicExtFallback(e.currentTarget)} /* ⭐ NEW */
                     initial={{ opacity: 0 }}
                     animate={controls}
-                    variants={{ visible: { opacity: 1 }, hidden: { opacity: 0 } }}
+                    variants={{
+                      visible: { opacity: 1 },
+                      hidden: { opacity: 0 },
+                    }}
                     transition={{ duration: 0.8 }}
                   />
                 </SwiperSlide>
@@ -170,6 +189,7 @@ export default function AboutSection() {
             </Swiper>
           </div>
 
+          {/* ---------- text block ---------- */}
           <motion.div
             className="w-full lg:w-1/2 lg:pl-8"
             initial="hidden"
@@ -193,8 +213,9 @@ export default function AboutSection() {
           </motion.div>
         </div>
 
+        {/* ---------- mission & vision cards (unchanged) ---------- */}
         <div className="flex flex-col items-center justify-center lg:flex-row lg:space-x-8">
-          {/* Mission Card */}
+          {/* Mission card */}
           <motion.div
             className="flex w-full flex-col items-center lg:w-1/2"
             initial="hidden"
@@ -224,7 +245,7 @@ export default function AboutSection() {
             </div>
           </motion.div>
 
-          {/* Vision Card */}
+          {/* Vision card */}
           <motion.div
             className="mt-12 flex w-full flex-col items-center lg:mt-6 lg:w-1/2"
             initial="hidden"
@@ -247,7 +268,8 @@ export default function AboutSection() {
                 <h3 className="mb-2 text-xl font-semibold">Our Vision</h3>
                 <p className="px-4 text-gray-600 sm:px-8 md:px-12 lg:px-4">
                   To be the leading restoration company known for innovation,
-                  reliability, and excellence—setting new standards for the industry.
+                  reliability, and excellence—setting new standards for the
+                  industry.
                 </p>
               </div>
             </div>
