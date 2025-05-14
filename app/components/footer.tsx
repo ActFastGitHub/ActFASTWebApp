@@ -8,6 +8,7 @@ import { useInView } from "react-intersection-observer";
 import facebookIcon from "@/app/images/facebookIcon.png";
 import instagramIcon from "@/app/images/instagramIcon.png";
 import AFlogo from "@/app/images/actfast-logo.jpg";
+import VersionInfo from "@/app/components/VersionInfo";
 
 const Footer: React.FC = () => {
   const { ref, inView } = useInView({ threshold: 0.2, triggerOnce: true });
@@ -129,6 +130,7 @@ const Footer: React.FC = () => {
             Built & maintained by{" "}
             <span className="font-semibold">Angelo Guerra</span>
           </p>
+          <VersionInfo />
         </motion.div>
       </div>
     </footer>

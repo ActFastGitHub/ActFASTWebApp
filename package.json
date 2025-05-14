@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "ts-node scripts/writeVersion.ts",
     "build": "prisma generate && next build",
     "postbuild": "next-sitemap",
     "start": "next start",
