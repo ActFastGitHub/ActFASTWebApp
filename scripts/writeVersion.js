@@ -1,6 +1,6 @@
-// scripts/writeVersion.ts
-import { execSync } from "child_process";
-import fs from "fs";
+// scripts/writeVersion.js
+const { execSync } = require("child_process");
+const fs = require("fs");
 
 const commitCount = execSync("git rev-list --count HEAD").toString().trim();
 const version = `1.${commitCount}`;
