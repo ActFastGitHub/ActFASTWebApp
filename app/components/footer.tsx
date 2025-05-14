@@ -14,7 +14,9 @@ const Footer: React.FC = () => {
 
   const controls = useAnimation();
 
-  useEffect(() => { if (inView) controls.start("visible"); }, [inView, controls]);
+  useEffect(() => {
+    if (inView) controls.start("visible");
+  }, [inView, controls]);
 
   return (
     <footer className="bg-gray-800 py-8 text-white">
@@ -48,6 +50,7 @@ const Footer: React.FC = () => {
         {/* Logo */}
         <motion.img
           src={AFlogo.src}
+          alt="ActFAST Restoration and Repairs Logo"
           className="mx-auto mb-4 h-12 w-auto bg-gray-500"
           initial="hidden"
           animate={controls}
@@ -86,7 +89,7 @@ const Footer: React.FC = () => {
             >
               <img
                 src={facebookIcon.src}
-                alt="Facebook"
+                alt="ActFast Facebook"
                 className="mr-2 h-6 w-6"
               />
               Facebook
@@ -99,7 +102,7 @@ const Footer: React.FC = () => {
             >
               <img
                 src={instagramIcon.src}
-                alt="Instagram"
+                alt="ActFast Instagram"
                 className="mr-2 h-6 w-6"
               />
               Instagram
@@ -119,11 +122,12 @@ const Footer: React.FC = () => {
           transition={{ duration: 0.5, delay: 0.6 }}
         >
           <p>
-            &copy; {new Date().getFullYear()} Restoration & Repairs.
-            All rights reserved.
+            &copy; {new Date().getFullYear()} Restoration & Repairs. All rights
+            reserved.
           </p>
           <p className="mt-1 text-xs">
-            Built & maintained by <span className="font-semibold">Angelo Guerra</span>
+            Built & maintained by{" "}
+            <span className="font-semibold">Angelo Guerra</span>
           </p>
         </motion.div>
       </div>
