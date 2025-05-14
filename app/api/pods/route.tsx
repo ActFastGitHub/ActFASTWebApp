@@ -22,54 +22,48 @@ export async function GET(request: Request) {
 
 // UPDATE
 export async function PATCH(request: Request) {
-	const session = await getServerSession(authOptions);
+  const session = await getServerSession(authOptions);
 
-	if (!session) {
-		return NextResponse.json({
-			message: "Unauthorized access",
-			status: 401
-		});
-	} else {
-		try {
-			const body = await request.json();
-			const { boxid, name, color } = body.data;
+  if (!session) {
+    return NextResponse.json({ message: "Unauthorized access", status: 401 });
+  }
 
-			// Retrieve the user's profile using their email from the session
-			const profile = await prisma.profile.findUnique({
-				where: {
-					userEmail: session.user.email
-				}
-			});
+  try {
+    const body = await request.json();
+    const {
+      boxid,       
+      name,
+      color,
+      length,
+      width,
+      height,
+      notes,
+    } = body.data;
 
-			if (!profile) {
-				return NextResponse.json({
-					message: "Profile not found",
-					status: 404
-				});
-			}
+    const profile = await prisma.profile.findUnique({
+      where: { userEmail: session.user.email },
+    });
+    if (!profile)
+      return NextResponse.json({ message: "Profile not found", status: 404 });
 
-			const updateBox = await prisma.box.update({
-				where: {
-					boxNumber: boxid
-				},
-				data: {
-					name,
-					color,
-					lastModifiedBy: {
-						connect: {
-							nickname: profile.nickname!
-						}
-					}
-				}
-			});
+    const updateBox = await prisma.box.update({
+      where: { boxNumber: boxid },
+      data: {
+        name,
+        color,
+        length, 
+        width,
+        height,
+        notes,
+        lastModifiedBy: {
+          connect: { nickname: profile.nickname! },
+        },
+      },
+    });
 
-			return NextResponse.json({ updateBox, status: 200 });
-		} catch (error) {
-			const { code = 500, message = "Internal server error" } = error as APIErr;
-			return NextResponse.json({
-				status: code,
-				error: message
-			});
-		}
-	}
+    return NextResponse.json({ updateBox, status: 200 });
+  } catch (error) {
+    const { code = 500, message = "Internal server error" } = error as APIErr;
+    return NextResponse.json({ status: code, error: message });
+  }
 }

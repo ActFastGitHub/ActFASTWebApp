@@ -108,6 +108,13 @@ model Box {
   name             String
   color            String
   level            Int
+
+    // New fields
+  length           Float?
+  width            Float?
+  height           Float?
+  notes            String?
+  
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   lastModifiedById String?
