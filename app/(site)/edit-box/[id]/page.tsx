@@ -27,6 +27,21 @@ const dateRangeOptions = [
   { value: "all", label: "All Time" },
 ];
 
+const getLevelLabel = (level: string) => {
+  switch (level) {
+    case "1":
+      return "Niflo Level 1";
+    case "2":
+      return "Niflo Level 2";
+    case "3":
+      return "Vangie Level 1";
+    case "4":
+      return "Vangie Level 2";
+    default:
+      return `Level ${level}`;
+  }
+};
+
 /* ─────────── Types ─────────── */
 interface EditBoxProps {
   params: { id: string };
@@ -176,7 +191,8 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
           .filter((i: any) => i.packedStatus === "In")
           .sort(
             (a: any, b: any) =>
-              new Date(b.packedInAt).getTime() - new Date(a.packedInAt).getTime(),
+              new Date(b.packedInAt).getTime() -
+              new Date(a.packedInAt).getTime(),
           ),
       );
       setPackedOutItems(
@@ -184,7 +200,8 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
           .filter((i: any) => i.packedStatus === "Out")
           .sort(
             (a: any, b: any) =>
-              new Date(b.packedOutAt).getTime() - new Date(a.packedOutAt).getTime(),
+              new Date(b.packedOutAt).getTime() -
+              new Date(a.packedOutAt).getTime(),
           ),
       );
     } catch (err) {
@@ -272,7 +289,9 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
   const filteredPackedIn = useMemo(
     () =>
       packedInItems.filter((it) =>
-        `${it.name} ${it.description}`.toLowerCase().includes(searchTermIn.toLowerCase()),
+        `${it.name} ${it.description}`
+          .toLowerCase()
+          .includes(searchTermIn.toLowerCase()),
       ),
     [packedInItems, searchTermIn],
   );
@@ -328,10 +347,10 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
 
         {/* Level */}
         <div className="mb-4">
-          <label className="block text-sm font-medium">Level</label>
+          <label className="block text-sm font-medium">Location</label>
           <input
             type="text"
-            value={level}
+            value={getLevelLabel(level)}
             disabled
             className="mt-1 w-full rounded border p-2"
           />
@@ -371,7 +390,8 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
           </div>
           <div className="mt-2 text-sm text-gray-600">
             <p>
-              Floor Area: <span className="font-medium">{floorArea.toFixed(2)} ft²</span>
+              Floor Area:{" "}
+              <span className="font-medium">{floorArea.toFixed(2)} ft²</span>
             </p>
             <p>
               Dimensions:{" "}
@@ -498,9 +518,7 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
                   </div>
                 </div>
 
-                {showDetails[it.id] && (
-                  <ItemDetails item={it} />
-                )}
+                {showDetails[it.id] && <ItemDetails item={it} />}
               </div>
             ))}
             {/* Pagination */}
@@ -694,27 +712,25 @@ const PackedItemsSection: React.FC<PackedProps> = ({
                 >
                   {showDetails[it.id] ? <FaEyeSlash /> : <FaEye />}
                 </button>
-                {out ? (
-                  /* Packed-Out can be re-linked */
-                  onLink && (
-                    <button
-                      onClick={() => onLink(it.id)}
-                      className="rounded bg-green-500 p-2 text-white hover:bg-green-600"
-                    >
-                      <FaLink />
-                    </button>
-                  )
-                ) : (
-                  /* Packed-In can be un-linked */
-                  onUnlink && (
-                    <button
-                      onClick={() => onUnlink(it.id)}
-                      className="rounded bg-red-500 p-2 text-white hover:bg-red-600"
-                    >
-                      <FaUnlink />
-                    </button>
-                  )
-                )}
+                {out
+                  ? /* Packed-Out can be re-linked */
+                    onLink && (
+                      <button
+                        onClick={() => onLink(it.id)}
+                        className="rounded bg-green-500 p-2 text-white hover:bg-green-600"
+                      >
+                        <FaLink />
+                      </button>
+                    )
+                  : /* Packed-In can be un-linked */
+                    onUnlink && (
+                      <button
+                        onClick={() => onUnlink(it.id)}
+                        className="rounded bg-red-500 p-2 text-white hover:bg-red-600"
+                      >
+                        <FaUnlink />
+                      </button>
+                    )}
               </div>
             </div>
 
