@@ -11,6 +11,7 @@
     "lint": "next lint",
     "seed": "ts-node prisma/seed.ts",
     "project_seed": "ts-node prisma/project_seed.ts",
+    "seed_new_boxes": "ts-node prisma/newBoxesSeed.ts",
     "update_project_status": "ts-node prisma/updateProjectStatus.ts"
   },
   "dependencies": {

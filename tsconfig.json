@@ -6,8 +6,8 @@
     "strict": true,
     "noEmit": true,
     "esModuleInterop": true,
-    "module": "ESNext", // esnext for normal, CommonJS to seed
-    "moduleResolution": "Bundler", // Bundler for normal, Node to seed
+    "module": "CommonJS", // ESNext for normal, CommonJS to seed
+    "moduleResolution": "Node", // Bundler for normal, Node to seed
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",

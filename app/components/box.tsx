@@ -1,4 +1,4 @@
-// components/box.tsx
+// app/components/box.tsx
 
 import React from 'react';
 import { useRouter } from 'next/navigation';

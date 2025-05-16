@@ -1,3 +1,5 @@
+// app/(site)/edit-box/[id]/page.tsx
+
 "use client";
 
 import axios from "axios";
