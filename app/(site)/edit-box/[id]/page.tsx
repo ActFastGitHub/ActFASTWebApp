@@ -219,7 +219,7 @@ const EditBox: React.FC<EditBoxProps> = ({ params }) => {
       const res = await axios.patch("/api/pods", {
         data: {
           boxid: id,
-          name: name.toUpperCase(),
+          name: name.toUpperCase().trim(),
           color,
           length: length ? parseFloat(length) : undefined,
           width: width ? parseFloat(width) : undefined,
