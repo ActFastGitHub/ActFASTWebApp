@@ -1,14 +1,10 @@
-// app/components/boxNames.tsx
+// // app/components/boxNames.tsx
 
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  groupAndCountNames,
-  GroupedName,
-} from "@/app/utils/groupAndCountNames";
+import { groupAndCountNames, GroupedName } from "@/app/utils/groupAndCountNames";
 
-/* ───────────── Types ───────────── */
 export interface Box {
   id: string;
   boxNumber: string;
@@ -21,18 +17,19 @@ export interface Box {
   items: any[];
 }
 
-/* ─────────── Component ─────────── */
+const getLocation = (level: number): "Niflo" | "Vangie" => {
+  return level === 1 || level === 2 ? "Niflo" : "Vangie";
+};
+
 const BoxList = () => {
   const [groupedNames, setGroupedNames] = useState<GroupedName[]>([]);
+  const [rawBoxes, setRawBoxes] = useState<Box[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  /* search + sort state */
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<"name" | "count">("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
-  /* data fetch */
   useEffect(() => {
     (async () => {
       try {
@@ -40,6 +37,7 @@ const BoxList = () => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Request failed");
 
+        setRawBoxes(data.boxes);
         const grouped = groupAndCountNames(data.boxes);
         setGroupedNames(grouped);
       } catch (err: any) {
@@ -50,7 +48,6 @@ const BoxList = () => {
     })();
   }, []);
 
-  /* helpers */
   const toggleSort = (key: "name" | "count") => {
     if (key === sortKey) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -60,18 +57,15 @@ const BoxList = () => {
     }
   };
 
-  /* memoised filter + sort */
   const visible = useMemo(() => {
-    /* filter */
     const q = query.trim().toLowerCase();
     let out = groupedNames.filter(
       ({ name, boxNumbers }) =>
         !q ||
         name.toLowerCase().includes(q) ||
-        boxNumbers.some((n) => n.includes(q)),
+        boxNumbers.some((n) => n.toLowerCase().includes(q))
     );
 
-    /* sort */
     out = [...out].sort((a, b) => {
       const cmp =
         sortKey === "name"
@@ -83,7 +77,26 @@ const BoxList = () => {
     return out;
   }, [groupedNames, query, sortKey, sortDir]);
 
-  /* ─────────── UI states ─────────── */
+  const nameToLocationData = useMemo(() => {
+    const map: Record<
+      string,
+      { Niflo: string[]; Vangie: string[] }
+    > = {};
+
+    for (const box of rawBoxes) {
+      const nameKey = box.name || "(Unnamed)";
+      const location = getLocation(box.level);
+
+      if (!map[nameKey]) {
+        map[nameKey] = { Niflo: [], Vangie: [] };
+      }
+
+      map[nameKey][location].push(box.boxNumber);
+    }
+
+    return map;
+  }, [rawBoxes]);
+
   if (loading)
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -98,7 +111,6 @@ const BoxList = () => {
       </div>
     );
 
-  /* ──────────── Render ──────────── */
   return (
     <section className="mx-auto max-w-screen-xl px-4 py-8">
       <h1 className="mb-6 text-center text-2xl font-bold sm:text-3xl md:text-4xl">
@@ -107,7 +119,6 @@ const BoxList = () => {
 
       {/* Controls */}
       <div className="mx-auto mb-6 flex max-w-xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        {/* search */}
         <input
           type="search"
           placeholder="Search by name or pod number…"
@@ -116,7 +127,6 @@ const BoxList = () => {
           className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500 sm:max-w-xs sm:text-base"
         />
 
-        {/* sort buttons */}
         <div className="flex gap-2">
           {(["name", "count"] as const).map((key) => {
             const active = sortKey === key;
@@ -139,39 +149,80 @@ const BoxList = () => {
         </div>
       </div>
 
-      {/* responsive grid */}
+      {/* Cards */}
       <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-        {visible.map(({ name, count, boxNumbers }) => (
-          <li
-            key={name}
-            className="relative overflow-hidden rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition hover:shadow-md"
-          >
-            {/* count badge */}
-            <span className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white sm:h-8 sm:w-8 sm:text-sm md:h-9 md:w-9 md:text-base">
-              {count}
-            </span>
+        {visible.map(({ name }) => {
+          const locData = nameToLocationData[name] || {
+            Niflo: [],
+            Vangie: [],
+          };
+          const nifloCount = locData.Niflo.length;
+          const vangieCount = locData.Vangie.length;
 
-            {/* name */}
-            <h2 className="pr-10 text-base font-semibold text-gray-800 sm:text-lg md:text-xl">
-              {name}
-            </h2>
+          return (
+            <li
+              key={name}
+              className="relative overflow-hidden rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition hover:shadow-md"
+            >
+              {/* Dual badge counts */}
+              <div className="absolute right-2 top-2 flex gap-1">
+                {nifloCount > 0 && (
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-green-600 text-xs font-bold text-white sm:h-7 sm:w-7 sm:text-sm">
+                    {nifloCount}
+                  </span>
+                )}
+                {vangieCount > 0 && (
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-purple-600 text-xs font-bold text-white sm:h-7 sm:w-7 sm:text-sm">
+                    {vangieCount}
+                  </span>
+                )}
+              </div>
 
-            {/* pod chips */}
-            <div className="mt-2 flex flex-wrap gap-1">
-              {boxNumbers.map((num) => (
-                <span
-                  key={num}
-                  className="rounded-full bg-gray-300 px-2 py-0.5 text-[0.65rem] font-medium text-gray-700 sm:text-xs md:text-sm"
-                >
-                  {num}
-                </span>
-              ))}
-            </div>
-          </li>
-        ))}
+              {/* name */}
+              <h2 className="mb-2 pr-10 text-base font-semibold text-gray-800 sm:text-lg md:text-xl">
+                {name}
+              </h2>
+
+              {/* Niflo pod chips */}
+              {nifloCount > 0 && (
+                <div className="mb-2">
+                  <p className="text-xs font-semibold text-green-700">Niflo</p>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {locData.Niflo.map((num) => (
+                      <span
+                        key={num}
+                        className="rounded-full bg-green-100 px-2 py-0.5 text-[0.65rem] font-medium text-green-800 sm:text-xs md:text-sm"
+                      >
+                        {num}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Vangie pod chips */}
+              {vangieCount > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-purple-700">Vangie</p>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {locData.Vangie.map((num) => (
+                      <span
+                        key={num}
+                        className="rounded-full bg-purple-100 px-2 py-0.5 text-[0.65rem] font-medium text-purple-800 sm:text-xs md:text-sm"
+                      >
+                        {num}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </section>
   );
 };
 
 export default BoxList;
+
