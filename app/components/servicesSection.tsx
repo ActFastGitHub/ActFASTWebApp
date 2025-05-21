@@ -80,7 +80,7 @@ const SERVICES: readonly Service[] = [
     "Skilled carpentry, drywall, and finishing to restore any part of your home.",
     "GeneralRepairs",
     "Repairs",
-    12,
+    14,
   ),
   makeService(
     "Contents Restoration",

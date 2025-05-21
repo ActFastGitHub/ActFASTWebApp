@@ -1,375 +1,253 @@
+// Updated Projects Page: Styled with Toggleable Details & Icon Buttons
 "use client";
 
-import React, { useEffect, useState, FormEvent } from "react";
+import React, { useEffect, useState, FormEvent, ChangeEvent } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/app/components/navBar";
 import { Project } from "@/app/libs/interfaces";
-import { Swiper, SwiperSlide } from "swiper/react";
-import "swiper/css";
-import "swiper/css/effect-flip";
-import "swiper/css/pagination";
-import "swiper/css/navigation";
-import { EffectFlip, Pagination, Navigation } from "swiper/modules";
 import toast from "react-hot-toast";
 import axios from "axios";
+import {
+  FaEdit,
+  FaTrashAlt,
+  FaEye,
+  FaEyeSlash,
+  FaSave,
+} from "react-icons/fa";
 
-type EditProjectData = {
-  [key: string]: Partial<Project>;
-};
+const ITEMS_PER_PAGE = 6;
 
-type ProjectField = keyof Project;
+type ProjectPartial = Partial<Project>;
+type EditProjectData = { [key: string]: ProjectPartial };
 
-const ViewAllProjects = () => {
+const ViewAllProjects: React.FC = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [projects, setProjects] = useState<Partial<Project>[]>([]);
-  const [filteredProjects, setFilteredProjects] = useState<Partial<Project>[]>([]);
+  const [projects, setProjects] = useState<ProjectPartial[]>([]);
+  const [filteredProjects, setFilteredProjects] = useState<ProjectPartial[]>([]);
   const [editProjectData, setEditProjectData] = useState<EditProjectData>({});
-  const [isMounted, setIsMounted] = useState(false);
-  const [newProjectCode, setNewProjectCode] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [showMoreDetails, setShowMoreDetails] = useState<string | null>(null);
+  const [newProjectCode, setNewProjectCode] = useState("");
   const [editableProjectId, setEditableProjectId] = useState<string | null>(null);
+  const [showDetails, setShowDetails] = useState<{ [key: string]: boolean }>({});
   const [disabled, setDisabled] = useState(false);
-  const [totalProjects, setTotalProjects] = useState(0);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [sortOrder, setSortOrder] = useState<string>("");
 
   const fetchProjects = async () => {
     try {
       const response = await axios.get("/api/projects");
-      const sortedProjects = response.data.projects.sort(
-        (a: Partial<Project>, b: Partial<Project>) => {
-          if (a.code && b.code) {
-            return b.code.localeCompare(a.code);
-          }
-          return 0;
-        }
-      );
-      setProjects(sortedProjects);
-      setFilteredProjects(sortedProjects);
-      setTotalProjects(sortedProjects.length);
-    } catch (error) {
-      console.error("Error fetching projects:", error);
+      const sorted: ProjectPartial[] = response.data.projects.sort((a: ProjectPartial, b: ProjectPartial) => (b.code ?? "").localeCompare(a.code ?? ""));
+      setProjects(sorted);
+      setFilteredProjects(sorted);
+    } catch {
       toast.error("Failed to fetch projects");
     }
   };
 
   useEffect(() => {
-    if (session?.user.email) fetchProjects();
-  }, [session?.user.email]);
+    if (session?.user?.email) fetchProjects();
+    if (status !== "loading" && !session) router.push("/login");
+  }, [session, status]);
 
-  useEffect(() => {
-    if (status !== "loading" && !session) {
-      router.push("/login");
-    }
-    setIsMounted(true);
-  }, [session, status, router]);
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const q = e.target.value.toUpperCase();
+    setSearchQuery(q);
+    const filtered = projects.filter((p) =>
+      [p.code, p.insured, p.adjuster, p.claimNo, p.address, p.email].some((f) =>
+        (f ?? "").toUpperCase().includes(q)
+      )
+    );
+    setFilteredProjects(filtered);
+    setCurrentPage(1);
+  };
+
+  const handleSortChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    setSortOrder(value);
+    const sorted = [...filteredProjects].sort((a, b) => {
+      const nameA = a.code?.toUpperCase() || "";
+      const nameB = b.code?.toUpperCase() || "";
+      return value === "asc" ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+    });
+    setFilteredProjects(sorted);
+  };
 
   const handleCreateProject = async () => {
     if (newProjectCode.trim() === "") return;
-
     try {
-      const response = await axios.post("/api/projects", {
-        code: newProjectCode.trim().toUpperCase(),
-      });
+      const response = await axios.post("/api/projects", { code: newProjectCode.trim().toUpperCase() });
       if (response.data.status === 201) {
-        const newProject = response.data.project;
-        const updatedProjects = [newProject, ...projects].sort((a, b) =>
-          b.code!.localeCompare(a.code!)
-        );
-        setProjects(updatedProjects);
-        setFilteredProjects(updatedProjects);
+        toast.success("Project created");
+        fetchProjects();
         setNewProjectCode("");
-        setTotalProjects(updatedProjects.length);
-        toast.success("Project created successfully!");
-      } else {
-        toast.error(
-          response.data.message || "An error occurred while creating the project."
-        );
-      }
-    } catch (error) {
-      console.error("Error creating project:", error);
-      toast.error("An error occurred while creating the project.");
+      } else toast.error(response.data.message || "Failed to create");
+    } catch {
+      toast.error("Failed to create project");
     }
   };
 
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
-    const filtered = projects.filter(
-      (project) =>
-        project.code?.toUpperCase().includes(e.target.value.toUpperCase()) ||
-        project.insured?.toUpperCase().includes(e.target.value.toUpperCase())
-    );
-    setFilteredProjects(filtered);
-  };
+  const paginated = filteredProjects.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(filteredProjects.length / ITEMS_PER_PAGE);
 
-  const toggleMoreDetails = (projectId: string) => {
-    if (showMoreDetails === projectId) {
-      setShowMoreDetails(null);
-    } else {
-      setShowMoreDetails(projectId);
+  const handleEditToggle = (id: string) => {
+    setEditableProjectId(editableProjectId === id ? null : id);
+    if (!editProjectData[id]) {
+      const project = projects.find((p) => p.id === id);
+      if (project) setEditProjectData((prev) => ({ ...prev, [id]: { ...project } }));
     }
   };
 
-  const handleEditToggle = (projectId: string) => {
-    setEditableProjectId((prevId) => (prevId === projectId ? null : projectId));
-    if (!editProjectData[projectId]) {
-      const project = projects.find((proj) => proj.id === projectId);
-      if (project) {
-        setEditProjectData((prevData) => ({
-          ...prevData,
-          [projectId]: { ...project },
-        }));
-      }
-    }
-  };
-
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-    projectId: string
-  ) => {
+  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>, id: string) => {
     const { name, value } = e.target;
-    setEditProjectData((prevData) => ({
-      ...prevData,
-      [projectId]: {
-        ...prevData[projectId],
-        [name]: value,
-      },
+    setEditProjectData((prev) => ({
+      ...prev,
+      [id]: { ...prev[id], [name]: value },
     }));
   };
 
-  const updateProject = async (projectId: string, e: FormEvent) => {
+  const updateProject = async (id: string, e: FormEvent) => {
     e.preventDefault();
     setDisabled(true);
-    const loadingToastId = toast.loading("Updating project...");
-
+    toast.loading("Saving changes...");
     try {
-      const response = await axios.patch("/api/projects", editProjectData[projectId]);
-
-      toast.dismiss(loadingToastId);
-
-      if (response.data.status !== 200) {
-        const errorMessage = response.data?.message || "An error occurred";
-        toast.error(errorMessage);
-        setTimeout(() => setDisabled(false), 2000);
-      } else {
-        toast.success("Project successfully updated");
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
-      }
-    } catch (error) {
-      console.error("Error updating project:", error);
-      toast.dismiss(loadingToastId);
-      toast.error("An error occurred while updating the project.");
-      setTimeout(() => setDisabled(false), 2000);
+      const response = await axios.patch("/api/projects", editProjectData[id]);
+      toast.dismiss();
+      if (response.data.status === 200) toast.success("Updated");
+      else toast.error("Error updating project");
+      setTimeout(() => window.location.reload(), 1000);
+    } catch {
+      toast.dismiss();
+      toast.error("Failed to save");
     }
   };
 
-  const deleteProject = async (projectId: string) => {
+  const deleteProject = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this project?")) return;
     setDisabled(true);
-    const loadingToastId = toast.loading("Deleting project...");
-
+    toast.loading("Deleting...");
     try {
-      const response = await axios.delete("/api/projects", {
-        data: { id: projectId },
-      });
-
-      toast.dismiss(loadingToastId);
-
-      if (response.data.status === 200) {
-        toast.success("Project deleted successfully");
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
-      } else {
-        toast.error(
-          response.data.message || "An error occurred while deleting the project."
-        );
-        setTimeout(() => setDisabled(false), 2000);
-      }
-    } catch (error) {
-      console.error("Error deleting project:", error);
-      toast.dismiss(loadingToastId);
-      toast.error("An error occurred while deleting the project.");
-      setTimeout(() => setDisabled(false), 2000);
+      await axios.delete("/api/projects", { data: { id } });
+      toast.dismiss();
+      toast.success("Deleted");
+      setTimeout(() => window.location.reload(), 1000);
+    } catch {
+      toast.dismiss();
+      toast.error("Delete failed");
     }
   };
 
-  if (!isMounted) return null;
+  const toggleDetails = (id: string) => {
+    setShowDetails((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
   return (
-    <div className="relative min-h-screen bg-gray-100">
+    <div className="bg-gray-100 min-h-screen">
       <Navbar />
-      <div className="p-6 pt-24">
-        <div className="mb-6 flex flex-col items-center justify-between space-y-4 sm:flex-row sm:space-y-0">
-          <h1 className="text-3xl font-bold">View All Projects</h1>
-          <div className="text-lg font-semibold">
-            Total Projects: {totalProjects}
-          </div>
-          <div className="flex flex-col items-center space-y-4 sm:flex-row sm:space-x-4 sm:space-y-0">
+      <div className="pt-24 px-4 max-w-6xl mx-auto">
+        <h1 className="text-3xl font-bold mb-4">Project Details</h1>
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <input
+            type="text"
+            placeholder="Search by code, insured, adjuster..."
+            value={searchQuery}
+            onChange={handleSearch}
+            className="px-4 py-2 border rounded w-full sm:w-1/3"
+          />
+          <select
+            className="px-4 py-2 border rounded w-full sm:w-1/4"
+            value={sortOrder}
+            onChange={handleSortChange}
+          >
+            <option value="">Sort by</option>
+            <option value="asc">Name Ascending</option>
+            <option value="desc">Name Descending</option>
+          </select>
+          <div className="flex w-full sm:w-1/3 items-center gap-2">
             <input
               type="text"
-              value={searchQuery}
-              onChange={handleSearch}
-              placeholder="Search by code or insured"
-              className="w-full rounded border px-4 py-2 sm:w-auto"
+              placeholder="New Project Code"
+              value={newProjectCode}
+              onChange={(e) => setNewProjectCode(e.target.value)}
+              className="px-4 py-2 border rounded w-full"
             />
-            {["admin", "lead"].includes(session?.user.role) && (
-              <>
-                <input
-                  type="text"
-                  value={newProjectCode}
-                  onChange={(e) => setNewProjectCode(e.target.value)}
-                  placeholder="Enter project code"
-                  className="w-full rounded border px-4 py-2 sm:w-auto"
-                />
-                <button
-                  onClick={handleCreateProject}
-                  className="w-full rounded bg-blue-500 px-4 py-2 font-bold text-white hover:bg-blue-600 sm:w-auto"
-                >
-                  Create Project
-                </button>
-              </>
-            )}
+            <button
+              onClick={handleCreateProject}
+              className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+            >
+              Create
+            </button>
           </div>
         </div>
-        {filteredProjects.length > 0 ? (
-          <Swiper
-            effect="flip"
-            grabCursor={true}
-            pagination={false}
-            navigation={true}
-            modules={[EffectFlip, Pagination, Navigation]}
-            className="mySwiper mx-auto w-full max-w-lg"
-          >
-            {filteredProjects.map((project) => (
-              <SwiperSlide key={project?.id}>
-                <div className="mx-auto w-full max-w-lg rounded-lg bg-white p-6 shadow-lg">
-                  <div className="flex flex-col items-center">
-                    <div className="mt-4 text-center">
-                      <div className="text-2xl font-bold truncate w-full">
-                        {editableProjectId === project?.id ? (
-                          <input
-                            type="text"
-                            name="code"
-                            value={
-                              editProjectData[project?.id]?.code || project?.code || ""
-                            }
-                            onChange={(e) => handleChange(e, project?.id!)}
-                            className="ml-2 w-full rounded border px-2 py-1"
-                          />
-                        ) : (
-                          project?.code
-                        )}
-                      </div>
-                      <p className="text-gray-600 break-words">{project?.address}</p>
-                    </div>
-                    <div className="mt-6 w-full space-y-4">
-                      {(["insured", "address", "phoneNumber", "typeOfDamage", "category"] as ProjectField[]).map((field) => (
-                        <p key={field} className="flex flex-col sm:flex-row sm:items-center text-lg break-words">
-                          <strong className="sm:w-1/3">{field.replace(/([A-Z])/g, ' $1')}: </strong>
-                          {editableProjectId === project?.id ? (
-                            <input
-                              type="text"
-                              name={field}
-                              value={
-                                editProjectData[project?.id]?.[field] || project?.[field] || ""
-                              }
-                              onChange={(e) => handleChange(e, project?.id!)}
-                              className="ml-2 w-full rounded border px-2 py-1"
-                            />
-                          ) : (
-                            <span className="sm:w-2/3">{project?.[field]}</span>
-                          )}
-                        </p>
-                      ))}
-                      {showMoreDetails === project?.id && (
-                        <div className="mt-4 w-full space-y-4">
-                          {(["email", "insuranceProvider", "claimNo", "adjuster", "dateOfLoss", "dateAttended", "lockBoxCode", "notes"] as ProjectField[]).map((field) => (
-                            <p key={field} className="flex flex-col sm:flex-row sm:items-center text-lg break-words">
-                              <strong className="sm:w-1/3">{field.replace(/([A-Z])/g, ' $1')}: </strong>
-                              {editableProjectId === project?.id ? (
-                                field === "notes" ? (
-                                  <textarea
-                                    name={field}
-                                    value={
-                                      editProjectData[project?.id]?.[field] || project?.[field] || ""
-                                    }
-                                    onChange={(e) => handleChange(e, project?.id!)}
-                                    className="ml-2 w-full rounded border px-2 py-1"
-                                  />
-                                ) : (
-                                  <input
-                                    type={field.includes("date") ? "date" : "text"}
-                                    name={field}
-                                    value={
-                                      editProjectData[project?.id]?.[field] || project?.[field] || ""
-                                    }
-                                    onChange={(e) => handleChange(e, project?.id!)}
-                                    className="ml-2 w-full rounded border px-2 py-1"
-                                  />
-                                )
-                              ) : (
-                                <span className="sm:w-2/3">{project?.[field]}</span>
-                              )}
-                            </p>
-                          ))}
-                        </div>
-                      )}
-                      <button
-                        className="mt-4 w-full rounded bg-gray-200 py-2 font-bold text-black hover:bg-gray-300"
-                        onClick={() => toggleMoreDetails(project?.id!)}
-                      >
-                        {showMoreDetails === project?.id
-                          ? "Hide Details"
-                          : "Show More Details"}
-                      </button>
-                    </div>
-                    {["admin", "lead"].includes(session?.user.role) && (
-                      <div className="mt-6 w-full space-y-4">
-                        {editableProjectId === project?.id && (
-                          <button
-                            className={`w-full rounded py-2 ${
-                              disabled
-                                ? "cursor-not-allowed bg-green-500 text-white opacity-50"
-                                : "bg-green-500 text-white hover:bg-green-600"
-                            }`}
-                            onClick={(e) => updateProject(project?.id!, e)}
-                            disabled={disabled}
-                          >
-                            Save Changes
-                          </button>
-                        )}
-                        <button
-                          className={`w-full rounded py-2 ${
-                            editableProjectId === project?.id
-                              ? "bg-red-500 text-white hover:bg-red-600"
-                              : "bg-blue-500 text-white hover:bg-blue-600"
-                          }`}
-                          onClick={() => handleEditToggle(project?.id!)}
-                          disabled={disabled}
-                        >
-                          {editableProjectId === project?.id
-                            ? "Cancel Editing"
-                            : "Edit Project"}
-                        </button>
-                        <button
-                          className="w-full rounded bg-red-500 py-2 font-bold text-white hover:bg-red-600"
-                          onClick={() => deleteProject(project?.id!)}
-                          disabled={disabled}
-                        >
-                          Delete Project
-                        </button>
-                      </div>
-                    )}
-                  </div>
+
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {paginated.map((project) => (
+            <div
+              key={project.id}
+              className="bg-white rounded-lg shadow p-4 hover:shadow-lg transition"
+            >
+              <div className="flex justify-between items-start">
+                <div className="text-lg font-bold text-blue-700 truncate">
+                  {project.code}
                 </div>
-              </SwiperSlide>
-            ))}
-          </Swiper>
-        ) : (
-          <p>No projects found.</p>
+                <div className="flex gap-2">
+                  <button onClick={() => toggleDetails(project.id!)} className="text-gray-500 hover:text-black">
+                    {showDetails[project.id!] ? <FaEyeSlash /> : <FaEye />}
+                  </button>
+                  <button onClick={() => handleEditToggle(project.id!)} className="text-blue-600 hover:text-blue-800">
+                    <FaEdit />
+                  </button>
+                  <button onClick={() => deleteProject(project.id!)} className="text-red-600 hover:text-red-800">
+                    <FaTrashAlt />
+                  </button>
+                </div>
+              </div>
+              {showDetails[project.id!] && (
+                <form onSubmit={(e) => updateProject(project.id!, e)} className="mt-3 space-y-2 text-sm">
+                  {["code", "insured", "address", "adjuster", "claimNo", "email", "phoneNumber", "insuranceProvider", "typeOfDamage", "category", "dateOfLoss", "dateAttended", "lockBoxCode", "notes"].map((field) => (
+                    <input
+                      key={field}
+                      name={field}
+                      placeholder={field}
+                      value={editProjectData[project.id!]?.[field as keyof Project] ?? project[field as keyof Project] ?? ""}
+                      onChange={(e) => handleChange(e, project.id!)}
+                      disabled={editableProjectId !== project.id}
+                      className="w-full rounded border px-3 py-1"
+                    />
+                  ))}
+                  {editableProjectId === project.id && (
+                    <button
+                      type="submit"
+                      className="flex items-center justify-center gap-2 rounded bg-green-600 px-3 py-2 text-white hover:bg-green-700"
+                    >
+                      <FaSave /> Save Changes
+                    </button>
+                  )}
+                </form>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {totalPages > 1 && (
+          <div className="mt-8 flex justify-center space-x-2">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 rounded bg-gray-300 hover:bg-gray-400 disabled:opacity-50"
+            >
+              Prev
+            </button>
+            <span className="px-2 text-sm">Page {currentPage} of {totalPages}</span>
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 rounded bg-gray-300 hover:bg-gray-400 disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
         )}
       </div>
     </div>
