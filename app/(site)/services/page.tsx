@@ -31,7 +31,7 @@ const water     = gen("WaterDamage",       "Water",    45);
 const fire      = gen("FireDamage",        "Fire",     52);
 const mold      = gen("MoldRemediation",   "Mold",     31);
 const asbestos  = gen("AsbestosAbatement", "Asbestos", 9);
-const repairs   = gen("GeneralRepairs",    "Repairs",  12);
+const repairs   = gen("GeneralRepairs",    "Repairs",  14);
 const contents  = gen("ContentsRestoration","Contents",35);
 
 /* ------------------------------------------------------------------ */

@@ -119,4 +119,3 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onPortalClick }) => {
 };
 
 export default HeroSection;
-
