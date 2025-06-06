@@ -28,6 +28,13 @@ const aboutImages = [
   "/images/About/image (10).jpg",
   "/images/About/image (11).jpg",
   "/images/About/image (12).jpg",
+  "/images/About/image (13).jpg",
+  "/images/About/image (14).jpg",
+  "/images/About/image (15).jpg",
+  "/images/About/image (16).jpg",
+  "/images/About/image (17).jpg",
+  "/images/About/image (18).jpg",
+  "/images/About/image (19).jpg",
 ];
 
 /* ------------------------------------------------------------------ */
