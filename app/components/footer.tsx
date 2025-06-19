@@ -46,6 +46,9 @@ const Footer: React.FC = () => {
           <Link href="/teampage" className="hover:underline">
             Team
           </Link>
+          <Link href="/privacypolicy" className="hover:underline">
+            Privacy Policy
+          </Link>
         </motion.div>
 
         {/* Logo */}
