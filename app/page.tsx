@@ -13,6 +13,7 @@ const Footer            = dynamic(() => import("@/app/components/footer"));
 
 import HeroSection        from "@/app/components/heroSection";
 import StickyContactButtons from "@/app/components/stickyContactButtons";
+import ContactUsSection from "@/app/components/ContactUs";
 import Modal               from "@/app/components/modal";
 
 export default function Home() {
@@ -48,6 +49,7 @@ export default function Home() {
         <ServicesSection />
         <AboutSection />
         <TestimonialsSection />
+        <ContactUsSection />
         <Footer />
       </div>
 
