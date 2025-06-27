@@ -10,10 +10,11 @@ const ServicesSection   = dynamic(() => import("@/app/components/servicesSection
 const AboutSection      = dynamic(() => import("@/app/components/aboutSection"));
 const TestimonialsSection = dynamic(() => import("@/app/components/testimonialSection"));
 const Footer            = dynamic(() => import("@/app/components/footer"));
+const ContactUsSection = dynamic(() => import("@/app/components/ContactUs"));
 
 import HeroSection        from "@/app/components/heroSection";
 import StickyContactButtons from "@/app/components/stickyContactButtons";
-import ContactUsSection from "@/app/components/ContactUs";
+// import ContactUsSection from "@/app/components/ContactUs";
 import Modal               from "@/app/components/modal";
 
 export default function Home() {
