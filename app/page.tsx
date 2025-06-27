@@ -46,7 +46,7 @@ export default function Home() {
         </section>
 
         {/* large sections are now client-side streamed; JS parsed *after* hero */}
-        {/* <ServicesSection /> */}
+        <ServicesSection />
         <AboutSection />
         <TestimonialsSection />
         <ContactUsSection />
