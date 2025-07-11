@@ -226,7 +226,7 @@ export default function ServicesPage() {
         </section>
       </main>
       {mounted && <Modal showModal={showModal} onClose={() => setShowModal(false)} />}      
-      <Footer />
+      {/* <Footer /> */}
     </div>
   );
 }
