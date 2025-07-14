@@ -87,10 +87,14 @@ function useLightbox() {
     return () => window.removeEventListener("keydown", onKey);
   }, [onKey]);
 
-  /* swipe */
+  /* swipe helpers */
   const startX = useRef<number | null>(null);
-  const touchStart = (x: number) => (startX.current = x);
-  const touchEnd = (x: number) => {
+
+  const beginSwipe = (x: number) => {
+    startX.current = x;
+  };
+
+  const endSwipe = (x: number) => {
     if (!viewer || startX.current === null) return;
     const dx = x - startX.current;
     if (Math.abs(dx) > 50) (dx < 0 ? next() : prev());
@@ -103,8 +107,12 @@ function useLightbox() {
       <div
         className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
         onClick={close}
-        onPointerDown={(e) => touchStart(e.clientX)}
-        onPointerUp={(e) => touchEnd(e.clientX)}
+        /* pointer covers modern desktop + mobile */
+        onPointerDown={(e) => beginSwipe(e.clientX)}
+        onPointerUp={(e) => endSwipe(e.clientX)}
+        /* fallback for very old mobile browsers */
+        onTouchStart={(e) => beginSwipe(e.touches[0].clientX)}
+        onTouchEnd={(e) => endSwipe(e.changedTouches[0].clientX)}
       >
         {/* close button */}
         <button
@@ -114,7 +122,7 @@ function useLightbox() {
           ✕
         </button>
 
-        {/* Before / After badge (matches carousel style) */}
+        {/* Before / After badge */}
         <span
           className="absolute left-2 top-2 rounded bg-black/70 px-2 py-1 text-xs font-semibold uppercase tracking-wider text-white"
           onClick={(e) => e.stopPropagation()}
