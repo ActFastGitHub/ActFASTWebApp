@@ -34,7 +34,7 @@ const Modal: React.FC<ModalProps> = ({ showModal, onClose }) => {
   if (!showModal) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center text-black">
       <div className="fixed inset-0 bg-black opacity-50" />
       <div className="relative mx-auto w-11/12 max-w-md rounded bg-white p-8 text-center shadow-lg">
         <button

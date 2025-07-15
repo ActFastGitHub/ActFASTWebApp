@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------
-   FeaturedPage.tsx – shows “Before / After” badge inside light‑box
+   FeaturedPage.tsx – shows “Before / After” badge inside light‑box
    ------------------------------------------------------------------ */
 "use client";
 
@@ -20,9 +20,9 @@ import {
 import { motion, useAnimation } from "framer-motion";
 import { useInView } from "react-intersection-observer";
 
-/* ------------------------------------------------------------------ */
-/* raw project data                                                   */
-/* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------
+   raw project data
+   ------------------------------------------------------------------ */
 const projects = [
   {
     title: "Agas Fire Restoration",
@@ -30,11 +30,11 @@ const projects = [
       "This home was completely destroyed by fire and required a full rebuild from the foundation up. Today, it stands fully restored—stronger, safer, and better than ever before.",
     before: Array.from(
       { length: 6 },
-      (_, i) => `/images/Projects/Agas/Before/Before (${i + 1}).jpg`,
+      (_, i) => `/images/Projects/Agas/Before/Before (${i + 1}).jpg`
     ),
     after: Array.from(
       { length: 6 },
-      (_, i) => `/images/Projects/Agas/After/After (${i + 1}).jpg`,
+      (_, i) => `/images/Projects/Agas/After/After (${i + 1}).jpg`
     ),
   },
   {
@@ -43,18 +43,18 @@ const projects = [
       "After a severe fire left this duplex completely destroyed, our team rebuilt the home from the ground up. The result is a fully restored and modernized property that reflects expert craftsmanship and a commitment to quality.",
     before: Array.from(
       { length: 32 },
-      (_, i) => `/images/Projects/EPS/Before/Before (${i + 1}).jpg`,
+      (_, i) => `/images/Projects/EPS/Before/Before (${i + 1}).jpg`
     ),
     after: Array.from(
       { length: 32 },
-      (_, i) => `/images/Projects/EPS/After/After (${i + 1}).jpg`,
+      (_, i) => `/images/Projects/EPS/After/After (${i + 1}).jpg`
     ),
   },
 ];
 
-/* ------------------------------------------------------------------ */
-/* helper – interleave before / after and tag with label              */
-/* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------
+   helper – interleave before / after and tag with label
+   ------------------------------------------------------------------ */
 type Slide = { src: string; label: "Before" | "After" };
 
 const pairSlides = (before: string[], after: string[]): Slide[] => {
@@ -67,26 +67,26 @@ const pairSlides = (before: string[], after: string[]): Slide[] => {
   return out;
 };
 
-/* ------------------------------------------------------------------ */
-/* project block                                                      */
-/* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------
+   project block
+   ------------------------------------------------------------------ */
 const Project = memo(function Project({
   project,
   idx,
   openLightbox,
 }: {
-  project: (typeof projects)[number];
+  project: typeof projects[number];
   idx: number;
   openLightbox: (imgs: LightboxItem[], i: number) => void;
 }) {
   const slides = useMemo(
     () => pairSlides(project.before, project.after),
-    [project.before, project.after],
+    [project.before, project.after]
   );
 
-  /* fade‑in when in view */
   const { ref, inView } = useInView({ threshold: 0.2 });
   const anim = useAnimation();
+
   useEffect(() => {
     anim.start(inView ? "visible" : "hidden");
   }, [inView, anim]);
@@ -107,9 +107,7 @@ const Project = memo(function Project({
           transition={{ duration: 0.5 }}
           className="w-full lg:w-1/2"
         >
-          <Swiper
-            className="aspect-video w-full rounded-lg shadow-lg"
-          >
+          <Swiper className="aspect-video w-full rounded-lg shadow-lg">
             {slides.map((s, i) => (
               <SwiperSlide key={s.src}>
                 <div className="relative h-full w-full">
@@ -119,7 +117,6 @@ const Project = memo(function Project({
                     className="h-full w-full cursor-pointer object-cover"
                     onClick={() => openLightbox(slides, i)}
                   />
-                  {/* label on slide */}
                   <span className="absolute left-2 top-2 rounded bg-black/70 px-2 py-1 text-xs font-semibold uppercase tracking-wider text-white">
                     {s.label}
                   </span>
@@ -150,33 +147,49 @@ const Project = memo(function Project({
   );
 });
 
-/* ------------------------------------------------------------------ */
-/* inner page – uses hook                                             */
-/* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------
+   inner page – uses hook
+   ------------------------------------------------------------------ */
 function FeaturedPageInner() {
   const openLightbox = useLightbox();
   const [showModal, setShowModal] = useState(false);
 
+  // lock body scroll when modal is open
+  useEffect(() => {
+    document.body.style.overflow = showModal ? "hidden" : "auto";
+    return () => {
+      document.body.style.overflow = "auto";
+    };
+  }, [showModal]);
+
   return (
-    <div className="min-h-screen bg-gray-900 pb-16 pt-24 overflow-x-hidden touch-pan-y">
-      <Navbar onPortalClick={() => setShowModal(true)} />
+    <>
+      {/* blurred & scroll‑locked background when showModal=true */}
+      <div
+        className={`min-h-screen bg-gray-900 pb-16 pt-24
+                    overflow-x-hidden touch-pan-y
+                    ${showModal ? "overflow-hidden filter blur-3xl" : ""}`}
+      >
+        <Navbar onPortalClick={() => setShowModal(true)} />
 
-      <h1 className="mx-auto mb-14 max-w-6xl px-4 text-center text-4xl font-extrabold text-white lg:text-6xl">
-        Featured Projects
-      </h1>
+        <h1 className="mx-auto mb-14 max-w-6xl px-4 text-center text-4xl font-extrabold text-white lg:text-6xl">
+          Featured Projects
+        </h1>
 
-      {projects.map((p, i) => (
-        <Project key={i} project={p} idx={i} openLightbox={openLightbox} />
-      ))}
+        {projects.map((p, i) => (
+          <Project key={i} project={p} idx={i} openLightbox={openLightbox} />
+        ))}
+      </div>
 
+      {/* modal overlay */}
       <Modal showModal={showModal} onClose={() => setShowModal(false)} />
-    </div>
+    </>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* exported page wrapped with provider                                */
-/* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------
+   exported page wrapped with provider
+   ------------------------------------------------------------------ */
 export default function FeaturedPage() {
   return (
     <LightboxProvider>

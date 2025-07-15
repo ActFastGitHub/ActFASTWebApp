@@ -9,15 +9,14 @@ import Navbar from "@/app/components/siteNavBar";
 import Modal from "@/app/components/modal";
 
 import {
-  LightboxProvider, // provider
-  useLightbox,      // hook
+  LightboxProvider,
+  useLightbox,
 } from "@/app/context/LightboxProvider";
 
 import { motion, useAnimation } from "framer-motion";
 import { useInView } from "react-intersection-observer";
 import phoneIcon from "@/app/images/phone-icon.svg";
 
-// 📦 Swiper imports for touch‑enabled, autoplay carousel
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Autoplay, Pagination, Navigation } from "swiper/modules";
 import "swiper/css";
@@ -54,7 +53,7 @@ function ImageCarousel({
       modules={[Autoplay, Pagination, Navigation]}
       spaceBetween={10}
       slidesPerView={1}
-      loop={true}
+      loop
       autoplay={{ delay: 3000, disableOnInteraction: false }}
       className="w-full rounded-lg shadow-xl"
     >
@@ -64,7 +63,7 @@ function ImageCarousel({
             src={src}
             alt=""
             onClick={() => onImageClick?.(idx)}
-            className="h-60 md:h-96 w-full cursor-pointer object-cover object-center"
+            className="h-60 w-full cursor-pointer object-cover object-center md:h-96"
           />
         </SwiperSlide>
       ))}
@@ -95,7 +94,10 @@ function TableOfContents({ onJump }: { onJump: (id: string) => void }) {
           <ul className="space-y-2 text-sm">
             {items.map(([id, label]) => (
               <li key={id}>
-                <button onClick={() => onJump(id)} className="hover:underline">
+                <button
+                  onClick={() => onJump(id)}
+                  className="hover:underline"
+                >
                   {label}
                 </button>
               </li>
@@ -151,7 +153,19 @@ function TableOfContents({ onJump }: { onJump: (id: string) => void }) {
 function ServicesPageInner() {
   const openLightbox = useLightbox();
   const [showModal, setShowModal] = useState(false);
-  const { ref, inView } = useInView({ threshold: 0.2, triggerOnce: true });
+
+  // lock body scroll when modal is open
+  useEffect(() => {
+    document.body.style.overflow = showModal ? "hidden" : "auto";
+    return () => {
+      document.body.style.overflow = "auto";
+    };
+  }, [showModal]);
+
+  const { ref, inView } = useInView({
+    threshold: 0.2,
+    triggerOnce: true,
+  });
   const controls = useAnimation();
 
   useEffect(() => {
@@ -175,200 +189,207 @@ function ServicesPageInner() {
   };
 
   return (
-    <div className="relative bg-gray-900 text-white overflow-x-hidden touch-pan-y">
-      {/* sticky nav */}
-      <div className="fixed left-0 top-0 z-50 w-full bg-gray-900">
-        <Navbar onPortalClick={() => setShowModal(true)} />
+    <div className="relative">
+      {/* all content blurred & scroll‑locked when showModal=true */}
+      <div
+        className={`touch-pan-y overflow-x-hidden bg-gray-900 text-white ${
+          showModal ? "filter blur-3xl overflow-hidden" : ""
+        }`}
+      >
+        {/* sticky nav */}
+        <div className="fixed left-0 top-0 z-50 w-full bg-gray-900">
+          <Navbar onPortalClick={() => setShowModal(true)} />
+        </div>
+
+        {/* sidebar / drawer */}
+        <TableOfContents onJump={jump} />
+
+        {/* main content */}
+        <main className="container mx-auto px-4 pb-16 pt-28 md:pl-52 md:pt-36">
+          {/* intro */}
+          <section id="intro" ref={ref} className="mb-12">
+            <motion.h1
+              className="mb-6 text-4xl font-extrabold md:text-5xl"
+              variants={fade("up")}
+              initial="hidden"
+              animate={controls}
+              transition={{ duration: 0.5 }}
+            >
+              Our Services
+            </motion.h1>
+            <motion.p
+              className="max-w-3xl text-lg leading-relaxed text-gray-200"
+              variants={fade("up")}
+              initial="hidden"
+              animate={controls}
+              transition={{ duration: 0.5, delay: 0.2 }}
+            >
+              At ActFast Restoration & Repairs we handle insurance claims for
+              water, fire, mold, asbestos, repairs, and contents restoration
+              across Metro Vancouver and Surrey. We respond fast and restore
+              your property efficiently.
+            </motion.p>
+          </section>
+
+          {/* service sections */}
+          <ServiceBlock
+            id="water-damage"
+            num={1}
+            title="Water Damage Restoration 🚰"
+            bullets={[
+              "Rapid response to leaks, floods, and pipe bursts.",
+              "Water extraction, drying, and moisture control.",
+              "Works with insurance claims for hassle‑free processing.",
+            ]}
+            services={[
+              "Emergency Water Removal",
+              "Structural Drying",
+              "Mold Prevention",
+              "Sewage Cleanup",
+            ]}
+            images={water}
+            cta="Call Us Now for 24/7 Water Damage Restoration!"
+            open={(imgs, idx) => openLightbox(imgs, idx)}
+          />
+
+          <ServiceBlock
+            id="fire-damage"
+            num={2}
+            title="Fire Damage Restoration 🔥"
+            bullets={[
+              "Smoke & soot removal for homes and businesses.",
+              "Odor elimination and structural cleaning.",
+              "Insurance claims assistance for fire‑related damages.",
+            ]}
+            services={[
+              "Fire Damage Cleanup",
+              "Smoke & Soot Removal",
+              "Odor Neutralization",
+              "Structural Repairs",
+            ]}
+            images={fire}
+            cta="Get Your Property Restored After Fire Damage Today!"
+            open={(imgs, idx) => openLightbox(imgs, idx)}
+          />
+
+          <ServiceBlock
+            id="mold-remediation"
+            num={3}
+            title="Mold Remediation 🦠"
+            bullets={[
+              "Safe and certified mold removal to prevent health risks.",
+              "Inspection, testing, and full mold treatment.",
+              "Works with homeowners & insurance adjusters.",
+            ]}
+            services={[
+              "Mold Inspection",
+              "Containment & Removal",
+              "Air Purification",
+              "Moisture Control",
+            ]}
+            images={mold}
+            cta="Protect Your Home from Dangerous Mold – Contact Us!"
+            open={(imgs, idx) => openLightbox(imgs, idx)}
+          />
+
+          <ServiceBlock
+            id="asbestos-abatement"
+            num={4}
+            title="Asbestos Abatement ⚠️"
+            bullets={[
+              "Licensed testing and removal of asbestos‑containing materials.",
+              "Containment, safe disposal, and air‑quality clearance reports.",
+              "Meets all WorkSafeBC and federal regulations.",
+            ]}
+            services={[
+              "Asbestos Inspection & Sampling",
+              "Hazard Containment",
+              "Certified Removal & Disposal",
+              "Air Monitoring / Clearance",
+            ]}
+            images={asbestos}
+            cta="Need Safe Asbestos Removal? Call Our Certified Team!"
+            open={(imgs, idx) => openLightbox(imgs, idx)}
+          />
+
+          <ServiceBlock
+            id="general-repairs"
+            num={5}
+            title="General Repairs & Renovations 🛠"
+            bullets={[
+              "Full restoration & repair services after water/fire damage.",
+              "Residential & commercial rebuilds and renovations.",
+              "Work with insurance claims and private projects.",
+            ]}
+            services={[
+              "Drywall & Painting",
+              "Flooring & Carpentry",
+              "Electrical & Plumbing Repairs",
+              "Roofing & Structural Work",
+            ]}
+            images={repairs}
+            cta="Need Property Repairs? We’ve Got You Covered!"
+            open={(imgs, idx) => openLightbox(imgs, idx)}
+          />
+
+          <ServiceBlock
+            id="contents-restoration"
+            num={6}
+            title="Contents Restoration & Pack‑Out Services 📦"
+            bullets={[
+              "Secure storage and management of your belongings during repairs.",
+              "Professional pack‑out & pack‑back services, ensuring safe handling.",
+              "Cleaning & decontamination of items affected by fire, smoke, mold, or water.",
+              "We coordinate directly with insurers for smooth claims.",
+            ]}
+            services={[
+              "Secure Off‑Site Storage",
+              "Pack‑Out & Inventory Management",
+              "Contents Cleaning & Restoration",
+              "Pack‑Back Services",
+            ]}
+            images={contents}
+            cta="Need Pack‑Out or Storage? Call Us Today!"
+            open={(imgs, idx) => openLightbox(imgs, idx)}
+          />
+
+          {/* final CTA */}
+          <section id="final-cta">
+            <motion.div
+              className="rounded bg-red-700 p-6 text-center md:mx-auto md:max-w-4xl"
+              whileInView="visible"
+              initial="hidden"
+              viewport={{ once: true }}
+              variants={fade("up")}
+              transition={{ duration: 0.5 }}
+            >
+              <h3 className="mb-2 text-2xl font-bold md:text-3xl">
+                We are ready to assist you 24/7!
+              </h3>
+              <p className="mb-4 md:text-lg">
+                If you need emergency restoration services in Metro Vancouver,
+                Surrey, or the Okanagan Area, contact us today!
+              </p>
+              <p className="md:text-lg">
+                📞{" "}
+                <a
+                  href="tel:+1-604-518-5129"
+                  className="font-bold underline hover:no-underline"
+                >
+                  604‑518‑5129
+                </a>{" "}
+                | 📧{" "}
+                <a
+                  href="mailto:info@actfast.ca"
+                  className="font-bold underline hover:no-underline"
+                >
+                  info@actfast.ca
+                </a>
+              </p>
+            </motion.div>
+          </section>
+        </main>
       </div>
-
-      {/* sidebar / drawer */}
-      <TableOfContents onJump={jump} />
-
-      {/* main content */}
-      <main className="container mx-auto px-4 pb-16 pt-28 md:pl-52 md:pt-36">
-        {/* intro */}
-        <section id="intro" ref={ref} className="mb-12">
-          <motion.h1
-            className="mb-6 text-4xl font-extrabold md:text-5xl"
-            variants={fade("up")}
-            initial="hidden"
-            animate={controls}
-            transition={{ duration: 0.5 }}
-          >
-            Our Services
-          </motion.h1>
-          <motion.p
-            className="max-w-3xl text-lg leading-relaxed text-gray-200"
-            variants={fade("up")}
-            initial="hidden"
-            animate={controls}
-            transition={{ duration: 0.5, delay: 0.2 }}
-          >
-            At ActFast Restoration & Repairs we handle insurance claims for
-            water, fire, mold, asbestos, repairs, and contents restoration
-            across Metro Vancouver and Surrey. We respond fast and restore your
-            property efficiently.
-          </motion.p>
-        </section>
-
-        {/* service sections */}
-        <ServiceBlock
-          id="water-damage"
-          num={1}
-          title="Water Damage Restoration 🚰"
-          bullets={[
-            "Rapid response to leaks, floods, and pipe bursts.",
-            "Water extraction, drying, and moisture control.",
-            "Works with insurance claims for hassle‑free processing.",
-          ]}
-          services={[
-            "Emergency Water Removal",
-            "Structural Drying",
-            "Mold Prevention",
-            "Sewage Cleanup",
-          ]}
-          images={water}
-          cta="Call Us Now for 24/7 Water Damage Restoration!"
-          open={(imgs, idx) => openLightbox(imgs, idx)}
-        />
-
-        <ServiceBlock
-          id="fire-damage"
-          num={2}
-          title="Fire Damage Restoration 🔥"
-          bullets={[
-            "Smoke & soot removal for homes and businesses.",
-            "Odor elimination and structural cleaning.",
-            "Insurance claims assistance for fire‑related damages.",
-          ]}
-          services={[
-            "Fire Damage Cleanup",
-            "Smoke & Soot Removal",
-            "Odor Neutralization",
-            "Structural Repairs",
-          ]}
-          images={fire}
-          cta="Get Your Property Restored After Fire Damage Today!"
-          open={(imgs, idx) => openLightbox(imgs, idx)}
-        />
-
-        <ServiceBlock
-          id="mold-remediation"
-          num={3}
-          title="Mold Remediation 🦠"
-          bullets={[
-            "Safe and certified mold removal to prevent health risks.",
-            "Inspection, testing, and full mold treatment.",
-            "Works with homeowners & insurance adjusters.",
-          ]}
-          services={[
-            "Mold Inspection",
-            "Containment & Removal",
-            "Air Purification",
-            "Moisture Control",
-          ]}
-          images={mold}
-          cta="Protect Your Home from Dangerous Mold – Contact Us!"
-          open={(imgs, idx) => openLightbox(imgs, idx)}
-        />
-
-        <ServiceBlock
-          id="asbestos-abatement"
-          num={4}
-          title="Asbestos Abatement ⚠️"
-          bullets={[
-            "Licensed testing and removal of asbestos‑containing materials.",
-            "Containment, safe disposal, and air‑quality clearance reports.",
-            "Meets all WorkSafeBC and federal regulations.",
-          ]}
-          services={[
-            "Asbestos Inspection & Sampling",
-            "Hazard Containment",
-            "Certified Removal & Disposal",
-            "Air Monitoring / Clearance",
-          ]}
-          images={asbestos}
-          cta="Need Safe Asbestos Removal? Call Our Certified Team!"
-          open={(imgs, idx) => openLightbox(imgs, idx)}
-        />
-
-        <ServiceBlock
-          id="general-repairs"
-          num={5}
-          title="General Repairs & Renovations 🛠"
-          bullets={[
-            "Full restoration & repair services after water/fire damage.",
-            "Residential & commercial rebuilds and renovations.",
-            "Work with insurance claims and private projects.",
-          ]}
-          services={[
-            "Drywall & Painting",
-            "Flooring & Carpentry",
-            "Electrical & Plumbing Repairs",
-            "Roofing & Structural Work",
-          ]}
-          images={repairs}
-          cta="Need Property Repairs? We’ve Got You Covered!"
-          open={(imgs, idx) => openLightbox(imgs, idx)}
-        />
-
-        <ServiceBlock
-          id="contents-restoration"
-          num={6}
-          title="Contents Restoration & Pack‑Out Services 📦"
-          bullets={[
-            "Secure storage and management of your belongings during repairs.",
-            "Professional pack‑out & pack‑back services, ensuring safe handling.",
-            "Cleaning & decontamination of items affected by fire, smoke, mold, or water.",
-            "We coordinate directly with insurers for smooth claims.",
-          ]}
-          services={[
-            "Secure Off‑Site Storage",
-            "Pack‑Out & Inventory Management",
-            "Contents Cleaning & Restoration",
-            "Pack‑Back Services",
-          ]}
-          images={contents}
-          cta="Need Pack‑Out or Storage? Call Us Today!"
-          open={(imgs, idx) => openLightbox(imgs, idx)}
-        />
-
-        {/* final CTA */}
-        <section id="final-cta">
-          <motion.div
-            className="rounded bg-red-700 p-6 text-center md:mx-auto md:max-w-4xl"
-            whileInView="visible"
-            initial="hidden"
-            viewport={{ once: true }}
-            variants={fade("up")}
-            transition={{ duration: 0.5 }}
-          >
-            <h3 className="mb-2 text-2xl font-bold md:text-3xl">
-              We are ready to assist you 24/7!
-            </h3>
-            <p className="mb-4 md:text-lg">
-              If you need emergency restoration services in Metro Vancouver,
-              Surrey, or the Okanagan Area, contact us today!
-            </p>
-            <p className="md:text-lg">
-              📞{" "}
-              <a
-                href="tel:+1-604-518-5129"
-                className="font-bold underline hover:no-underline"
-              >
-                604‑518‑5129
-              </a>{" "}
-              | 📧{" "}
-              <a
-                href="mailto:info@actfast.ca"
-                className="font-bold underline hover:no-underline"
-              >
-                info@actfast.ca
-              </a>
-            </p>
-          </motion.div>
-        </section>
-      </main>
 
       {/* global Modal (for “Portal” calls in Navbar) */}
       <Modal showModal={showModal} onClose={() => setShowModal(false)} />
