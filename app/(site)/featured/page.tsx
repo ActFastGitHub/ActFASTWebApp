@@ -1,26 +1,28 @@
+/* ------------------------------------------------------------------
+   FeaturedPage.tsx – shows “Before / After” badge inside light‑box
+   ------------------------------------------------------------------ */
 "use client";
 
-import React, {
-  useEffect,
-  useState,
-  useCallback,
-  useRef,
-  memo,
-  useMemo,
-} from "react";
+import React, { useEffect, useMemo, useState, memo } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
-import { Navigation, Pagination } from "swiper/modules";
+import { Navigation } from "swiper/modules";
 import "swiper/css";
 import "swiper/css/navigation";
-import "swiper/css/pagination";
 
 import Navbar from "@/app/components/siteNavBar";
 import Modal from "@/app/components/modal";
+
+import {
+  LightboxProvider,
+  useLightbox,
+  type LightboxItem,
+} from "@/app/context/LightboxProvider";
+
 import { motion, useAnimation } from "framer-motion";
 import { useInView } from "react-intersection-observer";
 
 /* ------------------------------------------------------------------ */
-/* 1️⃣  raw data                                                       */
+/* raw project data                                                   */
 /* ------------------------------------------------------------------ */
 const projects = [
   {
@@ -52,100 +54,10 @@ const projects = [
 ];
 
 /* ------------------------------------------------------------------ */
-/* shared slide type                                                  */
+/* helper – interleave before / after and tag with label              */
 /* ------------------------------------------------------------------ */
 type Slide = { src: string; label: "Before" | "After" };
 
-/* ------------------------------------------------------------------ */
-/* 2️⃣  light‑box with in‑image badge                                  */
-/* ------------------------------------------------------------------ */
-function useLightbox() {
-  const [viewer, setViewer] = useState<{ imgs: Slide[]; idx: number } | null>(
-    null,
-  );
-
-  const open = (imgs: Slide[], idx: number) => setViewer({ imgs, idx });
-  const close = () => setViewer(null);
-  const next = () =>
-    setViewer((v) => v && { ...v, idx: (v.idx + 1) % v.imgs.length });
-  const prev = () =>
-    setViewer((v) => v && { ...v, idx: (v.idx - 1 + v.imgs.length) % v.imgs.length });
-
-  /* keyboard nav */
-  const onKey = useCallback(
-    (e: KeyboardEvent) => {
-      if (!viewer) return;
-      if (e.key === "Escape") close();
-      if (e.key === "ArrowRight") next();
-      if (e.key === "ArrowLeft") prev();
-    },
-    [viewer],
-  );
-
-  useEffect(() => {
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onKey]);
-
-  /* swipe helpers */
-  const startX = useRef<number | null>(null);
-
-  const beginSwipe = (x: number) => {
-    startX.current = x;
-  };
-
-  const endSwipe = (x: number) => {
-    if (!viewer || startX.current === null) return;
-    const dx = x - startX.current;
-    if (Math.abs(dx) > 50) (dx < 0 ? next() : prev());
-    startX.current = null;
-  };
-
-  /* overlay */
-  const overlay =
-    viewer && (
-      <div
-        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
-        onClick={close}
-        /* pointer covers modern desktop + mobile */
-        onPointerDown={(e) => beginSwipe(e.clientX)}
-        onPointerUp={(e) => endSwipe(e.clientX)}
-        /* fallback for very old mobile browsers */
-        onTouchStart={(e) => beginSwipe(e.touches[0].clientX)}
-        onTouchEnd={(e) => endSwipe(e.changedTouches[0].clientX)}
-      >
-        {/* close button */}
-        <button
-          className="absolute right-4 top-4 rounded bg-black/60 p-2 text-white"
-          onClick={close}
-        >
-          ✕
-        </button>
-
-        {/* Before / After badge */}
-        <span
-          className="absolute left-2 top-2 rounded bg-black/70 px-2 py-1 text-xs font-semibold uppercase tracking-wider text-white"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {viewer.imgs[viewer.idx].label}
-        </span>
-
-        {/* image */}
-        <img
-          src={viewer.imgs[viewer.idx].src}
-          className="max-h-full max-w-full object-contain"
-          onClick={(e) => e.stopPropagation()}
-          alt=""
-        />
-      </div>
-    );
-
-  return { open, overlay };
-}
-
-/* ------------------------------------------------------------------ */
-/* helper → B0 A0 B1 A1 … plus label                                  */
-/* ------------------------------------------------------------------ */
 const pairSlides = (before: string[], after: string[]): Slide[] => {
   const out: Slide[] = [];
   const max = Math.max(before.length, after.length);
@@ -157,35 +69,33 @@ const pairSlides = (before: string[], after: string[]): Slide[] => {
 };
 
 /* ------------------------------------------------------------------ */
-/* 3️⃣  project block                                                 */
+/* project block                                                      */
 /* ------------------------------------------------------------------ */
 const Project = memo(function Project({
   project,
   idx,
-  open,
+  openLightbox,
 }: {
   project: (typeof projects)[number];
   idx: number;
-  open: (imgs: Slide[], i: number) => void;
+  openLightbox: (imgs: LightboxItem[], i: number) => void;
 }) {
   const slides = useMemo(
     () => pairSlides(project.before, project.after),
     [project.before, project.after],
   );
 
+  /* fade‑in when in view */
   const { ref, inView } = useInView({ threshold: 0.2 });
   const anim = useAnimation();
   useEffect(() => {
     anim.start(inView ? "visible" : "hidden");
   }, [inView, anim]);
 
-  const rowDir = idx % 2 === 0 ? "lg:flex-row" : "lg:flex-row-reverse";
+  const rowDir = idx % 2 ? "lg:flex-row-reverse" : "lg:flex-row";
 
   return (
-    <section
-      ref={ref}
-      className="mx-auto mb-20 max-w-6xl px-4 md:px-6 lg:px-8"
-    >
+    <section ref={ref} className="mx-auto mb-20 max-w-6xl px-4 md:px-6 lg:px-8">
       <div className={`flex flex-col items-center ${rowDir} lg:space-x-8`}>
         {/* slideshow */}
         <motion.div
@@ -200,8 +110,7 @@ const Project = memo(function Project({
         >
           <Swiper
             navigation
-            // pagination={{ clickable: true }}
-            modules={[Navigation, Pagination]}
+            modules={[Navigation]}
             className="aspect-video w-full rounded-lg shadow-lg"
           >
             {slides.map((s, i) => (
@@ -210,12 +119,10 @@ const Project = memo(function Project({
                   <img
                     src={s.src}
                     alt={`${s.label} image ${i + 1} for ${project.title}`}
-                    loading="lazy"
-                    decoding="async"
                     className="h-full w-full cursor-pointer object-cover"
-                    onClick={() => open(slides, i)}
+                    onClick={() => openLightbox(slides, i)}
                   />
-                  {/* label overlay */}
+                  {/* label on slide */}
                   <span className="absolute left-2 top-2 rounded bg-black/70 px-2 py-1 text-xs font-semibold uppercase tracking-wider text-white">
                     {s.label}
                   </span>
@@ -247,18 +154,14 @@ const Project = memo(function Project({
 });
 
 /* ------------------------------------------------------------------ */
-/* 4️⃣  page component                                                */
+/* inner page – uses hook                                             */
 /* ------------------------------------------------------------------ */
-export default function FeaturedPage() {
-  const [mounted, setMounted] = useState(false);
+function FeaturedPageInner() {
+  const openLightbox = useLightbox();
   const [showModal, setShowModal] = useState(false);
-  const lightbox = useLightbox();
-
-  useEffect(() => setMounted(true), []);
 
   return (
     <div className="min-h-screen bg-gray-900 pb-16 pt-24">
-      {lightbox.overlay}
       <Navbar onPortalClick={() => setShowModal(true)} />
 
       <h1 className="mx-auto mb-14 max-w-6xl px-4 text-center text-4xl font-extrabold text-white lg:text-6xl">
@@ -266,12 +169,21 @@ export default function FeaturedPage() {
       </h1>
 
       {projects.map((p, i) => (
-        <Project key={i} project={p} idx={i} open={lightbox.open} />
+        <Project key={i} project={p} idx={i} openLightbox={openLightbox} />
       ))}
 
-      {mounted && (
-        <Modal showModal={showModal} onClose={() => setShowModal(false)} />
-      )}
+      <Modal showModal={showModal} onClose={() => setShowModal(false)} />
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* exported page wrapped with provider                                */
+/* ------------------------------------------------------------------ */
+export default function FeaturedPage() {
+  return (
+    <LightboxProvider>
+      <FeaturedPageInner />
+    </LightboxProvider>
   );
 }

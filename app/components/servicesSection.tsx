@@ -3,14 +3,7 @@
    ------------------------------------------------------------------ */
 "use client";
 
-import React, {
-  useEffect,
-  useState,
-  useCallback,
-  useRef,
-  memo,
-  useMemo,
-} from "react";
+import React, { useEffect, useMemo, memo } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { EffectFade, Navigation, Pagination } from "swiper/modules";
 
@@ -21,6 +14,8 @@ import "swiper/css/pagination";
 
 import { motion, useAnimation } from "framer-motion";
 import { useInView } from "react-intersection-observer";
+
+import { useLightbox } from "@/app/context/LightboxProvider"; // 
 
 /* ------------------------------------------------------------------ */
 /* helpers                                                             */
@@ -95,79 +90,7 @@ const SERVICES: readonly Service[] = [
 ];
 
 /* ------------------------------------------------------------------ */
-/* light-box hook                                                      */
-/* ------------------------------------------------------------------ */
-const useLightbox = () => {
-  const [viewer, setViewer] = useState<{ imgs: string[]; idx: number } | null>(
-    null,
-  );
-
-  const open = useCallback((imgs: string[], idx: number) => {
-    setViewer({ imgs, idx });
-  }, []);
-
-  const close = useCallback(() => setViewer(null), []);
-
-  useEffect(() => {
-    if (!viewer) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
-      if (e.key === "ArrowRight")
-        setViewer((v) => v && { ...v, idx: (v.idx + 1) % v.imgs.length });
-      if (e.key === "ArrowLeft")
-        setViewer(
-          (v) =>
-            v && { ...v, idx: (v.idx - 1 + v.imgs.length) % v.imgs.length },
-        );
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [viewer, close]);
-
-  const startX = useRef<number | null>(null);
-  const onTouchStart = (e: React.TouchEvent) =>
-    (startX.current = e.touches[0].clientX);
-  const onTouchEnd = (e: React.TouchEvent) => {
-    if (!viewer || startX.current === null) return;
-    const dx = e.changedTouches[0].clientX - startX.current;
-    if (Math.abs(dx) > 50)
-      setViewer(
-        (v) =>
-          v && {
-            ...v,
-            idx: (v.idx + (dx < 0 ? 1 : -1) + v.imgs.length) % v.imgs.length,
-          },
-      );
-  };
-
-  const overlay =
-    viewer && (
-      <div
-        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
-        onClick={close}
-        onTouchStart={onTouchStart}
-        onTouchEnd={onTouchEnd}
-      >
-        <button
-          className="absolute right-4 top-4 z-10 rounded bg-black/60 p-2 text-white backdrop-blur-md"
-          onClick={close}
-        >
-          ✕
-        </button>
-        <img
-          src={viewer.imgs[viewer.idx]}
-          alt=""
-          className="max-h-full max-w-full object-contain"
-          onClick={(e) => e.stopPropagation()}
-        />
-      </div>
-    );
-
-  return { open, overlay };
-};
-
-/* ------------------------------------------------------------------ */
-/* ServiceCard – Swiper now uses fade + lazyPreloadPrevNext           */
+/* ServiceCard – Swiper uses fade + lazyPreloadPrevNext               */
 /* ------------------------------------------------------------------ */
 const ServiceCard = memo(
   ({
@@ -196,7 +119,7 @@ const ServiceCard = memo(
         grabCursor
         navigation
         pagination={false}
-        lazyPreloadPrevNext={1} // Swiper 11 replacement for old lazy config
+        lazyPreloadPrevNext={1}
         modules={[EffectFade, Navigation]}
         className="mySwiper mb-4"
       >
@@ -233,7 +156,7 @@ const LazyCard = ({
   idx: number;
   open: (imgs: string[], idx: number) => void;
 }) => {
-  const { ref, inView } = useInView({triggerOnce: true});
+  const { ref, inView } = useInView({ triggerOnce: true });
   return (
     <div ref={ref} style={{ minHeight: 400 }}>
       {inView ? (
@@ -247,9 +170,9 @@ const LazyCard = ({
 /* main component                                                     */
 /* ------------------------------------------------------------------ */
 export default function ServicesSection() {
-  const { ref, inView } = useInView({threshold: 0.1, triggerOnce: true });
+  const { ref, inView } = useInView({ threshold: 0.1, triggerOnce: true });
   const controls = useAnimation();
-  const { open, overlay } = useLightbox();
+  const open = useLightbox();           // ⬅️ provider gives us the opener
   const services = useMemo(() => SERVICES, []);
 
   useEffect(() => {
@@ -258,8 +181,6 @@ export default function ServicesSection() {
 
   return (
     <section ref={ref} className="bg-gray-800 py-12">
-      {overlay}
-
       <div className="container mx-auto px-4">
         <motion.h2
           initial="hidden"
