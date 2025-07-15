@@ -1,17 +1,25 @@
+/* ------------------------------------------------------------------
+   MeetTheTeamPage.tsx – design unchanged, uses modular Lightbox
+   ------------------------------------------------------------------ */
 "use client";
 
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import Navbar from "@/app/components/siteNavBar";
-import Modal from "@/app/components/modal";
+import Modal  from "@/app/components/modal";
+
+import {
+  LightboxProvider,
+  useLightbox,               // ⬅️ global hook
+} from "@/app/context/LightboxProvider";
+
 import {
   motion,
   useAnimation,
   useInView,
-  AnimatePresence,
 } from "framer-motion";
 
 /* ------------------------------------------------------------------ */
-/* 0) Double-tap on mobile → scroll to top                            */
+/* 0️⃣ Double-tap on mobile → smooth-scroll to top                     */
 /* ------------------------------------------------------------------ */
 function useDoubleTapToTop() {
   const last = useRef<number | null>(null);
@@ -30,118 +38,14 @@ function useDoubleTapToTop() {
 }
 
 /* ------------------------------------------------------------------ */
-/* 1) Light-box hook                                                  */
+/* 1️⃣  Team data (exactly the same)                                   */
 /* ------------------------------------------------------------------ */
-type LightboxState = { imgs: string[]; idx: number } | null;
-
-function useLightbox() {
-  const [viewer, setViewer] = useState<LightboxState>(null);
-
-  const open = (imgs: string[], idx: number) => setViewer({ imgs, idx });
-  const close = () => setViewer(null);
-  const next = () =>
-    setViewer((v) => (v ? { ...v, idx: (v.idx + 1) % v.imgs.length } : v));
-  const prev = () =>
-    setViewer((v) => (v ? { ...v, idx: (v.idx - 1 + v.imgs.length) % v.imgs.length } : v));
-
-  /* keys */
-  const onKey = useCallback(
-    (e: KeyboardEvent) => {
-      if (!viewer) return;
-      if (e.key === "Escape") close();
-      if (e.key === "ArrowRight") next();
-      if (e.key === "ArrowLeft") prev();
-    },
-    [viewer],
-  );
-  useEffect(() => {
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onKey]);
-
-  /* swipe */
-  const startX = useRef<number | null>(null);
-  const start = (x: number) => (startX.current = x);
-  const end = (x: number) => {
-    if (!viewer || startX.current === null) return;
-    const dx = x - startX.current;
-    if (Math.abs(dx) > 50) (dx < 0 ? next() : prev());
-    startX.current = null;
-  };
-
-  const overlay = (
-    <AnimatePresence>
-      {viewer && (
-        <motion.div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={close}
-          onPointerDown={(e) => start(e.clientX)}
-          onPointerUp={(e) => end(e.clientX)}
-        >
-          {/* close */}
-          <button
-            className="absolute right-4 top-4 z-10 rounded bg-black/60 p-2 text-white backdrop-blur-md"
-            onClick={(e) => {
-              e.stopPropagation();
-              close();
-            }}
-          >
-            ✕
-          </button>
-          {/* arrows – phones only */}
-          <button
-            className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded bg-black/60 p-2 text-white md:hidden"
-            onClick={(e) => {
-              e.stopPropagation();
-              prev();
-            }}
-          >
-            ◀
-          </button>
-          <button
-            className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded bg-black/60 p-2 text-white md:hidden"
-            onClick={(e) => {
-              e.stopPropagation();
-              next();
-            }}
-          >
-            ▶
-          </button>
-
-          <motion.img
-            key={viewer.imgs[viewer.idx]}
-            src={viewer.imgs[viewer.idx]}
-            alt=""
-            className="max-h-full max-w-full rounded-lg shadow-xl"
-            initial={{ scale: 0.8, rotate: -5, opacity: 0 }}
-            animate={{ scale: 1, rotate: 0, opacity: 1 }}
-            exit={{ scale: 0.8, rotate: 5, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 260, damping: 22 }}
-            onClick={(e) => e.stopPropagation()}
-          />
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-  return { open, overlay };
-}
-
-/* ------------------------------------------------------------------ */
-/* 2) Data                                                            */
-/* ------------------------------------------------------------------ */
-interface TeamMember {
-  name: string;
-  role: string;
-  description: string;
-}
-interface TeamSection {
+type TeamMember = { name: string; role: string; description: string };
+type TeamSection = {
   role: string;
   members: { name: string; description: string }[];
   description: string;
-}
+};
 
 const upperManagement: TeamMember[] = [
   {
@@ -217,7 +121,7 @@ const teamSections: TeamSection[] = [
       {
         name: "Lisa",
         description:
-          "Lead member ensuring all items are accurately tracked, labeled, and ready for packout and packback.",
+          "Lead member ensuring all items are accurately tracked, labeled, and ready for pack-out and pack-back.",
       },
       {
         name: "Lorena",
@@ -266,7 +170,7 @@ const teamSections: TeamSection[] = [
       {
         name: "George",
         description:
-          "Coordinates packouts and packbacks with precision, ensuring items move safely from client sites to storage.",
+          "Coordinates pack-outs and pack-backs with precision, ensuring items move safely from client sites to storage.",
       },
       {
         name: "Lito",
@@ -313,7 +217,9 @@ const teamSections: TeamSection[] = [
   },
 ];
 
-/* role-color map */
+/* ------------------------------------------------------------------ */
+/* 2️⃣ role → color map                                               */
+/* ------------------------------------------------------------------ */
 const roleColors: Record<string, string> = {
   "Project Manager": "bg-cyan-500",
   "Construction Manager": "bg-blue-500",
@@ -328,7 +234,9 @@ const roleColors: Record<string, string> = {
   Automotive: "bg-indigo-700",
 };
 
-/* helpers */
+/* ------------------------------------------------------------------ */
+/* helpers (unchanged)                                                */
+/* ------------------------------------------------------------------ */
 const getImagePath = (name: string) =>
   `/images/team/${name.toLowerCase().replace(/ /g, "_")}.jpg`;
 
@@ -347,31 +255,28 @@ const animationVariants = {
 };
 
 /* ------------------------------------------------------------------ */
-/* 4) Page component                                                  */
+/* 3️⃣ Page component (design intact)                                 */
 /* ------------------------------------------------------------------ */
-export default function MeetTheTeamPage() {
+function TeamPageInner() {
   const [showModal, setShowModal] = useState(false);
-  const [showMenu, setShowMenu] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+  const [showMenu, setShowMenu]   = useState(false);
 
   useDoubleTapToTop();
-  const lightbox = useLightbox();
+
+  /* new lightbox opener */
+  const openLightbox = useLightbox();
 
   const toggleMenu = () => setShowMenu((v) => !v);
-  const scrollTo = (id: string) => {
+  const scrollTo   = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
     setShowMenu(false);
   };
 
-  const managers = upperManagement.filter((m) => m.role !== "General Manager");
+  const managers   = upperManagement.filter((m) => m.role !== "General Manager");
   const officeImgs = managers.map((m) => getImagePath(m.name));
 
   return (
     <div className="bg-gradient-to-b from-gray-900 to-gray-800 py-16">
-      {lightbox.overlay}
       <Navbar onPortalClick={() => setShowModal(true)} />
 
       {/* title */}
@@ -385,7 +290,7 @@ export default function MeetTheTeamPage() {
         Meet the Team
       </motion.h1>
 
-      {/* menu */}
+      {/* dropdown menu */}
       {showMenu && (
         <div className="absolute left-0 top-16 z-50 w-full bg-gray-800 py-3 text-white shadow-xl">
           <button className="absolute right-4 top-1 text-2xl" onClick={toggleMenu}>
@@ -424,7 +329,6 @@ export default function MeetTheTeamPage() {
             Office Team
           </motion.h2>
 
-          {/* manager cards */}
           <div
             className={`flex flex-wrap justify-center gap-12 ${getGridClasses(
               managers.length,
@@ -436,7 +340,7 @@ export default function MeetTheTeamPage() {
               const controls = useAnimation();
               useEffect(() => {
                 if (inView) controls.start("visible");
-              }, [inView]);
+              }, [inView, controls]);
 
               return (
                 <motion.div
@@ -447,7 +351,7 @@ export default function MeetTheTeamPage() {
                   animate={controls}
                   whileHover="hover"
                   transition={{ duration: 0.5, delay: i * 0.1 }}
-                  onClick={() => lightbox.open(officeImgs, i)}
+                  onClick={() => openLightbox(officeImgs, i)}
                   className={`cursor-pointer rounded-2xl p-6 shadow-xl ${roleColors[m.role]}`}
                 >
                   <div className="flex flex-col items-center">
@@ -458,7 +362,9 @@ export default function MeetTheTeamPage() {
                         className="h-full w-full object-cover"
                       />
                     </div>
-                    <h3 className="text-xl font-semibold text-white lg:text-2xl">{m.name}</h3>
+                    <h3 className="text-xl font-semibold text-white lg:text-2xl">
+                      {m.name}
+                    </h3>
                     <div className="mb-4 mt-1 rounded-lg bg-white px-3 py-1 text-xs font-medium text-gray-800 shadow-sm">
                       {m.role}
                     </div>
@@ -472,9 +378,10 @@ export default function MeetTheTeamPage() {
           </div>
         </section>
 
-        {/* Departments */}
+        {/* Other departments */}
         {teamSections.map((sec) => {
-          const imgs = sec.members.map((m) => getImagePath(m.name));
+          const imgs = sec.members.map((mem) => getImagePath(mem.name));
+
           return (
             <section id={sec.role} key={sec.role} className="space-y-12">
               <motion.h2
@@ -499,17 +406,17 @@ export default function MeetTheTeamPage() {
                 <p className="mb-4 text-center text-sm text-white">{sec.description}</p>
 
                 <div className={`grid gap-4 ${getGridClasses(sec.members.length)}`}>
-                  {sec.members.map((m, idx) => {
+                  {sec.members.map((mem, idx) => {
                     const ref = useRef<HTMLDivElement>(null);
                     const inView = useInView(ref, { once: true });
                     const controls = useAnimation();
                     useEffect(() => {
                       if (inView) controls.start("visible");
-                    }, [inView]);
+                    }, [inView, controls]);
 
                     return (
                       <motion.div
-                        key={m.name}
+                        key={mem.name}
                         ref={ref}
                         variants={animationVariants}
                         initial="hidden"
@@ -517,18 +424,18 @@ export default function MeetTheTeamPage() {
                         whileHover="hover"
                         transition={{ duration: 0.5, delay: idx * 0.1 }}
                         className="flex cursor-pointer flex-col items-center text-center"
-                        onClick={() => lightbox.open(imgs, idx)}
+                        onClick={() => openLightbox(imgs, idx)}
                       >
                         <div className="mb-4 h-24 w-24 overflow-hidden rounded-full bg-gray-200 shadow-xl ring-4 ring-white">
                           <img
-                            src={getImagePath(m.name)}
-                            alt={m.name}
+                            src={getImagePath(mem.name)}
+                            alt={mem.name}
                             className="h-full w-full object-cover"
                           />
                         </div>
-                        <p className="text-lg font-semibold text-white">{m.name}</p>
+                        <p className="text-lg font-semibold text-white">{mem.name}</p>
                         <div className="mt-2 rounded-lg bg-white px-3 py-2 text-sm text-gray-800 shadow-md">
-                          {m.description}
+                          {mem.description}
                         </div>
                       </motion.div>
                     );
@@ -540,9 +447,18 @@ export default function MeetTheTeamPage() {
         })}
       </div>
 
-      {/* modal portal */}
-      {isMounted && <Modal showModal={showModal} onClose={() => setShowModal(false)} />}
+      <Modal showModal={showModal} onClose={() => setShowModal(false)} />
     </div>
   );
 }
 
+/* ------------------------------------------------------------------ */
+/* 4️⃣ Export wrapped with provider                                   */
+/* ------------------------------------------------------------------ */
+export default function MeetTheTeamPage() {
+  return (
+    <LightboxProvider>
+      <TeamPageInner />
+    </LightboxProvider>
+  );
+}

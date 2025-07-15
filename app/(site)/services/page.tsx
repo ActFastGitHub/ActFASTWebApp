@@ -9,19 +9,26 @@ import Navbar from "@/app/components/siteNavBar";
 import Modal from "@/app/components/modal";
 
 import {
-  LightboxProvider, // ⬅️ provider
-  useLightbox, // ⬅️ hook
+  LightboxProvider, // provider
+  useLightbox,      // hook
 } from "@/app/context/LightboxProvider";
 
 import { motion, useAnimation } from "framer-motion";
 import { useInView } from "react-intersection-observer";
 import phoneIcon from "@/app/images/phone-icon.svg";
 
+// 📦 Swiper imports for touch‑enabled, autoplay carousel
+import { Swiper, SwiperSlide } from "swiper/react";
+import { Autoplay, Pagination, Navigation } from "swiper/modules";
+import "swiper/css";
+import "swiper/css/navigation";
+import "swiper/css/pagination";
+
 /* ---------- helper to build image arrays ------------------------- */
 const gen = (folder: string, prefix: string, count: number) =>
   Array.from(
     { length: count },
-    (_, i) => `/images/${folder}/${prefix} (${i + 1}).jpg`,
+    (_, i) => `/images/${folder}/${prefix} (${i + 1}).jpg`
   );
 
 /* ---------- static galleries ------------------------------------- */
@@ -32,9 +39,9 @@ const asbestos = gen("AsbestosAbatement", "Asbestos", 9);
 const repairs = gen("GeneralRepairs", "Repairs", 14);
 const contents = gen("ContentsRestoration", "Contents", 35);
 
-/* ------------------------------------------------------------------ */
-/* ⭐ Re‑usable auto‑scroll carousel                                  */
-/* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------
+   ⭐ Swiper‑based auto‑scroll carousel
+   ------------------------------------------------------------------ */
 function ImageCarousel({
   images,
   onImageClick,
@@ -42,57 +49,32 @@ function ImageCarousel({
   images: string[];
   onImageClick?: (idx: number) => void;
 }) {
-  const [cur, setCur] = useState(0);
-
-  /* auto‑advance */
-  useEffect(() => {
-    if (!images.length) return;
-    const id = setInterval(() => setCur((i) => (i + 1) % images.length), 3000);
-    return () => clearInterval(id); // always return a function – TS safe
-  }, [images]);
-
-  const jump = (d: number) =>
-    setCur((i) => (i + d + images.length) % images.length);
-
   return (
-    <div className="relative aspect-video w-full overflow-hidden rounded-lg shadow-xl">
-      {images.map((src, i) => (
-        <div
-          key={src}
-          className={`absolute inset-0 transition-opacity duration-700 ${i === cur ? "opacity-100" : "opacity-0"}`}
-        >
+    <Swiper
+      modules={[Autoplay, Pagination, Navigation]}
+      spaceBetween={10}
+      slidesPerView={1}
+      loop={true}
+      autoplay={{ delay: 3000, disableOnInteraction: false }}
+      className="w-full rounded-lg shadow-xl"
+    >
+      {images.map((src, idx) => (
+        <SwiperSlide key={src}>
           <img
             src={src}
             alt=""
-            onClick={() => onImageClick?.(i)}
-            className="h-full w-full cursor-pointer object-cover object-center"
+            onClick={() => onImageClick?.(idx)}
+            className="h-60 md:h-96 w-full cursor-pointer object-cover object-center"
           />
-        </div>
+        </SwiperSlide>
       ))}
-
-      {images.length > 1 && (
-        <>
-          <button
-            onClick={() => jump(-1)}
-            className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
-          >
-            ◀
-          </button>
-          <button
-            onClick={() => jump(1)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
-          >
-            ▶
-          </button>
-        </>
-      )}
-    </div>
+    </Swiper>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* 📑 Services menu (desktop sidebar + mobile drawer)                 */
-/* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------
+   📑 Services menu (desktop sidebar + mobile drawer)
+   ------------------------------------------------------------------ */
 function TableOfContents({ onJump }: { onJump: (id: string) => void }) {
   const [open, setOpen] = useState(false);
   const items: [string, string][] = [
@@ -163,11 +145,11 @@ function TableOfContents({ onJump }: { onJump: (id: string) => void }) {
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* 🚀 Page component wrapped in <LightboxProvider>                    */
-/* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------
+   🚀 Inner page component
+   ------------------------------------------------------------------ */
 function ServicesPageInner() {
-  const openLightbox = useLightbox(); // ✅ safe here
+  const openLightbox = useLightbox();
   const [showModal, setShowModal] = useState(false);
   const { ref, inView } = useInView({ threshold: 0.2, triggerOnce: true });
   const controls = useAnimation();
@@ -180,9 +162,12 @@ function ServicesPageInner() {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
   const fade = (dir: "left" | "right" | "up" | "down" = "up") => {
-    const d = { left: [-50, 0], right: [50, 0], up: [0, -50], down: [0, 50] }[
-      dir
-    ] as [number, number];
+    const d = {
+      left: [-50, 0],
+      right: [50, 0],
+      up: [0, -50],
+      down: [0, 50],
+    }[dir] as [number, number];
     return {
       hidden: { opacity: 0, x: d[0], y: d[1] },
       visible: { opacity: 1, x: 0, y: 0 },
@@ -190,7 +175,7 @@ function ServicesPageInner() {
   };
 
   return (
-    <div className="relative bg-gray-900 text-white">
+    <div className="relative bg-gray-900 text-white overflow-x-hidden touch-pan-y">
       {/* sticky nav */}
       <div className="fixed left-0 top-0 z-50 w-full bg-gray-900">
         <Navbar onPortalClick={() => setShowModal(true)} />
@@ -244,7 +229,7 @@ function ServicesPageInner() {
           ]}
           images={water}
           cta="Call Us Now for 24/7 Water Damage Restoration!"
-          open={openLightbox}
+          open={(imgs, idx) => openLightbox(imgs, idx)}
         />
 
         <ServiceBlock
@@ -264,7 +249,7 @@ function ServicesPageInner() {
           ]}
           images={fire}
           cta="Get Your Property Restored After Fire Damage Today!"
-          open={openLightbox}
+          open={(imgs, idx) => openLightbox(imgs, idx)}
         />
 
         <ServiceBlock
@@ -284,7 +269,7 @@ function ServicesPageInner() {
           ]}
           images={mold}
           cta="Protect Your Home from Dangerous Mold – Contact Us!"
-          open={openLightbox}
+          open={(imgs, idx) => openLightbox(imgs, idx)}
         />
 
         <ServiceBlock
@@ -304,7 +289,7 @@ function ServicesPageInner() {
           ]}
           images={asbestos}
           cta="Need Safe Asbestos Removal? Call Our Certified Team!"
-          open={openLightbox}
+          open={(imgs, idx) => openLightbox(imgs, idx)}
         />
 
         <ServiceBlock
@@ -324,7 +309,7 @@ function ServicesPageInner() {
           ]}
           images={repairs}
           cta="Need Property Repairs? We’ve Got You Covered!"
-          open={openLightbox}
+          open={(imgs, idx) => openLightbox(imgs, idx)}
         />
 
         <ServiceBlock
@@ -345,7 +330,7 @@ function ServicesPageInner() {
           ]}
           images={contents}
           cta="Need Pack‑Out or Storage? Call Us Today!"
-          open={openLightbox}
+          open={(imgs, idx) => openLightbox(imgs, idx)}
         />
 
         {/* final CTA */}
@@ -385,14 +370,15 @@ function ServicesPageInner() {
         </section>
       </main>
 
+      {/* global Modal (for “Portal” calls in Navbar) */}
       <Modal showModal={showModal} onClose={() => setShowModal(false)} />
     </div>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* 🔄 ServiceBlock (re‑usable section)                                */
-/* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------
+   🔄 ServiceBlock (re‑usable section)
+   ------------------------------------------------------------------ */
 function ServiceBlock({
   id,
   num,
@@ -475,13 +461,12 @@ function ServiceBlock({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* 📦 default export – wrapped with provider                          */
-/* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------
+   📦 default export – wrapped with provider
+   ------------------------------------------------------------------ */
 export default function ServicesPage() {
   return (
     <LightboxProvider>
-      {" "}
       <ServicesPageInner />
     </LightboxProvider>
   );

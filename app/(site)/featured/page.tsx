@@ -5,7 +5,6 @@
 
 import React, { useEffect, useMemo, useState, memo } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
-import { Navigation } from "swiper/modules";
 import "swiper/css";
 import "swiper/css/navigation";
 
@@ -109,8 +108,6 @@ const Project = memo(function Project({
           className="w-full lg:w-1/2"
         >
           <Swiper
-            navigation
-            modules={[Navigation]}
             className="aspect-video w-full rounded-lg shadow-lg"
           >
             {slides.map((s, i) => (
@@ -161,7 +158,7 @@ function FeaturedPageInner() {
   const [showModal, setShowModal] = useState(false);
 
   return (
-    <div className="min-h-screen bg-gray-900 pb-16 pt-24">
+    <div className="min-h-screen bg-gray-900 pb-16 pt-24 overflow-x-hidden touch-pan-y">
       <Navbar onPortalClick={() => setShowModal(true)} />
 
       <h1 className="mx-auto mb-14 max-w-6xl px-4 text-center text-4xl font-extrabold text-white lg:text-6xl">

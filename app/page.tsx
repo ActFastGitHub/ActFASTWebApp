@@ -64,7 +64,7 @@ export default function Home() {
     <LightboxProvider>
       {" "}
       {/* ⬅️ wrap everything that may invoke the light‑box */}
-      <div className="relative">
+      <div className="relative overflow-x-hidden touch-pan-y">
         <div className={showModal ? "blur-3xl" : ""}>
           {/* HERO */}
           <section ref={heroRef}>
