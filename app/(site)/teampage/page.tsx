@@ -3,13 +3,13 @@
    ------------------------------------------------------------------ */
 "use client";
 
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Navbar from "@/app/components/siteNavBar";
-import Modal  from "@/app/components/modal";
+import Modal from "@/app/components/modal";
 
 import {
   LightboxProvider,
-  useLightbox,               // ⬅️ global hook
+  useLightbox, // global hook
 } from "@/app/context/LightboxProvider";
 
 import {
@@ -18,9 +18,9 @@ import {
   useInView,
 } from "framer-motion";
 
-/* ------------------------------------------------------------------ */
-/* 0️⃣ Double-tap on mobile → smooth-scroll to top                     */
-/* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------
+   0️⃣ Double-tap on mobile → smooth-scroll to top
+   ------------------------------------------------------------------ */
 function useDoubleTapToTop() {
   const last = useRef<number | null>(null);
   useEffect(() => {
@@ -37,9 +37,9 @@ function useDoubleTapToTop() {
   }, []);
 }
 
-/* ------------------------------------------------------------------ */
-/* 1️⃣  Team data (exactly the same)                                   */
-/* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------
+   1️⃣ Team data (unchanged)
+   ------------------------------------------------------------------ */
 type TeamMember = { name: string; role: string; description: string };
 type TeamSection = {
   role: string;
@@ -107,6 +107,8 @@ const upperManagement: TeamMember[] = [
 const teamSections: TeamSection[] = [
   {
     role: "Contents Team",
+    description:
+      "The Contents Team collaboratively manages sorting, packing, proper labeling, and recording of items. They also handle initial cleanup and ensure everything is accounted for before and after transport.",
     members: [
       {
         name: "Julia",
@@ -134,11 +136,11 @@ const teamSections: TeamSection[] = [
           "Supports all aspects of sorting, labeling, and cleanup to keep operations running smoothly.",
       },
     ],
-    description:
-      "The Contents Team collaboratively manages sorting, packing, proper labeling, and recording of items. They also handle initial cleanup and ensure everything is accounted for before and after transport.",
   },
   {
     role: "Emergency Team",
+    description:
+      "The Emergency Team is the frontline crew for urgent restoration situations—whether water, fire, smoke, or mold. They respond swiftly, bring specialized equipment, and stabilize conditions alongside Project Managers on-site.",
     members: [
       {
         name: "Ricco",
@@ -161,11 +163,11 @@ const teamSections: TeamSection[] = [
           "Newest team member capable of handling a broad range of emergency tasks.",
       },
     ],
-    description:
-      "The Emergency Team is the frontline crew for urgent restoration situations—whether water, fire, smoke, or mold. They respond swiftly, bring specialized equipment, and stabilize conditions alongside Project Managers on-site.",
   },
   {
     role: "Logistics Team",
+    description:
+      "The Logistics Team manages transportation and delivery, from retrieving packed items at client sites to placing them in secure warehouse pods, as well as delivering ordered materials to project locations.",
     members: [
       {
         name: "George",
@@ -178,11 +180,11 @@ const teamSections: TeamSection[] = [
           "Oversees pickups, deliveries, and organizes stored items in designated pods for clients.",
       },
     ],
-    description:
-      "The Logistics Team manages transportation and delivery, from retrieving packed items at client sites to placing them in secure warehouse pods, as well as delivering ordered materials to project locations.",
   },
   {
     role: "Final Repairs Team",
+    description:
+      "The Final Repairs Team handles the end-stage fixes, from essential touch-ups to warranty repairs. They step in for in-house repairs if subcontractors aren’t utilized.",
     members: [
       {
         name: "Fred",
@@ -200,11 +202,11 @@ const teamSections: TeamSection[] = [
           "Newest member of the final repairs team with strong expertise in HVAC systems.",
       },
     ],
-    description:
-      "The Final Repairs Team handles the end-stage fixes, from essential touch-ups to warranty repairs. They step in for in-house repairs if subcontractors aren’t utilized.",
   },
   {
     role: "Automotive",
+    description:
+      "Our Automotive Specialist ensures company vehicles are in prime condition and assists other teams whenever necessary.",
     members: [
       {
         name: "Jun C",
@@ -212,14 +214,12 @@ const teamSections: TeamSection[] = [
           "Handles all vehicle maintenance and repairs, providing support to other departments as needed.",
       },
     ],
-    description:
-      "Our Automotive Specialist ensures company vehicles are in prime condition and assists other teams whenever necessary.",
   },
 ];
 
-/* ------------------------------------------------------------------ */
-/* 2️⃣ role → color map                                               */
-/* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------
+   2️⃣ role → color map
+   ------------------------------------------------------------------ */
 const roleColors: Record<string, string> = {
   "Project Manager": "bg-cyan-500",
   "Construction Manager": "bg-blue-500",
@@ -234,9 +234,9 @@ const roleColors: Record<string, string> = {
   Automotive: "bg-indigo-700",
 };
 
-/* ------------------------------------------------------------------ */
-/* helpers (unchanged)                                                */
-/* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------
+   helpers (unchanged)
+   ------------------------------------------------------------------ */
 const getImagePath = (name: string) =>
   `/images/team/${name.toLowerCase().replace(/ /g, "_")}.jpg`;
 
@@ -254,207 +254,230 @@ const animationVariants = {
   tap: { scale: 1.05, transition: { duration: 0.3 } },
 };
 
-/* ------------------------------------------------------------------ */
-/* 3️⃣ Page component (design intact)                                 */
-/* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------
+   3️⃣ Inner page component with blur + scroll‐lock
+   ------------------------------------------------------------------ */
 function TeamPageInner() {
   const [showModal, setShowModal] = useState(false);
-  const [showMenu, setShowMenu]   = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
 
   useDoubleTapToTop();
-
-  /* new lightbox opener */
   const openLightbox = useLightbox();
 
+  // lock body scroll when modal is open
+  useEffect(() => {
+    document.body.style.overflow = showModal ? "hidden" : "auto";
+    return () => {
+      document.body.style.overflow = "auto";
+    };
+  }, [showModal]);
+
   const toggleMenu = () => setShowMenu((v) => !v);
-  const scrollTo   = (id: string) => {
+  const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
     setShowMenu(false);
   };
 
-  const managers   = upperManagement.filter((m) => m.role !== "General Manager");
+  const managers = upperManagement.filter((m) => m.role !== "General Manager");
   const officeImgs = managers.map((m) => getImagePath(m.name));
 
   return (
-    <div className="bg-gradient-to-b from-gray-900 to-gray-800 py-16">
-      <Navbar onPortalClick={() => setShowModal(true)} />
-
-      {/* title */}
-      <motion.h1
-        className="mb-10 cursor-pointer text-center text-4xl font-extrabold text-white lg:text-6xl"
-        initial={{ opacity: 0, y: 50 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        onClick={toggleMenu}
+    <div className="relative bg-gradient-to-b from-gray-900 to-gray-800 py-16">
+      {/* blurred & scroll-locked background when modal open */}
+      <div
+        className={`touch-pan-y overflow-x-hidden ${
+          showModal ? "filter blur-3xl overflow-hidden" : ""
+        }`}
       >
-        Meet the Team
-      </motion.h1>
+        <Navbar onPortalClick={() => setShowModal(true)} />
 
-      {/* dropdown menu */}
-      {showMenu && (
-        <div className="absolute left-0 top-16 z-50 w-full bg-gray-800 py-3 text-white shadow-xl">
-          <button className="absolute right-4 top-1 text-2xl" onClick={toggleMenu}>
-            ×
-          </button>
-          <ul className="flex flex-col items-center space-y-2">
-            <li
-              className="cursor-pointer hover:text-cyan-300"
-              onClick={() => scrollTo("office-team")}
+        {/* title */}
+        <motion.h1
+          className="mb-10 cursor-pointer text-center text-4xl font-extrabold text-white lg:text-6xl"
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          onClick={toggleMenu}
+        >
+          Meet the Team
+        </motion.h1>
+
+        {/* dropdown menu */}
+        {showMenu && (
+          <div className="absolute left-0 top-16 z-50 w-full bg-gray-800 py-3 text-white shadow-xl">
+            <button
+              className="absolute right-4 top-1 text-2xl"
+              onClick={toggleMenu}
+            >
+              ×
+            </button>
+            <ul className="flex flex-col items-center space-y-2">
+              <li
+                className="cursor-pointer hover:text-cyan-300"
+                onClick={() => scrollTo("office-team")}
+              >
+                Office Team
+              </li>
+              {teamSections.map((s) => (
+                <li
+                  key={s.role}
+                  className="cursor-pointer hover:text-cyan-300"
+                  onClick={() => scrollTo(s.role)}
+                >
+                  {s.role}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <div className="container mx-auto mt-6 space-y-16 px-6">
+          {/* Office Team */}
+          <section id="office-team" className="space-y-12">
+            <motion.h2
+              className="text-center text-3xl font-bold text-white"
+              initial={{ opacity: 0, y: 50 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
             >
               Office Team
-            </li>
-            {teamSections.map((s) => (
-              <li
-                key={s.role}
-                className="cursor-pointer hover:text-cyan-300"
-                onClick={() => scrollTo(s.role)}
-              >
-                {s.role}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+            </motion.h2>
 
-      <div className="container mx-auto mt-6 space-y-16 px-6">
-        {/* Office Team */}
-        <section id="office-team" className="space-y-12">
-          <motion.h2
-            className="text-center text-3xl font-bold text-white"
-            initial={{ opacity: 0, y: 50 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-          >
-            Office Team
-          </motion.h2>
+            <div
+              className={`flex flex-wrap justify-center gap-12 ${getGridClasses(
+                managers.length
+              )}`}
+            >
+              {managers.map((m, i) => {
+                const ref = useRef<HTMLDivElement>(null);
+                const inView = useInView(ref, { once: true });
+                const controls = useAnimation();
+                useEffect(() => {
+                  if (inView) controls.start("visible");
+                }, [inView, controls]);
 
-          <div
-            className={`flex flex-wrap justify-center gap-12 ${getGridClasses(
-              managers.length,
-            )}`}
-          >
-            {managers.map((m, i) => {
-              const ref = useRef<HTMLDivElement>(null);
-              const inView = useInView(ref, { once: true });
-              const controls = useAnimation();
-              useEffect(() => {
-                if (inView) controls.start("visible");
-              }, [inView, controls]);
+                return (
+                  <motion.div
+                    key={m.name}
+                    ref={ref}
+                    variants={animationVariants}
+                    initial="hidden"
+                    animate={controls}
+                    whileHover="hover"
+                    transition={{ duration: 0.5, delay: i * 0.1 }}
+                    onClick={() => openLightbox(officeImgs, i)}
+                    className={`cursor-pointer rounded-2xl p-6 shadow-xl ${
+                      roleColors[m.role]
+                    }`}
+                  >
+                    <div className="flex flex-col items-center">
+                      <div className="relative -mt-16 mb-4 h-24 w-24 overflow-hidden rounded-full bg-gray-200 shadow-2xl ring-4 ring-white lg:-mt-20 lg:h-32 lg:w-32">
+                        <img
+                          src={getImagePath(m.name)}
+                          alt={m.name}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                      <h3 className="text-xl font-semibold text-white lg:text-2xl">
+                        {m.name}
+                      </h3>
+                      <div className="mb-4 mt-1 rounded-lg bg-white px-3 py-1 text-xs font-medium text-gray-800 shadow-sm">
+                        {m.role}
+                      </div>
+                      <p className="rounded-lg bg-white px-3 py-2 text-sm text-gray-800 shadow-md lg:text-base">
+                        {m.description}
+                      </p>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </section>
 
-              return (
-                <motion.div
-                  key={m.name}
-                  ref={ref}
-                  variants={animationVariants}
-                  initial="hidden"
-                  animate={controls}
-                  whileHover="hover"
-                  transition={{ duration: 0.5, delay: i * 0.1 }}
-                  onClick={() => openLightbox(officeImgs, i)}
-                  className={`cursor-pointer rounded-2xl p-6 shadow-xl ${roleColors[m.role]}`}
+          {/* Other departments */}
+          {teamSections.map((sec) => {
+            const imgs = sec.members.map((mem) => getImagePath(mem.name));
+
+            return (
+              <section id={sec.role} key={sec.role} className="space-y-12">
+                <motion.h2
+                  className="text-center text-3xl font-bold text-white"
+                  initial={{ opacity: 0, y: 50 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5 }}
                 >
-                  <div className="flex flex-col items-center">
-                    <div className="relative -mt-16 mb-4 h-24 w-24 overflow-hidden rounded-full bg-gray-200 shadow-2xl ring-4 ring-white lg:-mt-20 lg:h-32 lg:w-32">
-                      <img
-                        src={getImagePath(m.name)}
-                        alt={m.name}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                    <h3 className="text-xl font-semibold text-white lg:text-2xl">
-                      {m.name}
-                    </h3>
-                    <div className="mb-4 mt-1 rounded-lg bg-white px-3 py-1 text-xs font-medium text-gray-800 shadow-sm">
-                      {m.role}
-                    </div>
-                    <p className="rounded-lg bg-white px-3 py-2 text-sm text-gray-800 shadow-md lg:text-base">
-                      {m.description}
-                    </p>
+                  {sec.role}
+                </motion.h2>
+
+                <motion.div
+                  className={`rounded-2xl p-6 shadow-xl ${
+                    roleColors[sec.role] || "bg-orange-500"
+                  }`}
+                  initial={{ opacity: 0, y: 50 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.6 }}
+                >
+                  <p className="mb-4 text-center text-sm text-white">
+                    {sec.description}
+                  </p>
+
+                  <div className={`grid gap-4 ${getGridClasses(sec.members.length)}`}>
+                    {sec.members.map((mem, idx) => {
+                      const ref = useRef<HTMLDivElement>(null);
+                      const inView = useInView(ref, { once: true });
+                      const controls = useAnimation();
+                      useEffect(() => {
+                        if (inView) controls.start("visible");
+                      }, [inView, controls]);
+
+                      return (
+                        <motion.div
+                          key={mem.name}
+                          ref={ref}
+                          variants={animationVariants}
+                          initial="hidden"
+                          animate={controls}
+                          whileHover="hover"
+                          transition={{ duration: 0.5, delay: idx * 0.1 }}
+                          className="flex cursor-pointer flex-col items-center text-center"
+                          onClick={() => openLightbox(imgs, idx)}
+                        >
+                          <div className="mb-4 h-24 w-24 overflow-hidden rounded-full bg-gray-200 shadow-xl ring-4 ring-white">
+                            <img
+                              src={getImagePath(mem.name)}
+                              alt={mem.name}
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                          <p className="text-lg font-semibold text-white">
+                            {mem.name}
+                          </p>
+                          <div className="mt-2 rounded-lg bg-white px-3 py-2 text-sm text-gray-800 shadow-md">
+                            {mem.description}
+                          </div>
+                        </motion.div>
+                      );
+                    })}
                   </div>
                 </motion.div>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* Other departments */}
-        {teamSections.map((sec) => {
-          const imgs = sec.members.map((mem) => getImagePath(mem.name));
-
-          return (
-            <section id={sec.role} key={sec.role} className="space-y-12">
-              <motion.h2
-                className="text-center text-3xl font-bold text-white"
-                initial={{ opacity: 0, y: 50 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5 }}
-              >
-                {sec.role}
-              </motion.h2>
-
-              <motion.div
-                className={`rounded-2xl p-6 shadow-xl ${
-                  roleColors[sec.role] || "bg-orange-500"
-                }`}
-                initial={{ opacity: 0, y: 50 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6 }}
-              >
-                <p className="mb-4 text-center text-sm text-white">{sec.description}</p>
-
-                <div className={`grid gap-4 ${getGridClasses(sec.members.length)}`}>
-                  {sec.members.map((mem, idx) => {
-                    const ref = useRef<HTMLDivElement>(null);
-                    const inView = useInView(ref, { once: true });
-                    const controls = useAnimation();
-                    useEffect(() => {
-                      if (inView) controls.start("visible");
-                    }, [inView, controls]);
-
-                    return (
-                      <motion.div
-                        key={mem.name}
-                        ref={ref}
-                        variants={animationVariants}
-                        initial="hidden"
-                        animate={controls}
-                        whileHover="hover"
-                        transition={{ duration: 0.5, delay: idx * 0.1 }}
-                        className="flex cursor-pointer flex-col items-center text-center"
-                        onClick={() => openLightbox(imgs, idx)}
-                      >
-                        <div className="mb-4 h-24 w-24 overflow-hidden rounded-full bg-gray-200 shadow-xl ring-4 ring-white">
-                          <img
-                            src={getImagePath(mem.name)}
-                            alt={mem.name}
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-                        <p className="text-lg font-semibold text-white">{mem.name}</p>
-                        <div className="mt-2 rounded-lg bg-white px-3 py-2 text-sm text-gray-800 shadow-md">
-                          {mem.description}
-                        </div>
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              </motion.div>
-            </section>
-          );
-        })}
+              </section>
+            );
+          })}
+        </div>
       </div>
 
+      {/* modal overlay */}
       <Modal showModal={showModal} onClose={() => setShowModal(false)} />
     </div>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* 4️⃣ Export wrapped with provider                                   */
-/* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------
+   4️⃣ Export wrapped with provider
+   ------------------------------------------------------------------ */
 export default function MeetTheTeamPage() {
   return (
     <LightboxProvider>

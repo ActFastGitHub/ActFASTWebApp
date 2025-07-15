@@ -29,13 +29,6 @@ export async function POST(request: Request) {
       };
     }
 
-    if (!validatePassword(password)) {
-      throw {
-        code: 400,
-        message:
-          "Password must be at least 8 characters long and contain at least one lowercase letter, one uppercase letter, and one number",
-      };
-    }
     if (!password) throw { code: 400, message: "Please enter your password" };
     if (!confirmpassword)
       throw { code: 400, message: "Please confirm your password" };
@@ -44,6 +37,14 @@ export async function POST(request: Request) {
         code: 400,
         message: "Password and Confirm Password doesn't match",
       };
+
+    if (!validatePassword(password)) {
+      throw {
+        code: 400,
+        message:
+          "Password must be at least 8 characters long and contain at least one lowercase letter, one uppercase letter, and one number",
+      };
+    }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 

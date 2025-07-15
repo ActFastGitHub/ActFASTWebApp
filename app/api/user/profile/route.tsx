@@ -203,10 +203,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ userProfile, status: 200 });
     } catch (error: any) {
       const { code = 500, message = "Internal server error" } = error as APIErr;
-      return NextResponse.json(
-        { status: code, error: message },
-        { status: code },
-      );
+      return NextResponse.json({
+        status: code,
+        error: message,
+      });
     }
   }
 }
@@ -253,7 +253,7 @@ export async function PATCH(request: Request) {
       if (!lastName) {
         throw {
           code: 400,
-          message: "Please enter your last name",
+          message: "Please enter your last asdasdasdas",
         };
       } else if (!validateName(lastName)) {
         throw {
@@ -410,10 +410,10 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ updatedUserProfile, status: 200 });
     } catch (error: any) {
       const { code = 500, message = "Internal server error" } = error as APIErr;
-      return NextResponse.json(
-        { status: code, error: message },
-        { status: code },
-      );
+      return NextResponse.json({
+        status: code,
+        error: message,
+      });
     }
   }
 }
