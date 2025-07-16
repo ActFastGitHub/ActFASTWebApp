@@ -201,6 +201,11 @@ const teamSections: TeamSection[] = [
         description:
           "Newest member of the final repairs team with strong expertise in HVAC systems.",
       },
+      {
+        name: "Dann",
+        description:
+          "Specialist in floor covering installation, expertly fitting hardwood, laminate, and vinyl to ensure seamless, durable, and aesthetically pleasing finishes.",
+      },
     ],
   },
   {
