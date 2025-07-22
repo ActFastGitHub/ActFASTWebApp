@@ -1,6 +1,3 @@
-/* ------------------------------------------------------------------
-   LightboxProvider.tsx – global context with optional label badge
-   ------------------------------------------------------------------ */
 "use client";
 
 import React, {
@@ -15,7 +12,6 @@ import React, {
 import { createPortal } from "react-dom";
 import clsx from "clsx";
 
-/* ---------- types ------------------------------------------------- */
 export type LightboxItem =
   | string
   | {
@@ -25,7 +21,13 @@ export type LightboxItem =
 
 type OpenFn = (imgs: LightboxItem[], idx: number) => void;
 
-const LightboxCtx = createContext<OpenFn | null>(null);
+type LightboxContextType = {
+  open: OpenFn;
+  isOpen: boolean;
+};
+
+const LightboxCtx = createContext<LightboxContextType | null>(null);
+
 export const useLightbox = () => {
   const ctx = useContext(LightboxCtx);
   if (!ctx)
@@ -33,16 +35,12 @@ export const useLightbox = () => {
   return ctx;
 };
 
-/* ---------- provider ---------------------------------------------- */
 export function LightboxProvider({ children }: { children: ReactNode }) {
-  const [viewer, setViewer] = useState<{ imgs: LightboxItem[]; idx: number } | null>(
-    null,
-  );
+  const [viewer, setViewer] = useState<{ imgs: LightboxItem[]; idx: number } | null>(null);
 
   const open = useCallback<OpenFn>((imgs, idx) => setViewer({ imgs, idx }), []);
   const close = useCallback(() => setViewer(null), []);
 
-  /* keyboard navigation */
   useEffect(() => {
     if (!viewer) return;
     const onKey = (e: KeyboardEvent) => {
@@ -58,7 +56,6 @@ export function LightboxProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [viewer, close]);
 
-  /* swipe navigation */
   const startX = useRef<number | null>(null);
   const onTouchStart = (e: React.TouchEvent) =>
     (startX.current = e.touches[0].clientX);
@@ -75,12 +72,6 @@ export function LightboxProvider({ children }: { children: ReactNode }) {
       );
   };
 
-  /* lock body scroll */
-  useEffect(() => {
-    document.body.style.overflow = viewer ? "hidden" : "";
-  }, [viewer]);
-
-  /*  overlay -------------------------------------------------------- */
   const overlay =
     viewer &&
     createPortal(
@@ -90,12 +81,9 @@ export function LightboxProvider({ children }: { children: ReactNode }) {
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
-        {/* close */}
         <button className="absolute right-4 top-4 rounded bg-black/60 p-2 text-white">
           ✕
         </button>
-
-        {/* image w/ optional badge */}
         {(() => {
           const item = viewer.imgs[viewer.idx];
           const src   = typeof item === "string" ? item : item.src;
@@ -121,9 +109,8 @@ export function LightboxProvider({ children }: { children: ReactNode }) {
       document.body,
     );
 
-  /* blur wrapper around app                                        */
   return (
-    <LightboxCtx.Provider value={open}>
+    <LightboxCtx.Provider value={{ open, isOpen: !!viewer }}>
       <div
         className={clsx(
           "transition-filter duration-200",

@@ -151,7 +151,7 @@ const Project = memo(function Project({
    inner page – uses hook
    ------------------------------------------------------------------ */
 function FeaturedPageInner() {
-  const openLightbox = useLightbox();
+  const { open } = useLightbox(); // FIX: Destructure open!
   const [showModal, setShowModal] = useState(false);
 
   // lock body scroll when modal is open
@@ -177,7 +177,7 @@ function FeaturedPageInner() {
         </h1>
 
         {projects.map((p, i) => (
-          <Project key={i} project={p} idx={i} openLightbox={openLightbox} />
+          <Project key={i} project={p} idx={i} openLightbox={open} />
         ))}
       </div>
 

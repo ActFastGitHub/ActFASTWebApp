@@ -1,6 +1,3 @@
-/* ------------------------------------------------------------------
-   page.tsx  (or Home.tsx)
-   ------------------------------------------------------------------ */
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -9,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useInView } from "react-intersection-observer";
 import dynamic from "next/dynamic";
 
-import { LightboxProvider } from "@/app/context/LightboxProvider";
+import { LightboxProvider, useLightbox } from "@/app/context/LightboxProvider";
 import HeroSection from "@/app/components/heroSection";
 import StickyContactButtons from "@/app/components/stickyContactButtons";
 import Modal from "@/app/components/modal";
@@ -47,68 +44,63 @@ const videos = [
 /* ------------------------------------------------------------------
    main page component
    ------------------------------------------------------------------ */
-export default function Home() {
+
+function HomeContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  /* 1️⃣ always start at the top */
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
-  /* 2️⃣ auth redirects */
   useEffect(() => {
     if (status === "loading") return;
     if (!session) router.push("/");
     else if (session.user.isNewUser) router.push("/create-profile");
   }, [session, status, router]);
 
-  /* 3️⃣ hero visibility for sticky CTA */
   const { ref: heroRef, inView: heroInView } = useInView({ threshold: 0.25 });
   const [showModal, setShowModal] = useState(false);
 
-  // lock body scroll when modal is open
+  // 👇 Get lightbox open state from context!
+  const { isOpen: isLightboxOpen } = useLightbox();
+
+  // Centralized scroll lock for modal and lightbox
   useEffect(() => {
-    document.body.style.overflow = showModal ? "hidden" : "auto";
+    if (showModal || isLightboxOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "auto";
+    }
     return () => {
       document.body.style.overflow = "auto";
     };
-  }, [showModal]);
+  }, [showModal, isLightboxOpen]);
 
   return (
-    <LightboxProvider>
-      <div className="relative">
-        {/* blurred & scroll‑locked background when showModal=true */}
-        <div
-          className={`overflow-x-hidden touch-pan-y ${
-            showModal ? "filter blur-3xl overflow-hidden" : ""
-          }`}
-        >
-          {/* HERO */}
-          <section ref={heroRef}>
-            <HeroSection onPortalClick={() => setShowModal(true)} />
-          </section>
-
-          {/* MAIN CONTENT */}
-          <ServicesSection />
-          <AboutSection />
-          <TestimonialsSection />
-
-          {/* 🎬 VIDEO GALLERY */}
-          <VideoCarouselSection videos={videos} />
-
-          <ContactUsSection />
-          <Footer />
-        </div>
-
-        {/* PORTAL & STICKY CTA */}
-        <Modal showModal={showModal} onClose={() => setShowModal(false)} />
-
-        {/* Only show the sticky buttons if both:
-             • the hero is out of view (heroInView = false), AND
-             • the modal is closed (showModal = false) */}
-        <StickyContactButtons show={!heroInView && !showModal} />
+    <div className="relative">
+      <div className={`overflow-hidden ${showModal ? "filter blur-3xl overflow-hidden" : ""}`}>
+        {/* HERO */}
+        <section ref={heroRef}>
+          <HeroSection onPortalClick={() => setShowModal(true)} />
+        </section>
+        <ServicesSection />
+        <AboutSection />
+        <TestimonialsSection />
+        <VideoCarouselSection videos={videos} />
+        <ContactUsSection />
+        <Footer />
       </div>
+      <Modal showModal={showModal} onClose={() => setShowModal(false)} />
+      <StickyContactButtons show={!heroInView && !showModal && !isLightboxOpen} />
+    </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <LightboxProvider>
+      <HomeContent />
     </LightboxProvider>
   );
 }

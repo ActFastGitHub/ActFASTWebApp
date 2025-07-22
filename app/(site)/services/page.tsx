@@ -151,10 +151,9 @@ function TableOfContents({ onJump }: { onJump: (id: string) => void }) {
    🚀 Inner page component
    ------------------------------------------------------------------ */
 function ServicesPageInner() {
-  const openLightbox = useLightbox();
+  const { open } = useLightbox(); // <-- FIXED: Destructure open!
   const [showModal, setShowModal] = useState(false);
 
-  // lock body scroll when modal is open
   useEffect(() => {
     document.body.style.overflow = showModal ? "hidden" : "auto";
     return () => {
@@ -190,7 +189,6 @@ function ServicesPageInner() {
 
   return (
     <div className="relative">
-      {/* all content blurred & scroll‑locked when showModal=true */}
       <div
         className={`touch-pan-y overflow-x-hidden bg-gray-900 text-white ${
           showModal ? "filter blur-3xl overflow-hidden" : ""
@@ -249,7 +247,7 @@ function ServicesPageInner() {
             ]}
             images={water}
             cta="Call Us Now for 24/7 Water Damage Restoration!"
-            open={(imgs, idx) => openLightbox(imgs, idx)}
+            open={open} // <-- Pass open directly!
           />
 
           <ServiceBlock
@@ -269,7 +267,7 @@ function ServicesPageInner() {
             ]}
             images={fire}
             cta="Get Your Property Restored After Fire Damage Today!"
-            open={(imgs, idx) => openLightbox(imgs, idx)}
+            open={open}
           />
 
           <ServiceBlock
@@ -289,7 +287,7 @@ function ServicesPageInner() {
             ]}
             images={mold}
             cta="Protect Your Home from Dangerous Mold – Contact Us!"
-            open={(imgs, idx) => openLightbox(imgs, idx)}
+            open={open}
           />
 
           <ServiceBlock
@@ -309,7 +307,7 @@ function ServicesPageInner() {
             ]}
             images={asbestos}
             cta="Need Safe Asbestos Removal? Call Our Certified Team!"
-            open={(imgs, idx) => openLightbox(imgs, idx)}
+            open={open}
           />
 
           <ServiceBlock
@@ -329,7 +327,7 @@ function ServicesPageInner() {
             ]}
             images={repairs}
             cta="Need Property Repairs? We’ve Got You Covered!"
-            open={(imgs, idx) => openLightbox(imgs, idx)}
+            open={open}
           />
 
           <ServiceBlock
@@ -350,7 +348,7 @@ function ServicesPageInner() {
             ]}
             images={contents}
             cta="Need Pack‑Out or Storage? Call Us Today!"
-            open={(imgs, idx) => openLightbox(imgs, idx)}
+            open={open}
           />
 
           {/* final CTA */}

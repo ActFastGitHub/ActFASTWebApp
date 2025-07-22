@@ -1,6 +1,3 @@
-/* ------------------------------------------------------------------
-   ServicesSection.tsx
-   ------------------------------------------------------------------ */
 "use client";
 
 import React, { useEffect, useMemo, memo } from "react";
@@ -15,11 +12,8 @@ import "swiper/css/pagination";
 import { motion, useAnimation } from "framer-motion";
 import { useInView } from "react-intersection-observer";
 
-import { useLightbox } from "@/app/context/LightboxProvider"; // 
+import { useLightbox } from "@/app/context/LightboxProvider";
 
-/* ------------------------------------------------------------------ */
-/* helpers                                                             */
-/* ------------------------------------------------------------------ */
 type Service = {
   title: string;
   description: string;
@@ -89,9 +83,6 @@ const SERVICES: readonly Service[] = [
   ),
 ];
 
-/* ------------------------------------------------------------------ */
-/* ServiceCard – Swiper uses fade + lazyPreloadPrevNext               */
-/* ------------------------------------------------------------------ */
 const ServiceCard = memo(
   ({
     svc,
@@ -144,9 +135,6 @@ const ServiceCard = memo(
   ),
 );
 
-/* ------------------------------------------------------------------ */
-/* Lazy wrapper – mounts a card only when near viewport               */
-/* ------------------------------------------------------------------ */
 const LazyCard = ({
   svc,
   idx,
@@ -166,13 +154,10 @@ const LazyCard = ({
   );
 };
 
-/* ------------------------------------------------------------------ */
-/* main component                                                     */
-/* ------------------------------------------------------------------ */
 export default function ServicesSection() {
   const { ref, inView } = useInView({ threshold: 0.1, triggerOnce: true });
   const controls = useAnimation();
-  const open = useLightbox();           // ⬅️ provider gives us the opener
+  const { open } = useLightbox(); // CORRECT: useLightbox returns an object
   const services = useMemo(() => SERVICES, []);
 
   useEffect(() => {
