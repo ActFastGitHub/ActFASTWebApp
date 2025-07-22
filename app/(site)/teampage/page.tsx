@@ -48,18 +48,195 @@ type TeamSection = {
 };
 
 const upperManagement: TeamMember[] = [
-  // ... unchanged
+  {
+    name: "Carlo Bernabe",
+    role: "Project Manager",
+    description:
+      "Seasoned professional with over 20 years of experience, overseeing key aspects of restoration and repair projects.",
+  },
+  {
+    name: "Jun Adasa",
+    role: "Project Manager",
+    description:
+      "Leads multiple projects with a focus on strategic coordination, ensuring budgets, schedules, and client expectations are met.",
+  },
+  {
+    name: "Albert Siscar",
+    role: "Project Manager",
+    description:
+      "Senior manager who drives project timelines, fosters strong client relationships, and guarantees high-quality outcomes.",
+  },
+  {
+    name: "DJ Lopez",
+    role: "Construction Manager",
+    description:
+      "Directs all final repair operations, managing budgets and collaborating with subcontractors to meet project scopes.",
+  },
+  {
+    name: "Ervin Ong",
+    role: "Project Coordinator",
+    description:
+      "Facilitates communication between teams, assisting in scheduling, client interaction, and on-site coordination.",
+  },
+  {
+    name: "Mac De Guzman",
+    role: "Project Coordinator",
+    description:
+      "Focuses on large-scale projects, managing employee schedules and ensuring timely progress on key deliverables.",
+  },
+  {
+    name: "April Adasa",
+    role: "Purchasing Officer",
+    description:
+      "Oversees procurement and supply management, supporting both final repairs and contents operations.",
+  },
+  {
+    name: "Girlie Atienza",
+    role: "Controller",
+    description:
+      "Manages financial tasks including bookkeeping, payroll, and time sheet administration.",
+  },
+  {
+    name: "Angelo Guerra",
+    role: "Technical Support Analyst",
+    description:
+      "Provides IT solutions, web development, and process optimization to streamline company operations.",
+  },
 ];
 
 const teamSections: TeamSection[] = [
-  // ... unchanged
+  {
+    role: "Contents Team",
+    description:
+      "The Contents Team collaboratively manages sorting, packing, proper labeling, and recording of items. They also handle initial cleanup and ensure everything is accounted for before and after transport.",
+    members: [
+      {
+        name: "Julia",
+        description:
+          "Lead member ensuring smooth coordination of sorting, packing, labeling, and record-keeping.",
+      },
+      {
+        name: "Beth",
+        description:
+          "Senior member focused on efficient team collaboration and thorough preparation for transport.",
+      },
+      {
+        name: "Lisa",
+        description:
+          "Lead member ensuring all items are accurately tracked, labeled, and ready for pack-out and pack-back.",
+      },
+      {
+        name: "Lorena",
+        description:
+          "Contributes to every stage of content handling, maintaining accurate records of item locations.",
+      },
+      {
+        name: "Vivian",
+        description:
+          "Supports all aspects of sorting, labeling, and cleanup to keep operations running smoothly.",
+      },
+    ],
+  },
+  {
+    role: "Emergency Team",
+    description:
+      "The Emergency Team is the frontline crew for urgent restoration situations—whether water, fire, smoke, or mold. They respond swiftly, bring specialized equipment, and stabilize conditions alongside Project Managers on-site.",
+    members: [
+      {
+        name: "Ricco",
+        description:
+          "Most tenured responder specializing in plumbing, ready for any urgent restoration needs.",
+      },
+      {
+        name: "Theo",
+        description:
+          "Expert in demolition and asbestos abatement, ensuring quick, safe resolutions.",
+      },
+      {
+        name: "Chriskie",
+        description:
+          "Skilled in demolition and asbestos abatement, delivering prompt support for water, fire, smoke, and mold incidents.",
+      },
+      {
+        name: "Julius",
+        description:
+          "Newest team member capable of handling a broad range of emergency tasks.",
+      },
+    ],
+  },
+  {
+    role: "Logistics Team",
+    description:
+      "The Logistics Team manages transportation and delivery, from retrieving packed items at client sites to placing them in secure warehouse pods, as well as delivering ordered materials to project locations.",
+    members: [
+      {
+        name: "George",
+        description:
+          "Coordinates pack-outs and pack-backs with precision, ensuring items move safely from client sites to storage.",
+      },
+      {
+        name: "Lito",
+        description:
+          "Oversees pickups, deliveries, and organizes stored items in designated pods for clients.",
+      },
+    ],
+  },
+  {
+    role: "Final Repairs Team",
+    description:
+      "The Final Repairs Team handles the end-stage fixes, from essential touch-ups to warranty repairs. They step in for in-house repairs if subcontractors aren’t utilized.",
+    members: [
+      {
+        name: "Fred",
+        description:
+          "Specialist in final repairs, touch-ups, and warranty work to ensure top-quality results.",
+      },
+      {
+        name: "Bobby",
+        description:
+          "Highly adept at final repairs with a strong specialty in drywalling; also flexible in handling various tasks.",
+      },
+      {
+        name: "Christopher",
+        description:
+          "Newest member of the final repairs team with strong expertise in HVAC systems.",
+      },
+      {
+        name: "Dann",
+        description:
+          "Specialist in floor covering installation, expertly fitting hardwood, laminate, and vinyl to ensure seamless, durable, and aesthetically pleasing finishes.",
+      },
+    ],
+  },
+  {
+    role: "Automotive",
+    description:
+      "Our Automotive Specialist ensures company vehicles are in prime condition and assists other teams whenever necessary.",
+    members: [
+      {
+        name: "Jun C",
+        description:
+          "Handles all vehicle maintenance and repairs, providing support to other departments as needed.",
+      },
+    ],
+  },
 ];
 
 /* ------------------------------------------------------------------
    2️⃣ role → color map
    ------------------------------------------------------------------ */
 const roleColors: Record<string, string> = {
-  // ... unchanged
+  "Project Manager": "bg-cyan-500",
+  "Construction Manager": "bg-blue-500",
+  "Project Coordinator": "bg-yellow-500",
+  "Purchasing Officer": "bg-purple-500",
+  Controller: "bg-pink-500",
+  "Technical Support Analyst": "bg-lime-500",
+  "Contents Team": "bg-orange-500",
+  "Emergency Team": "bg-blue-600",
+  "Logistics Team": "bg-green-700",
+  "Final Repairs Team": "bg-yellow-700",
+  Automotive: "bg-indigo-700",
 };
 
 /* ------------------------------------------------------------------
@@ -194,7 +371,7 @@ function TeamPageInner() {
                     animate={controls}
                     whileHover="hover"
                     transition={{ duration: 0.5, delay: i * 0.1 }}
-                    onClick={() => open(officeImgs, i)} // <-- FIXED HERE
+                    onClick={() => open(officeImgs, i)}
                     className={`cursor-pointer rounded-2xl p-6 shadow-xl ${
                       roleColors[m.role]
                     }`}
@@ -271,7 +448,7 @@ function TeamPageInner() {
                           whileHover="hover"
                           transition={{ duration: 0.5, delay: idx * 0.1 }}
                           className="flex cursor-pointer flex-col items-center text-center"
-                          onClick={() => open(imgs, idx)} // <-- FIXED HERE
+                          onClick={() => open(imgs, idx)}
                         >
                           <div className="mb-4 h-24 w-24 overflow-hidden rounded-full bg-gray-200 shadow-xl ring-4 ring-white">
                             <img
