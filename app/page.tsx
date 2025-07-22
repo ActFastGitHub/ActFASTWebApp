@@ -31,8 +31,16 @@ const Footer = dynamic(() => import("@/app/components/footer"));
 /* ---------- sample video data ------------------------------------- */
 const videos = [
   {
+    title: "ActFast Services",
+    embedUrl: "https://www.youtube.com/embed/ucaVv-l8HNA?si=lLsRxhbsokLwQxnw",
+  },
+  {
     title: "Client Success Story",
-    embedUrl: "https://www.youtube.com/embed/sthdYDd4hPk?si=b3fkpUwD-OHvEgIu",
+    embedUrl: "https://www.youtube.com/embed/MsBvmce8z5U?si=CmEkoa8XB5Px6hf9",
+  },
+  {
+    title: "Promotional Video",
+    embedUrl: "https://www.youtube.com/embed/sthdYDd4hPk?si=ZL6KMJNfndfJGvGl",
   },
 ];
 

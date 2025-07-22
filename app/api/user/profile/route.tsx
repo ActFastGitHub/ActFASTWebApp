@@ -253,7 +253,7 @@ export async function PATCH(request: Request) {
       if (!lastName) {
         throw {
           code: 400,
-          message: "Please enter your last asdasdasdas",
+          message: "Please enter your last name",
         };
       } else if (!validateName(lastName)) {
         throw {
