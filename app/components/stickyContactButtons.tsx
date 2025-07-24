@@ -68,7 +68,7 @@ const StickyContactButtons: React.FC<StickyContactButtonsProps> = ({
     {show && (
       <motion.div
         key="sticky-buttons"
-        className="fixed right-4 top-1/2 z-50 flex -translate-y-1/2 flex-col gap-4"
+        className="fixed right-4 bottom-20 z-50 flex -translate-y-1/2 flex-col gap-4"
         initial={{ opacity: 0, x: 96 }}
         animate={{ opacity: 1, x: 0 }}
         exit={{ opacity: 0, x: 96 }}
