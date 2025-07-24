@@ -115,7 +115,7 @@ const ServiceCard = memo(
           hidden: { opacity: 0, y: 40 },
         }}
         transition={{ duration: 0.5, delay }}
-        className="mx-auto max-w-sm rounded-2xl backdrop-blur-xl bg-white/60 shadow-lg border border-white/30 hover:shadow-2xl hover:scale-[1.025] transition-transform"
+        className="mx-auto max-w-sm rounded-2xl backdrop-blur-xl bg-white shadow-lg border border-white/30 hover:shadow-2xl hover:scale-[1.025] transition-transform"
       >
         <div className="relative group rounded-2xl overflow-hidden">
           <Swiper
