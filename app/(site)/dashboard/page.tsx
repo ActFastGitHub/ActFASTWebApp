@@ -200,7 +200,7 @@ export default function Dashboard() {
               {canAccess("inventorymanagementpage", role) && (
                 <Link href="/inventorymanagementpage">
                   <Card
-                    color="pink"
+                    color="green"
                     title="Inventory Management"
                     desc="Manage inventory & supplies."
                   />

@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
@@ -7,83 +6,101 @@ import Modal from "@/app/components/modal";
 import { LightboxProvider, useLightbox } from "@/app/context/LightboxProvider";
 import { motion, useAnimation, useInView } from "framer-motion";
 
-// Section color accents
+// --- Color Typing ---
+type SectionKey =
+  | "Contents Team"
+  | "Emergency Team"
+  | "Logistics Team"
+  | "Final Repairs Team"
+  | "Automotive";
+
+type RoleKey =
+  | "Project Manager"
+  | "Construction Manager"
+  | "Project Coordinator"
+  | "Purchasing Officer"
+  | "Controller"
+  | "Technical Support Analyst";
+
+// --- Section Colors ---
 const sectionColors: Record<
-  string,
+  SectionKey,
   { gradient: string; glow: string; inner: string }
 > = {
   "Contents Team": {
-    gradient: "from-orange-400/30 via-orange-100/30 to-white/10",
-    glow: "rgba(251,146,60,0.13)",
-    inner: "hover:bg-orange-100/70",
+    gradient: "from-orange-400/60 via-yellow-300/40 to-pink-300/30",
+    glow: "rgba(251,191,36,0.17)",
+    inner: "hover:bg-orange-200/90",
   },
   "Emergency Team": {
-    gradient: "from-blue-500/20 via-blue-100/20 to-white/10",
-    glow: "rgba(37,99,235,0.12)",
-    inner: "hover:bg-blue-100/70",
+    gradient: "from-cyan-400/60 via-sky-300/40 to-blue-400/30",
+    glow: "rgba(34,211,238,0.16)",
+    inner: "hover:bg-cyan-200/90",
   },
   "Logistics Team": {
-    gradient: "from-green-600/20 via-green-100/20 to-white/10",
-    glow: "rgba(21,128,61,0.10)",
-    inner: "hover:bg-green-100/70",
+    gradient: "from-green-400/60 via-lime-300/40 to-emerald-300/30",
+    glow: "rgba(74,222,128,0.15)",
+    inner: "hover:bg-green-200/90",
   },
   "Final Repairs Team": {
-    gradient: "from-yellow-400/30 via-yellow-100/30 to-white/10",
-    glow: "rgba(202,138,4,0.11)",
-    inner: "hover:bg-yellow-100/70",
+    gradient: "from-fuchsia-500/60 via-pink-400/40 to-indigo-300/30",
+    glow: "rgba(232,121,249,0.13)",
+    inner: "hover:bg-pink-200/90",
   },
-  Automotive: {
-    gradient: "from-indigo-500/20 via-indigo-100/20 to-white/10",
-    glow: "rgba(67,56,202,0.10)",
-    inner: "hover:bg-indigo-100/70",
+  "Automotive": {
+    gradient: "from-yellow-300/60 via-orange-400/40 to-amber-400/30",
+    glow: "rgba(251,191,36,0.13)",
+    inner: "hover:bg-yellow-200/90",
   },
 };
 
+// --- Role Colors (you = green, project managers = purple/fuchsia, others handled) ---
 const roleColors: Record<
-  string,
+  RoleKey,
   { border: string; ring: string; glow: string; gradient: string }
 > = {
   "Project Manager": {
-    border: "border-cyan-500",
-    ring: "ring-cyan-400",
-    glow: "rgba(34,211,238,0.18)",
-    gradient: "from-cyan-400/20 via-cyan-200/10 to-white/10",
+    border: "border-fuchsia-600",
+    ring: "ring-fuchsia-400",
+    glow: "rgba(192,38,211,0.23)",
+    gradient: "from-fuchsia-500/70 via-fuchsia-300/40 to-pink-100/30",
   },
   "Construction Manager": {
-    border: "border-blue-500",
-    ring: "ring-blue-400",
-    glow: "rgba(59,130,246,0.16)",
-    gradient: "from-blue-400/20 via-blue-200/10 to-white/10",
+    border: "border-sky-500",
+    ring: "ring-sky-400",
+    glow: "rgba(56,189,248,0.21)",
+    gradient: "from-sky-400/70 via-sky-200/40 to-white/10",
   },
   "Project Coordinator": {
-    border: "border-yellow-500",
-    ring: "ring-yellow-400",
-    glow: "rgba(250,204,21,0.13)",
-    gradient: "from-yellow-300/20 via-yellow-100/10 to-white/10",
+    border: "border-amber-500",
+    ring: "ring-amber-400",
+    glow: "rgba(251,191,36,0.21)",
+    gradient: "from-amber-400/70 via-yellow-200/40 to-white/10",
   },
   "Purchasing Officer": {
-    border: "border-purple-500",
-    ring: "ring-purple-400",
-    glow: "rgba(192,132,252,0.13)",
-    gradient: "from-purple-400/20 via-purple-200/10 to-white/10",
+    border: "border-emerald-600",
+    ring: "ring-emerald-400",
+    glow: "rgba(16,185,129,0.16)",
+    gradient: "from-emerald-400/70 via-emerald-200/40 to-white/10",
   },
   Controller: {
-    border: "border-pink-500",
-    ring: "ring-pink-400",
-    glow: "rgba(244,114,182,0.14)",
-    gradient: "from-pink-400/20 via-pink-200/10 to-white/10",
+    border: "border-indigo-500",
+    ring: "ring-indigo-400",
+    glow: "rgba(99,102,241,0.16)",
+    gradient: "from-indigo-400/70 via-indigo-200/40 to-white/10",
   },
+  // You = green!
   "Technical Support Analyst": {
-    border: "border-lime-500",
+    border: "border-lime-600",
     ring: "ring-lime-400",
-    glow: "rgba(163,230,53,0.11)",
-    gradient: "from-lime-400/20 via-lime-200/10 to-white/10",
+    glow: "rgba(101,163,13,0.23)",
+    gradient: "from-lime-400/70 via-green-200/40 to-white/10",
   },
 };
 
-type TeamMember = { name: string; role: string; description: string };
+type TeamMember = { name: string; role: RoleKey; description: string };
 type TeamSection = {
-  role: string;
+  role: SectionKey;
   members: { name: string; description: string }[];
   description: string;
 };
@@ -97,6 +114,7 @@ const upperManagement: TeamMember[] = [
   { name: "Mac De Guzman", role: "Project Coordinator", description: "Focuses on large-scale projects, managing employee schedules and ensuring timely progress on key deliverables." },
   { name: "April Adasa", role: "Purchasing Officer", description: "Oversees procurement and supply management, supporting both final repairs and contents operations." },
   { name: "Girlie Atienza", role: "Controller", description: "Manages financial tasks including bookkeeping, payroll, and time sheet administration." },
+  // You go last and will always be green
   { name: "Angelo Guerra", role: "Technical Support Analyst", description: "Provides IT solutions, web development, and process optimization to streamline company operations." },
 ];
 
@@ -180,8 +198,12 @@ function TeamPageInner() {
     setShowMenu(false);
   };
 
-  const managers = upperManagement.filter((m) => m.role !== "General Manager");
-  const officeImgs = managers.map((m) => getImagePath(m.name));
+  // Always ensure YOU are last for the green highlight
+  const sortedManagers = [
+    ...upperManagement.filter((m) => m.name !== "Angelo Guerra"),
+    upperManagement.find((m) => m.name === "Angelo Guerra")!,
+  ];
+  const officeImgs = sortedManagers.map((m) => getImagePath(m.name));
 
   return (
     <div className="relative bg-gradient-to-b from-gray-950 via-gray-900 to-gray-800 min-h-screen">
@@ -217,7 +239,7 @@ function TeamPageInner() {
           </motion.h1>
         </div>
 
-        {/* Dropdown menu (all teams visible and readable) */}
+        {/* Dropdown menu */}
         {showMenu && (
           <div className="fixed left-0 top-0 w-full h-full bg-black/50 z-50 flex flex-col items-center pt-24">
             <motion.div
@@ -257,10 +279,10 @@ function TeamPageInner() {
           </div>
         )}
 
-        {/* --- OFFICE TEAM --- */}
+        {/* --- OFFICE TEAM (now uses flex for perfect centering) --- */}
         <section id="office-team" className="space-y-10">
           <motion.h2
-            className="text-center text-3xl font-bold text-white mb-6 mt-4 tracking-wider"
+            className="text-center text-3xl font-bold text-white mb-2 mt-4 tracking-wider"
             initial={{ opacity: 0, y: 50 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
@@ -271,20 +293,23 @@ function TeamPageInner() {
           <div className="w-full flex justify-center">
             <div
               className={`
-                grid gap-8
-                grid-cols-1 sm:grid-cols-2 lg:grid-cols-3
-                max-w-5xl w-full justify-center
+                flex flex-wrap justify-center items-stretch
+                gap-8 xl:gap-10
+                w-full max-w-screen-xl
                 px-4
               `}
+              style={{
+                minHeight: "340px", // Ensures good vertical spacing for 1 or 2 rows
+              }}
             >
-              {managers.map((m, i) => {
+              {sortedManagers.map((m, i) => {
                 const ref = useRef<HTMLDivElement>(null);
                 const inView = useInView(ref, { once: true });
                 const controls = useAnimation();
                 useEffect(() => {
                   if (inView) controls.start("visible");
                 }, [inView, controls]);
-                const accent = roleColors[m.role] || roleColors["Technical Support Analyst"];
+                const accent = roleColors[m.role as RoleKey] || roleColors["Technical Support Analyst"];
                 return (
                   <motion.div
                     key={m.name}
@@ -296,29 +321,33 @@ function TeamPageInner() {
                     initial="hidden"
                     animate={controls}
                     whileInView="visible"
-                    transition={{ duration: 0.6, delay: i * 0.12 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.5, delay: i * 0.09 }}
                     onClick={() => open(officeImgs, i)}
                     className={`
                       cursor-pointer relative flex flex-col items-center
                       rounded-2xl
                       bg-gradient-to-br ${accent.gradient}
-                      bg-white/20 backdrop-blur-lg
+                      bg-white/30 backdrop-blur-lg
                       border border-white/30 border-l-8 ${accent.border}
-                      min-w-[260px] max-w-[350px] pt-16 pb-7 px-6
+                      pt-16 pb-7 px-6
                       group
                       transition-all duration-200
-                      shadow-xl
+                      shadow-2xl
+                      min-w-[270px] max-w-[340px] w-full
+                      flex-1
+                      sm:flex-initial
                     `}
                     style={{
                       marginTop: "52px",
                       overflow: "visible",
-                      boxShadow: `0 16px 40px 0 ${accent.glow}, 0 2px 16px 0 rgba(30,41,59,0.10)`,
+                      boxShadow: `0 16px 40px 0 ${accent.glow}, 0 2px 16px 0 rgba(30,41,59,0.13)`,
                     }}
                     whileHover={{
                       scale: 1.06,
-                      boxShadow: `0 36px 80px 0 ${accent.glow}, 0 2px 48px 0 ${accent.glow}, 0 2px 16px 0 rgba(30,41,59,0.19)`,
-                      backgroundColor: "rgba(255,255,255,0.38)",
-                      transition: { duration: 0.15, type: "tween" },
+                      boxShadow: `0 36px 80px 0 ${accent.glow}, 0 2px 48px 0 ${accent.glow}, 0 2px 16px 0 rgba(30,41,59,0.20)`,
+                      backgroundColor: "rgba(255,255,255,0.47)",
+                      transition: { duration: 0.14, type: "tween" },
                     }}
                   >
                     <div
@@ -344,7 +373,7 @@ function TeamPageInner() {
                         className="absolute inset-0 rounded-full pointer-events-none"
                         style={{
                           boxShadow: `0 0 24px 3px ${accent.glow}`,
-                          opacity: 0.5,
+                          opacity: 0.45,
                         }}
                       />
                     </div>
@@ -364,7 +393,7 @@ function TeamPageInner() {
                     <p
                       className="rounded-xl bg-white/40 px-4 py-3 text-sm text-gray-800 shadow-md font-medium mt-2 text-center"
                       style={{
-                        border: "1px solid rgba(255,255,255,0.11)",
+                        border: "1px solid rgba(255,255,255,0.13)",
                         backdropFilter: "blur(2px)",
                       }}
                     >
@@ -379,10 +408,10 @@ function TeamPageInner() {
 
         <SectionDivider colors="from-cyan-400 via-fuchsia-400 to-lime-300" className="my-12" />
 
-        {/* --- OTHER TEAMS --- */}
+        {/* --- OTHER TEAMS (unchanged but with lively colors) --- */}
         {teamSections.map((sec, sidx) => {
           const imgs = sec.members.map((mem) => getImagePath(mem.name));
-          const accent = sectionColors[sec.role] || sectionColors["Contents Team"];
+          const accent = sectionColors[sec.role as SectionKey] || sectionColors["Contents Team"];
           const isSingle = sec.members.length === 1;
           const isLast = sidx === teamSections.length - 1;
           return (
@@ -452,11 +481,12 @@ function TeamPageInner() {
                             initial="hidden"
                             animate={controls}
                             whileInView="visible"
+                            viewport={{ once: true }}
                             transition={{ duration: 0.55, delay: idx * 0.09 }}
                             onClick={() => open(imgs, idx)}
                             className={`
                               relative flex flex-col items-center rounded-xl
-                              bg-white/60 backdrop-blur-md border border-white/20
+                              bg-white/70 backdrop-blur-md border border-white/20
                               pt-14 pb-6 px-5 shadow
                               transition-all duration-200
                               cursor-pointer
@@ -470,7 +500,7 @@ function TeamPageInner() {
                             whileHover={{
                               scale: 1.045,
                               boxShadow: `0 6px 20px 0 ${accent.glow}`,
-                              backgroundColor: "rgba(255,255,255,0.93)",
+                              backgroundColor: "rgba(255,255,255,0.97)",
                               transition: { duration: 0.13, type: "tween" },
                             }}
                           >
