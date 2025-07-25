@@ -54,7 +54,7 @@ const sectionColors: Record<
   },
 };
 
-// --- Role Colors (you = green, project managers = purple/fuchsia, others handled) ---
+// --- Role Colors ---
 const roleColors: Record<
   RoleKey,
   { border: string; ring: string; glow: string; gradient: string }
@@ -114,7 +114,6 @@ const upperManagement: TeamMember[] = [
   { name: "Mac De Guzman", role: "Project Coordinator", description: "Focuses on large-scale projects, managing employee schedules and ensuring timely progress on key deliverables." },
   { name: "April Adasa", role: "Purchasing Officer", description: "Oversees procurement and supply management, supporting both final repairs and contents operations." },
   { name: "Girlie Atienza", role: "Controller", description: "Manages financial tasks including bookkeeping, payroll, and time sheet administration." },
-  // You go last and will always be green
   { name: "Angelo Guerra", role: "Technical Support Analyst", description: "Provides IT solutions, web development, and process optimization to streamline company operations." },
 ];
 
@@ -185,6 +184,7 @@ function TeamPageInner() {
   useDoubleTapToTop();
   const { open } = useLightbox();
 
+  // Body scroll lock for modal
   useEffect(() => {
     document.body.style.overflow = showModal ? "hidden" : "";
     return () => {
@@ -206,7 +206,7 @@ function TeamPageInner() {
   const officeImgs = sortedManagers.map((m) => getImagePath(m.name));
 
   return (
-    <div className="relative bg-gradient-to-b from-gray-950 via-gray-900 to-gray-800 min-h-screen">
+    <div className="relative min-h-screen">
       {/* SVG Noise Overlay */}
       <div
         className="pointer-events-none fixed inset-0 z-0"
@@ -217,10 +217,17 @@ function TeamPageInner() {
         }}
       />
 
-      <div>
+      {/* ==== MAIN PAGE CONTENT, gets blur+scroll lock when modal active ==== */}
+      <div
+        className={`
+          bg-gradient-to-b from-gray-950 via-gray-900 to-gray-800
+          min-h-screen transition-all duration-150
+          ${showModal ? "overflow-hidden filter blur-3xl" : ""}
+        `}
+      >
         <Navbar onPortalClick={() => setShowModal(true)} />
 
-        {/* -- SECTION MENU: restored for jump-to-section -- */}
+        {/* -- SECTION MENU: jump-to-section -- */}
         <div className="w-full flex justify-center items-center pt-6 pb-2">
           <motion.h1
             className="mt-16 text-center text-5xl lg:text-7xl font-extrabold tracking-tight text-white drop-shadow-xl transition-all"
@@ -279,7 +286,7 @@ function TeamPageInner() {
           </div>
         )}
 
-        {/* --- OFFICE TEAM (now uses flex for perfect centering) --- */}
+        {/* --- OFFICE TEAM --- */}
         <section id="office-team" className="space-y-10">
           <motion.h2
             className="text-center text-3xl font-bold text-white mb-2 mt-4 tracking-wider"
@@ -299,7 +306,7 @@ function TeamPageInner() {
                 px-4
               `}
               style={{
-                minHeight: "340px", // Ensures good vertical spacing for 1 or 2 rows
+                minHeight: "340px",
               }}
             >
               {sortedManagers.map((m, i) => {
@@ -408,7 +415,7 @@ function TeamPageInner() {
 
         <SectionDivider colors="from-cyan-400 via-fuchsia-400 to-lime-300" className="my-12" />
 
-        {/* --- OTHER TEAMS (unchanged but with lively colors) --- */}
+        {/* --- OTHER TEAMS --- */}
         {teamSections.map((sec, sidx) => {
           const imgs = sec.members.map((mem) => getImagePath(mem.name));
           const accent = sectionColors[sec.role as SectionKey] || sectionColors["Contents Team"];
@@ -550,6 +557,8 @@ function TeamPageInner() {
           );
         })}
       </div>
+
+      {/* Modal OUTSIDE the blurred area, always sharp */}
       <Modal showModal={showModal} onClose={() => setShowModal(false)} />
     </div>
   );
