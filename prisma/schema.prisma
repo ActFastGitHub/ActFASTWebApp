@@ -108,6 +108,7 @@ model Box {
   name             String
   color            String
   level            Int
+  previousName     String?
 
     // New fields
   length           Float?

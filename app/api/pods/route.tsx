@@ -1,3 +1,74 @@
+// // api/pods/route.tsx
+
+// import prisma from "@/app/libs/prismadb";
+// import { NextResponse } from "next/server";
+// import { getServerSession } from "next-auth";
+// import { authOptions } from "@/app/libs/authOption";
+// import { APIErr } from "@/app/libs/interfaces";
+
+// // READ
+// export async function GET(request: Request) {
+// 	try {
+// 		const boxes = await prisma.box.findMany();
+// 		return NextResponse.json({ boxes, status: 200 });
+// 	} catch (error) {
+// 		const { code = 500, message = "internal server error" } = error as APIErr;
+// 		return NextResponse.json({
+// 			status: code,
+// 			error: message
+// 		});
+// 	}
+// }
+
+// // UPDATE
+// export async function PATCH(request: Request) {
+//   const session = await getServerSession(authOptions);
+
+//   if (!session) {
+//     return NextResponse.json({ message: "Unauthorized access", status: 401 });
+//   }
+
+//   try {
+//     const body = await request.json();
+//     const {
+//       boxid,       
+//       name,
+//       color,
+//       length,
+//       width,
+//       height,
+//       notes,
+//     } = body.data;
+
+//     const profile = await prisma.profile.findUnique({
+//       where: { userEmail: session.user.email },
+//     });
+//     if (!profile)
+//       return NextResponse.json({ message: "Profile not found", status: 404 });
+
+//     const updateBox = await prisma.box.update({
+//       where: { boxNumber: boxid },
+//       data: {
+//         name,
+//         color,
+//         length, 
+//         width,
+//         height,
+//         notes,
+//         lastModifiedBy: {
+//           connect: { nickname: profile.nickname! },
+//         },
+//       },
+//     });
+
+//     return NextResponse.json({ updateBox, status: 200 });
+//   } catch (error) {
+//     const { code = 500, message = "Internal server error" } = error as APIErr;
+//     return NextResponse.json({ status: code, error: message });
+//   }
+// }
+
+
 // api/pods/route.tsx
 
 import prisma from "@/app/libs/prismadb";
@@ -8,30 +79,30 @@ import { APIErr } from "@/app/libs/interfaces";
 
 // READ
 export async function GET(request: Request) {
-	try {
-		const boxes = await prisma.box.findMany();
-		return NextResponse.json({ boxes, status: 200 });
-	} catch (error) {
-		const { code = 500, message = "internal server error" } = error as APIErr;
-		return NextResponse.json({
-			status: code,
-			error: message
-		});
-	}
+  try {
+    const boxes = await prisma.box.findMany();
+    return NextResponse.json({ boxes, status: 200 });
+  } catch (error) {
+    const { code = 500, message = "internal server error" } = error as APIErr;
+    return NextResponse.json({
+      status: code,
+      error: message,
+    });
+  }
 }
 
 // UPDATE
 export async function PATCH(request: Request) {
   const session = await getServerSession(authOptions);
 
-  if (!session) {
+  if (!session || !session.user?.email) {
     return NextResponse.json({ message: "Unauthorized access", status: 401 });
   }
 
   try {
     const body = await request.json();
     const {
-      boxid,       
+      boxid,
       name,
       color,
       length,
@@ -40,23 +111,41 @@ export async function PATCH(request: Request) {
       notes,
     } = body.data;
 
+    // Who's updating?
     const profile = await prisma.profile.findUnique({
       where: { userEmail: session.user.email },
+      select: { nickname: true },
     });
-    if (!profile)
+    if (!profile?.nickname) {
       return NextResponse.json({ message: "Profile not found", status: 404 });
+    }
+
+    // Fetch current name to decide previousName
+    const existing = await prisma.box.findUnique({
+      where: { boxNumber: boxid },
+      select: { name: true },
+    });
+    if (!existing) {
+      return NextResponse.json({ message: "Box not found", status: 404 });
+    }
+
+    const isNameChanging =
+      typeof name === "string" &&
+      name.trim().length > 0 &&
+      name.trim() !== existing.name;
 
     const updateBox = await prisma.box.update({
       where: { boxNumber: boxid },
       data: {
-        name,
+        name, // new name (already uppercased on client)
         color,
-        length, 
+        length,
         width,
         height,
         notes,
+        ...(isNameChanging ? { previousName: existing.name } : {}), // set previous name iff changed
         lastModifiedBy: {
-          connect: { nickname: profile.nickname! },
+          connect: { nickname: profile.nickname },
         },
       },
     });
