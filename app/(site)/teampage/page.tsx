@@ -111,7 +111,7 @@ const upperManagement: TeamMember[] = [
   { name: "Albert Siscar", role: "Project Manager", description: "Senior manager who drives project timelines, fosters strong client relationships, and guarantees high-quality outcomes." },
   { name: "DJ Lopez", role: "Construction Manager", description: "Directs all final repair operations, managing budgets and collaborating with subcontractors to meet project scopes." },
   { name: "Ervin Ong", role: "Project Coordinator", description: "Facilitates communication between teams, assisting in scheduling, client interaction, and on-site coordination." },
-  { name: "Mac De Guzman", role: "Project Coordinator", description: "Focuses on large-scale projects, managing employee schedules and ensuring timely progress on key deliverables." },
+  // { name: "Mac De Guzman", role: "Project Coordinator", description: "Focuses on large-scale projects, managing employee schedules and ensuring timely progress on key deliverables." },
   { name: "April Adasa", role: "Purchasing Officer", description: "Oversees procurement and supply management, supporting both final repairs and contents operations." },
   { name: "Girlie Atienza", role: "Controller", description: "Manages financial tasks including bookkeeping, payroll, and time sheet administration." },
   { name: "Angelo Guerra", role: "Technical Support Analyst", description: "Provides IT solutions, web development, and process optimization to streamline company operations." },

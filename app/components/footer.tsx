@@ -131,7 +131,7 @@ const Footer: React.FC = () => {
           </p>
           <p className="mt-1 text-xs">
             Built & maintained by{" "}
-            <span className="font-semibold">Angelo Guerra</span>
+            <Link href="https://www.linkedin.com/in/angelo-guerra/" className="font-semibold">Angelo Guerra</Link>
           </p>
           <VersionInfo />
         </motion.div>
