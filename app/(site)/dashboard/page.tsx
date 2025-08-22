@@ -17,14 +17,14 @@ const ACL: Record<string, string[]> = {
   "projectspage": [],
   "contentspage": [],
   "projectcosting": ["admin", "owner"], // protected
-  "projectmanagement": [],
-  "inventorymanagementpage": [],
+  "projectmanagement": ["admin", "owner"],
+  "inventorymanagementpage": ["admin", "owner"],
 };
 const norm = (s?: string) => s?.toLowerCase().trim() ?? "";
 const canAccess = (slug: string, role: string) =>
   !(ACL[slug]?.length) || ACL[slug].includes(role);
 
-/* small card */
+/* small card (note: if you use Tailwind with purge, safelist the colors you pass here) */
 const Card = ({
   color,
   title,
@@ -68,17 +68,17 @@ export default function Dashboard() {
 
   /* ——— fetch profile once logged in ——— */
   useEffect(() => {
-    if (status !== "authenticated" || !session?.user.email) return;
+    if (status !== "authenticated" || !session?.user?.email) return;
     (async () => {
       try {
         const res = await fetch(`/api/user/profile/${session.user.email}`);
         const data = await res.json();
         setUser(data);
       } catch {
-        setUser({ role: session.user.role } as UserProps); // fallback
+        setUser({ role: session?.user?.role } as UserProps); // fallback
       }
     })();
-  }, [status, session?.user.email]);
+  }, [status, session?.user?.email]);
 
   /* show spinner until BOTH session & profile resolved */
   if (status === "loading" || user === null) {
@@ -90,10 +90,10 @@ export default function Dashboard() {
   }
 
   /* guard again in rare case */
-  if (session?.user.isNewUser) return null;
+  if (session?.user?.isNewUser) return null;
 
   /* role resolution priority: profile role → session role → "" */
-  const role = norm(user?.role ?? session?.user.role);
+  const role = norm(user?.role ?? session?.user?.role);
 
   return (
     <div className="relative bg-gray-100">
@@ -108,17 +108,20 @@ export default function Dashboard() {
         >
           <div className="p-4">
             <h2 className="pt-20 text-2xl font-bold">Sidebar</h2>
-            <ul>
+
+            {/* existing items */}
+            <ul className="space-y-1">
               <li>(For Future Content)</li>
               <li>(For Future Content)</li>
               <li>(For Future Content)</li>
             </ul>
+           
           </div>
         </aside>
 
         {/* ——— main ——— */}
         <main
-          className={`flex-1 transition-all duration-300 ${
+          className={`flex-1 transition-all duration-300 md:mt-4 ${
             sidebarOpen ? "ml-32 sm:ml-48" : "ml-0"
           }`}
         >
@@ -203,6 +206,47 @@ export default function Dashboard() {
                     color="green"
                     title="Inventory Management"
                     desc="Manage inventory & supplies."
+                  />
+                </Link>
+              )}
+
+              {/* ---------------- EQUIPMENT (NEW) ---------------- */}
+              {/* Everyone: Tracking board */}
+              <Link href="/equipment">
+                <Card
+                  color="blue"
+                  title="Equipment Tracking"
+                  desc="See what's in warehouse vs. deployed, with days deployed."
+                />
+              </Link>
+
+              {/* Everyone: Quick Move form */}
+              <Link href="/equipment/move">
+                <Card
+                  color="purple"
+                  title="Equipment Move (OUT/IN)"
+                  desc="Record OUT to site or IN to warehouse. Supports lists & ranges."
+                />
+              </Link>
+
+              {/* Admin/Owner only: Add device (with optional QR) */}
+              {(role === "admin" || role === "owner") && (
+                <Link href="/equipment/admin/manage">
+                  <Card
+                    color="red"
+                    title="Add Equipment + QR"
+                    desc="Create a device and optionally generate a QR label."
+                  />
+                </Link>
+              )}
+
+              {/* Admin/Owner only: Bulk QR labels */}
+              {(role === "admin" || role === "owner") && (
+                <Link href="/equipment/qr-labels">
+                  <Card
+                    color="gray"
+                    title="QR Labels (Bulk)"
+                    desc="Generate/print QR stickers for many assets at once."
                   />
                 </Link>
               )}

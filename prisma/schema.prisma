@@ -81,6 +81,9 @@ model Profile {
 
   OfficeSupplyModified OfficeSupply[]     @relation("OfficeSupplyModifiedBy")
   SpreadsheetModified  SpreadsheetEntry[] @relation("SpreadsheetModifiedBy")
+
+  // NEW back-rel for EquipmentMovement.by
+  equipmentMovements EquipmentMovement[] @relation("ProfileEquipmentMovements")
 }
 
 model Location {
@@ -216,6 +219,10 @@ model Project {
   totalSubcontractorCost Float @default(0.0)
   totalLaborCost         Float @default(0.0)
   totalProjectCost       Float @default(0.0)
+
+  // Equipment 
+  equipments         Equipment[]         @relation("ProjectEquipments")
+  equipmentMovements EquipmentMovement[] @relation("ProjectEquipmentMovements")
 }
 
 model Material {
@@ -318,4 +325,53 @@ model SpreadsheetEntry {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model EquipmentType {
+  id          String      @id @default(auto()) @map("_id") @db.ObjectId
+  code        String      @unique            // e.g. "Dehumidifier", "Blower", "Vehicle"
+  description String?
+  equipments  Equipment[]
+}
+
+model Equipment {
+  id                 String         @id @default(auto()) @map("_id") @db.ObjectId
+  assetNumber        Int
+  typeCode           String
+  type               EquipmentType  @relation(fields: [typeCode], references: [code])
+
+  model              String?
+  serial             String?
+  status             String         // "WAREHOUSE" | "DEPLOYED" | "MAINTENANCE" | "LOST"
+  archived           Boolean        @default(false)
+
+  currentProjectCode String?
+  currentProject     Project?       @relation("ProjectEquipments", fields: [currentProjectCode], references: [code])
+
+  lastMovedAt        DateTime?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  movements EquipmentMovement[]
+
+  @@unique([typeCode, assetNumber]) // scoped per type
+}
+
+model EquipmentMovement {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  equipmentId String    @db.ObjectId
+  equipment   Equipment @relation(fields: [equipmentId], references: [id])
+
+  direction   String
+  at          DateTime  @default(now())
+
+  projectCode String?
+  project     Project?  @relation("ProjectEquipmentMovements", fields: [projectCode], references: [code])
+
+  byId        String?
+  by          Profile?  @relation("ProfileEquipmentMovements", fields: [byId], references: [nickname])
+
+  source      String?
+  note        String?
+  rawMessage  String?
 }
