@@ -1,23 +1,42 @@
 import { NextResponse } from "next/server";
 import prisma from "@/app/libs/prismadb";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/libs/authOption";
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email) return NextResponse.json({ status: 401, error: "Unauthorized" });
+  const body = await req.json().catch(() => ({}));
+  const type = String(body?.type ?? "").trim();
+  const assetNumber = Number(body?.assetNumber);
+  const model = typeof body?.model === "string" ? body.model.trim() : null;
+  const serial = typeof body?.serial === "string" ? body.serial.trim() : null;
 
-  const { assetNumber, type, model, serial } = await req.json();
-  if (typeof assetNumber !== "number" || !type?.trim())
-    return NextResponse.json({ status: 400, error: "assetNumber:number and type:string required" });
+  if (!type || !Number.isInteger(assetNumber) || assetNumber <= 0) {
+    return NextResponse.json({ status: 400, error: "type and positive integer assetNumber are required" });
+  }
 
-  await prisma.equipmentType.upsert({ where: { code: type.trim() }, update: {}, create: { code: type.trim() } });
-
-  const eq = await prisma.equipment.upsert({
-    where: { typeCode_assetNumber: { typeCode: type.trim(), assetNumber } },
-    update: { model: model ?? undefined, serial: serial ?? undefined, archived: false },
-    create: { typeCode: type.trim(), assetNumber, model: model ?? undefined, serial: serial ?? undefined, status: "WAREHOUSE" },
+  const existing = await prisma.equipment.findFirst({
+    where: { typeCode: type, assetNumber },
   });
 
-  return NextResponse.json({ status: 200, item: eq });
+  if (existing) {
+    const updated = await prisma.equipment.update({
+      where: { id: existing.id },
+      data: {
+        ...(model !== null ? { model } : {}),
+        ...(serial !== null ? { serial } : {}),
+      },
+    });
+    return NextResponse.json({ status: 200, id: updated.id, created: false });
+  }
+
+  const created = await prisma.equipment.create({
+    data: {
+      typeCode: type,
+      assetNumber,
+      model,
+      serial,
+      status: "WAREHOUSE",
+      archived: false,
+    },
+  });
+
+  return NextResponse.json({ status: 200, id: created.id, created: true });
 }

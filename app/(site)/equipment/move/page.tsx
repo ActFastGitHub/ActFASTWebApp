@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import MoveClient from "./MoveClient";
 
-export const dynamic = "force-dynamic"; // optional but helps avoid static export trips
+export const dynamic = "force-dynamic";
 
 export default function Page() {
   return (

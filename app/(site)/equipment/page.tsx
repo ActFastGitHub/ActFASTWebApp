@@ -6,19 +6,9 @@ import Navbar from "@/app/components/navBar";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import type { EquipmentDTO } from "@/app/types/equipment";
 
-type Eq = {
-  id: string;
-  assetNumber: number;
-  type: string;
-  status: "WAREHOUSE" | "DEPLOYED" | "MAINTENANCE" | "LOST";
-  currentProjectCode?: string | null;
-  model?: string | null;
-  serial?: string | null;
-  lastMovedAt?: string | null;
-};
-
-function daysSince(d?: string | null) {
+function daysSince(d?: string | Date | null) {
   if (!d) return null;
   const t = new Date(d).getTime();
   if (Number.isNaN(t)) return null;
@@ -35,7 +25,7 @@ export default function EquipmentTrackingPage() {
     }
   }, [status, router]);
 
-  const [items, setItems] = useState<Eq[]>([]);
+  const [items, setItems] = useState<EquipmentDTO[]>([]);
   const [loading, setLoading] = useState(false);
 
   const [q, setQ] = useState("");
@@ -47,26 +37,27 @@ export default function EquipmentTrackingPage() {
   async function load() {
     setLoading(true);
     try {
-      const { data } = await axios.get("/api/equipment", {
+      const { data } = await axios.get<{ status: 200; items: EquipmentDTO[] }>("/api/equipment", {
         params: {
           type: typeF || undefined,
           status: statusF || undefined,
         },
       });
-      const arr: Eq[] = data.items ?? [];
+      const arr = data.items ?? [];
       setItems(arr);
       setTypes(Array.from(new Set(arr.map(a => a.type))).sort());
-    } catch (e:any) {
-      toast.error(e?.response?.data?.error ?? "Failed to load equipment");
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { error?: string } } };
+      toast.error(err?.response?.data?.error ?? "Failed to load equipment");
     } finally { setLoading(false); }
   }
-
   useEffect(() => { load(); }, [typeF, statusF]); // eslint-disable-line
 
   const filtered = useMemo(() => {
     const s = q.toLowerCase();
     let list = items.filter(e =>
-      `${e.type} ${e.assetNumber} ${e.status} ${e.currentProjectCode ?? ""} ${e.model ?? ""} ${e.serial ?? ""}`.toLowerCase().includes(s)
+      `${e.type} ${e.assetNumber} ${e.status} ${e.currentProjectCode ?? ""} ${e.model ?? ""} ${e.serial ?? ""}`
+        .toLowerCase().includes(s)
     );
 
     if (onlyBand) {
@@ -80,13 +71,12 @@ export default function EquipmentTrackingPage() {
       });
     }
 
-    // show deployed first, then by longest deployed
+    // deployed first, longest deployed first
     list = list.sort((a,b) => {
       const da = a.status === "DEPLOYED" ? (daysSince(a.lastMovedAt) ?? -1) : -2;
       const db = b.status === "DEPLOYED" ? (daysSince(b.lastMovedAt) ?? -1) : -2;
       return db - da;
     });
-
     return list;
   }, [items, q, onlyBand]);
 
@@ -101,7 +91,7 @@ export default function EquipmentTrackingPage() {
     return { deployed: deployed.length, potential: pot.length, urgent: urg.length };
   }, [items]);
 
-  const bandBadge = (e: Eq) => {
+  const bandBadge = (e: EquipmentDTO) => {
     if (e.status !== "DEPLOYED") return null;
     const d = daysSince(e.lastMovedAt);
     if (d == null) return null;
@@ -116,7 +106,7 @@ export default function EquipmentTrackingPage() {
       <div className="mx-auto max-w-6xl p-4">
         <h1 className="mb-4 text-2xl font-bold">Equipment Tracking</h1>
 
-        {/* Top summary pills */}
+        {/* Summary */}
         <div className="mb-4 flex flex-wrap gap-2 text-sm">
           <span className="rounded bg-blue-100 px-2 py-1 text-blue-800">Deployed: {stats.deployed}</span>
           <span className="rounded bg-amber-100 px-2 py-1 text-amber-800">Potential pull-out (≥7): {stats.potential}</span>
@@ -134,8 +124,6 @@ export default function EquipmentTrackingPage() {
             <option value="">All Status</option>
             <option>WAREHOUSE</option><option>DEPLOYED</option><option>MAINTENANCE</option><option>LOST</option>
           </select>
-
-          {/* Band filter */}
           <div className="flex items-center gap-2">
             <button onClick={()=>setOnlyBand("")} className={`rounded px-3 py-2 text-sm ${onlyBand===""?"bg-gray-800 text-white":"bg-white border"}`}>All</button>
             <button onClick={()=>setOnlyBand("POTENTIAL")} className={`rounded px-3 py-2 text-sm ${onlyBand==="POTENTIAL"?"bg-amber-600 text-white":"bg-white border"}`}>Potential ≥7</button>
@@ -144,7 +132,7 @@ export default function EquipmentTrackingPage() {
           <div />
         </div>
 
-        {/* ====== TABLE (md+) ====== */}
+        {/* TABLE (md+) */}
         <div className="hidden overflow-x-auto rounded bg-white shadow md:block">
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50">
@@ -173,8 +161,18 @@ export default function EquipmentTrackingPage() {
                     <td className="p-3">{e.currentProjectCode ?? "—"}</td>
                     <td className="p-3">{e.model ?? "—"}</td>
                     <td className="p-3">{e.serial ?? "—"}</td>
-                    <td className="p-3">{e.lastMovedAt ? new Date(e.lastMovedAt).toLocaleString() : "—"}</td>
-                    <td className="p-3">{bandBadge(e)}</td>
+                    <td className="p-3">{e.lastMovedAt ? new Date(e.lastMovedAt as any).toLocaleString() : "—"}</td>
+                    <td className="p-3">
+                      {e.status === "DEPLOYED" ? (
+                        daysSince(e.lastMovedAt) != null && (
+                          daysSince(e.lastMovedAt)! >= 14
+                            ? <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">≥ 14 days</span>
+                            : daysSince(e.lastMovedAt)! >= 7
+                              ? <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">≥ 7 days</span>
+                              : null
+                        )
+                      ) : null}
+                    </td>
                   </tr>
                 ))
               )}
@@ -182,7 +180,7 @@ export default function EquipmentTrackingPage() {
           </table>
         </div>
 
-        {/* ====== CARDS (mobile) ====== */}
+        {/* CARDS (mobile) */}
         <div className="md:hidden">
           {loading ? (
             <div className="rounded bg-white p-4 text-sm shadow">Loading…</div>
@@ -191,7 +189,7 @@ export default function EquipmentTrackingPage() {
           ) : (
             <div className="space-y-3">
               {filtered.map((e) => {
-                const flag = bandBadge(e);
+                const d = daysSince(e.lastMovedAt);
                 return (
                   <div key={e.id} className="rounded bg-white p-4 shadow">
                     <div className="mb-2 flex items-center justify-between">
@@ -204,8 +202,16 @@ export default function EquipmentTrackingPage() {
                       <div className="flex justify-between"><span className="text-gray-500">Project</span><span className="font-medium">{e.currentProjectCode ?? "—"}</span></div>
                       <div className="flex justify-between"><span className="text-gray-500">Model</span><span>{e.model ?? "—"}</span></div>
                       <div className="flex justify-between"><span className="text-gray-500">Serial</span><span>{e.serial ?? "—"}</span></div>
-                      <div className="flex justify-between"><span className="text-gray-500">Date/Time</span><span>{e.lastMovedAt ? new Date(e.lastMovedAt).toLocaleString() : "—"}</span></div>
-                      {flag && <div className="pt-1">{flag}</div>}
+                      <div className="flex justify-between"><span className="text-gray-500">Date/Time</span><span>{e.lastMovedAt ? new Date(e.lastMovedAt as any).toLocaleString() : "—"}</span></div>
+                      {e.status === "DEPLOYED" && d != null && (
+                        <div className="pt-1">
+                          {d >= 14 ? (
+                            <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">≥ 14 days</span>
+                          ) : d >= 7 ? (
+                            <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">≥ 7 days</span>
+                          ) : null}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

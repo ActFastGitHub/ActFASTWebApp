@@ -1,231 +1,512 @@
 "use client";
 
-import React, { useMemo, useState, useEffect } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import axios from "axios";
+import React, { useEffect, useMemo, useState } from "react";
 import Navbar from "@/app/components/navBar";
 import { useSession } from "next-auth/react";
+import { useRouter, useSearchParams } from "next/navigation";
+import axios from "axios";
+import toast from "react-hot-toast";
 import { Combobox } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/24/outline";
-import toast from "react-hot-toast";
+import type {
+  MovementDirection,
+  MoveRequest,
+  MoveResponse,
+  DeleteResponse,
+} from "@/app/types/equipment";
+import { isMoveOK, isMoveError } from "@/app/types/equipment";
+import { isDeleteOK, isDeleteError } from "@/app/types/equipment";
+import type { AxiosError } from "axios";
 
 type Project = { id: string; code: string };
-type TypeItem = { code: string };
+type MoveRow = { type: string; assetNumber: string };
 
-function expandAssets(input: string): number[] {
-  const parts = `${input}`.split(/[,\s]+/).filter(Boolean);
-  const out: number[] = [];
-  for (const part of parts) {
-    const m = part.match(/^(\d+)-(\d+)$/);
-    if (m) {
-      const a = parseInt(m[1], 10), b = parseInt(m[2], 10);
-      const [start, end] = a <= b ? [a, b] : [b, a];
-      for (let n = start; n <= end; n++) out.push(n);
-    } else {
-      const n = parseInt(part, 10);
-      if (!isNaN(n)) out.push(n);
-    }
-  }
-  return Array.from(new Set(out));
-}
-
-export default function MovePage() {
+export default function MoveClient(): JSX.Element {
   const { status } = useSession();
   const router = useRouter();
+  const params = useSearchParams();
+
+  // Redirect to login if unauthenticated (keeps return)
   useEffect(() => {
     if (status === "unauthenticated") {
-      const dest = typeof window !== "undefined" ? window.location.href : "/equipment/move";
+      const dest =
+        typeof window !== "undefined"
+          ? window.location.href
+          : "/equipment/move";
       router.push(`/login?callbackUrl=${encodeURIComponent(dest)}`);
     }
   }, [status, router]);
 
-  const sp = useSearchParams();
-  const preAsset = sp.get("asset") ?? "";
-  const preType = sp.get("type") ?? "";
+  /* ---------- Quick-mode from QR ---------- */
+  const initialType = params.get("type") || "";
+  const initialAsset = params.get("asset") || "";
+  const initialDirection = (params.get("direction") || "").toUpperCase();
+  const quickMode = params.get("quick") === "1";
 
-  const [direction, setDirection] = useState<"OUT"|"IN">("OUT");
-  const [projectCode, setProjectCode] = useState("");
-  const [type, setType] = useState(preType || "");
-  const [assets, setAssets] = useState(preAsset);
-  const [note, setNote] = useState("");
-
-  // time controls
+  /* ---------- Movement Form State ---------- */
+  const [direction, setDirection] = useState<MovementDirection>(
+    initialDirection === "IN" || initialDirection === "OUT"
+      ? (initialDirection as MovementDirection)
+      : "OUT",
+  );
   const [useNow, setUseNow] = useState(true);
-  const [manualAt, setManualAt] = useState<string>(""); // yyyy-MM-ddTHH:mm
+  const [manualIso, setManualIso] = useState<string>("");
+  const [note, setNote] = useState<string>("");
 
-  const list = useMemo(() => expandAssets(assets), [assets]);
-
-  /* Projects (Combobox) */
+  /* ---------- Project Combobox (for OUT) ---------- */
   const [projects, setProjects] = useState<Project[]>([]);
-  const [query, setQuery] = useState("");
-  const filteredProjects =
-    query === "" ? projects : projects.filter((p) => p.code.toLowerCase().includes(query.toLowerCase()));
+  const [projQuery, setProjQuery] = useState("");
+  const [projectCode, setProjectCode] = useState<string>("");
+
+  const filteredProjects = useMemo(() => {
+    const q = projQuery.toLowerCase();
+    if (!q) return projects;
+    return projects.filter((p) => p.code.toLowerCase().includes(q));
+  }, [projects, projQuery]);
+
   useEffect(() => {
     (async () => {
       try {
         const res = await axios.get("/api/projects");
-        const list: Project[] = res.data?.projects ?? [];
-        setProjects(list.sort((a, b) => b.code.localeCompare(a.code)));
+        if (res.data?.projects) {
+          setProjects(
+            res.data.projects.map((p: any) => ({ id: p.id, code: p.code })),
+          );
+        }
       } catch {
-        toast.error("Failed to load projects");
-        setProjects([]);
+        /* noop */
       }
     })();
   }, []);
 
-  /* Types (dynamic) */
-  const [types, setTypes] = useState<TypeItem[]>([]);
-  useEffect(() => {
-    (async () => {
-      try {
-        const { data } = await axios.get("/api/equipment/types");
-        setTypes((data.items ?? []).map((x:any)=>({ code: x.code })));
-        if (!preType && data.items?.length && !type) setType(data.items[0].code);
-      } catch {}
-    })();
-  }, [preType, type]);
+  /* ---------- Rows (Type + Asset #) ---------- */
+  const [rows, setRows] = useState<MoveRow[]>([
+    { type: initialType, assetNumber: initialAsset },
+  ]);
 
-  async function submit() {
-    if (list.length === 0) { toast.error("Enter at least one asset #"); return; }
-    if (!type.trim()) { toast.error("Select a type"); return; }
-    if (direction === "OUT" && !projectCode) { toast.error("Project code required for OUT"); return; }
+  function addRow() {
+    setRows((r) => [...r, { type: "", assetNumber: "" }]);
+  }
+  function removeRow(i: number) {
+    setRows((r) => (r.length <= 1 ? r : r.filter((_, idx) => idx !== i)));
+  }
+  function updateRow(i: number, patch: Partial<MoveRow>) {
+    setRows((r) =>
+      r.map((row, idx) => (idx === i ? { ...row, ...patch } : row)),
+    );
+  }
 
-    let at: string | undefined = undefined;
+  /* ---------- Build Payload ---------- */
+  function buildPayload(): MoveRequest {
+    const items = rows
+      .map((r) => ({
+        type: r.type.trim(),
+        assetNumber: Number(r.assetNumber),
+      }))
+      .filter(
+        (i) => i.type && Number.isInteger(i.assetNumber) && i.assetNumber > 0,
+      );
+
+    return {
+      direction,
+      projectCode: direction === "OUT" ? projectCode.trim() : undefined,
+      when: useNow ? undefined : manualIso || undefined,
+      note: note || undefined,
+      rawMessage: undefined,
+      items,
+    };
+  }
+
+  /* ---------- Client-side validation ---------- */
+  function validateBeforeSubmit(): string | null {
+    const payload = buildPayload();
+    if (!payload.items.length) return "Please add at least one valid item.";
+    if (payload.direction === "OUT" && !payload.projectCode)
+      return "Project code is required when moving OUT.";
     if (!useNow) {
-      if (!manualAt) { toast.error("Pick a date & time or switch to Now"); return; }
-      const local = new Date(manualAt);
-      if (isNaN(local.getTime())) { toast.error("Invalid date-time"); return; }
-      at = local.toISOString();
+      if (!payload.when) return "Please select a manual date/time.";
+      const dt = new Date(payload.when);
+      if (Number.isNaN(dt.getTime())) return "Invalid manual date/time.";
+    }
+    return null;
+  }
+
+  /* ---------- Submit ---------- */
+  async function submitMove(stayAfter = false) {
+    const validation = validateBeforeSubmit();
+    if (validation) {
+      toast.error(validation);
+      return;
     }
 
     try {
-      const { data } = await axios.post("/api/equipment/move", {
-        direction,
-        projectCode: projectCode || undefined,
-        assetNumbers: assets,
-        type: type.trim(),
-        note,
-        source: "QR",
-        at,
-      });
+      const payload = buildPayload();
+      const { data } = await axios.post<MoveResponse>(
+        "/api/equipment/move",
+        payload,
+      );
 
-      const failed = data.results.filter((r: any) => !r.ok);
-      const success = data.results.filter((r: any) => r.ok);
+      if (isMoveOK(data)) {
+        toast.success(`Recorded ${direction} for ${data.moved} item(s)`);
 
-      if (success.length) {
-        toast.success(`${success.length} ${type}${success.length>1?" items":""} recorded`);
+        // Quick mode / Stay to scan next
+        if (stayAfter || quickMode) {
+          setRows([{ type: "", assetNumber: "" }]);
+          setNote("");
+          setUseNow(true);
+          setManualIso("");
+        } else {
+          // reset but no navigation
+          setRows([{ type: "", assetNumber: "" }]);
+          setNote("");
+          setUseNow(true);
+          setManualIso("");
+        }
+        refreshRecent();
+      } else {
+        // data is MoveResponseError
+        if (Array.isArray(data.missing)) {
+          toast.error(`Missing: ${data.missing.join(", ")}`, {
+            duration: 6000,
+          });
+        } else {
+          toast.error(data.error || "Failed to record movement");
+        }
       }
-      if (failed.length) {
-        const msg = failed.slice(0,3).map((f:any)=>`#${f.assetNumber}: ${f.msg}`).join(" • ");
-        toast.error(`Failed ${failed.length}: ${msg}${failed.length>3?" …":""}`);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: MoveResponse } };
+      const res = err.response?.data;
+
+      if (res && isMoveError(res) && Array.isArray(res.missing)) {
+        toast.error(`Missing: ${res.missing.join(", ")}`, { duration: 6000 });
+      } else if (res && isMoveError(res)) {
+        toast.error(res.error || "Failed to record movement");
+      } else {
+        toast.error("Failed to record movement");
       }
-      setNote("");
-    } catch (e: any) {
-      toast.error(e?.response?.data?.error ?? "Error submitting move");
     }
   }
 
+  /* ---------- Recent Movements (for delete) ---------- */
+  type Recent = {
+    id: string;
+    type: string;
+    assetNumber: number;
+    direction: string;
+    at: string;
+    projectCode?: string | null;
+    note?: string | null;
+    byId?: string | null;
+  };
+  const [recent, setRecent] = useState<Recent[]>([]);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  async function refreshRecent() {
+    try {
+      const { data } = await axios.get<{ status: number; items: Recent[] }>(
+        "/api/equipment/movements",
+        { params: { limit: 50 } },
+      );
+      if (data.status === 200) setRecent(data.items);
+    } catch {
+      /* noop */
+    }
+  }
+  useEffect(() => {
+    refreshRecent();
+  }, []);
+
+  async function deleteMovement(id: string) {
+    try {
+      const res = await axios.delete<DeleteResponse>(
+        `/api/equipment/movements/${id}`,
+      );
+      const data = res.data;
+
+      if (isDeleteOK(data)) {
+        toast.success("Movement deleted");
+        setConfirmDeleteId(null);
+        refreshRecent();
+      } else {
+        // data is DeleteResponseError here
+        toast.error(data.error || "Delete failed");
+      }
+    } catch (e) {
+      const ax = e as AxiosError<DeleteResponse>;
+      const data = ax.response?.data;
+
+      if (data && isDeleteError(data)) {
+        // safely access .error
+        toast.error(data.error || "Delete failed");
+      } else {
+        toast.error("Delete failed");
+      }
+    }
+  }
+
+  /* ---------- Render ---------- */
   return (
     <div className="min-h-screen bg-gray-100 pt-24 md:pt-28 lg:pt-32">
       <Navbar />
-      <div className="mx-auto max-w-xl p-4">
-        <h1 className="mb-4 text-2xl font-bold">Equipment Move</h1>
+      <div className="mx-auto max-w-4xl p-4">
+        <h1 className="mb-4 text-2xl font-bold">Equipment Movement</h1>
 
-        <div className="rounded bg-white p-4 shadow">
-          <div className="mb-3 grid grid-cols-2 gap-2">
-            <button onClick={()=>setDirection("OUT")} className={`rounded px-3 py-2 ${direction==="OUT"?"bg-blue-600 text-white":"bg-gray-200"}`}>OUT (to site)</button>
-            <button onClick={()=>setDirection("IN")} className={`rounded px-3 py-2 ${direction==="IN"?"bg-blue-600 text-white":"bg-gray-200"}`}>IN (to warehouse)</button>
+        {/* Direction */}
+        <div className="mb-4 flex gap-2">
+          {(["OUT", "IN"] as MovementDirection[]).map((d) => (
+            <button
+              key={d}
+              onClick={() => setDirection(d)}
+              className={`rounded px-3 py-2 text-sm ${
+                direction === d ? "bg-blue-600 text-white" : "border bg-white"
+              }`}
+            >
+              {d}
+            </button>
+          ))}
+        </div>
+
+        {/* Project (only OUT) */}
+        {direction === "OUT" && (
+          <div className="mb-4">
+            <label className="mb-1 block text-sm font-semibold text-gray-700">
+              Project
+            </label>
+            <Combobox
+              as="div"
+              value={projectCode}
+              onChange={(v: string) => setProjectCode(v ?? "")}
+            >
+              <div className="relative">
+                <Combobox.Input
+                  className="w-full rounded border p-2"
+                  displayValue={(v: string) => v}
+                  onChange={(e) => {
+                    setProjectCode(e.target.value);
+                    setProjQuery(e.target.value);
+                  }}
+                  placeholder="Search or select project code"
+                />
+                <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2">
+                  <ChevronUpDownIcon className="h-5 w-5 text-gray-400" />
+                </Combobox.Button>
+                {filteredProjects.length > 0 && (
+                  <Combobox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                    {filteredProjects.map((p) => (
+                      <Combobox.Option
+                        key={p.id}
+                        value={p.code}
+                        className={({ active }) =>
+                          `relative cursor-pointer select-none py-2 pl-3 pr-9 ${
+                            active ? "bg-blue-600 text-white" : "text-gray-900"
+                          }`
+                        }
+                      >
+                        {({ active, selected }) => (
+                          <>
+                            <span
+                              className={`block truncate ${
+                                selected ? "font-semibold" : ""
+                              }`}
+                            >
+                              {p.code}
+                            </span>
+                            {selected && (
+                              <span
+                                className={`absolute inset-y-0 right-0 flex items-center pr-4 ${
+                                  active ? "text-white" : "text-blue-600"
+                                }`}
+                              >
+                                <CheckIcon className="h-5 w-5" />
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </Combobox.Option>
+                    ))}
+                  </Combobox.Options>
+                )}
+              </div>
+            </Combobox>
           </div>
+        )}
 
-          {/* Type */}
-          <label className="block text-sm font-medium">Type</label>
-          <select className="mb-3 mt-1 w-full rounded border p-2" value={type} onChange={(e)=>setType(e.target.value)}>
-            <option value="">Select type…</option>
-            {types.map((t)=> <option key={t.code} value={t.code}>{t.code}</option>)}
-          </select>
-
-          {/* Project Combobox (OUT only) */}
-          {direction==="OUT" && (
-            <div className="mb-3">
-              <label htmlFor="searchProject" className="mb-1 block text-sm font-semibold text-gray-700">Project Code</label>
-              <Combobox as="div" value={projectCode} onChange={(val:string)=> setProjectCode(val ?? "")}>
-                <div className="relative mt-1">
-                  <Combobox.Input
-                    id="searchProject"
-                    className="w-full rounded-md border border-gray-300 bg-white py-2 pl-3 pr-10 text-sm leading-5 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    displayValue={(selectedCode: string) => selectedCode}
-                    onChange={(event) => {
-                      const v = event.target.value.toUpperCase();
-                      setQuery(v);
-                      setProjectCode(v);
-                    }}
-                    placeholder="Type to filter..."
-                  />
-                  <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2">
-                    <ChevronUpDownIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
-                  </Combobox.Button>
-                  {filteredProjects.length > 0 && (
-                    <Combobox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                      {filteredProjects.map((project) => (
-                        <Combobox.Option key={project.id} value={project.code}
-                          className={({ active }) => `relative cursor-pointer select-none py-2 pl-3 pr-9 ${active ? "bg-blue-600 text-white" : "text-gray-900"}`}>
-                          {({ active, selected }) => (
-                            <>
-                              <span className={`block truncate ${selected ? "font-semibold" : ""}`}>{project.code}</span>
-                              {selected && (
-                                <span className={`absolute inset-y-0 right-0 flex items-center pr-4 ${active ? "text-white" : "text-blue-600"}`}>
-                                  <CheckIcon className="h-5 w-5" aria-hidden="true" />
-                                </span>
-                              )}
-                            </>
-                          )}
-                        </Combobox.Option>
-                      ))}
-                    </Combobox.Options>
-                  )}
-                </div>
-              </Combobox>
-            </div>
-          )}
-
-          <label className="block text-sm font-medium">Asset # (single, lists, or ranges)</label>
-          <input className="mb-1 mt-1 w-full rounded border p-2" placeholder="1, 2-5, 55" value={assets} onChange={(e)=>setAssets(e.target.value)} />
-          <div className="mb-3 text-xs text-gray-500">Parsed: {list.join(", ") || "—"}</div>
-
-          {/* Time controls */}
-          <div className="mb-3">
-            <label className="mb-1 block text-sm font-medium">Move Time</label>
-            <div className="flex flex-wrap items-center gap-3">
-              <label className="inline-flex items-center gap-2">
-                <input type="radio" name="movetime" checked={useNow} onChange={()=>setUseNow(true)} />
-                <span>Now (device time)</span>
+        {/* Date / Time */}
+        <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={useNow}
+              onChange={(e) => setUseNow(e.target.checked)}
+            />
+            <span className="text-sm">Use current date/time</span>
+          </label>
+          {!useNow && (
+            <div>
+              <label className="block text-sm font-medium">
+                Specify date/time
               </label>
-              <label className="inline-flex items-center gap-2">
-                <input type="radio" name="movetime" checked={!useNow} onChange={()=>setUseNow(false)} />
-                <span>Manual</span>
-              </label>
-            </div>
-            {!useNow && (
               <input
                 type="datetime-local"
-                className="mt-2 w-full rounded border p-2"
-                value={manualAt}
-                onChange={(e)=>setManualAt(e.target.value)}
+                value={manualIso}
+                onChange={(e) => setManualIso(e.target.value)}
+                className="mt-1 w-full rounded border p-2"
               />
+            </div>
+          )}
+        </div>
+
+        {/* Items */}
+        <div className="mb-4 rounded bg-white p-4 shadow">
+          <h2 className="mb-2 font-semibold">Items</h2>
+          <div className="space-y-3">
+            {rows.map((row, i) => (
+              <div key={i} className="grid grid-cols-1 gap-2 sm:grid-cols-7">
+                <div className="sm:col-span-4">
+                  <label className="block text-xs text-gray-600">Type</label>
+                  <input
+                    className="mt-1 w-full rounded border p-2"
+                    value={row.type}
+                    onChange={(e) => updateRow(i, { type: e.target.value })}
+                    placeholder="Dehumidifier, Blower, Air Scrubber…"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs text-gray-600">Asset #</label>
+                  <input
+                    className="mt-1 w-full rounded border p-2"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={row.assetNumber}
+                    onChange={(e) =>
+                      updateRow(i, { assetNumber: e.target.value })
+                    }
+                    placeholder="e.g. 33"
+                  />
+                </div>
+                <div className="flex items-end sm:col-span-1">
+                  <button
+                    onClick={() => removeRow(i)}
+                    className="w-full rounded border px-3 py-2 text-sm"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              onClick={addRow}
+              className="rounded bg-gray-800 px-3 py-2 text-white"
+            >
+              + Add Row
+            </button>
+            <button
+              onClick={() => {
+                setRows([{ type: "", assetNumber: "" }]);
+                toast("Cleared");
+              }}
+              className="rounded border px-3 py-2"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+
+        {/* Notes (large textarea) */}
+        <div className="mb-4">
+          <label className="mb-1 block text-sm font-semibold text-gray-700">
+            Notes
+          </label>
+          <textarea
+            className="min-h-32 w-full rounded border p-3"
+            placeholder="Optional context... (who, where onsite, reason for delayed entry, etc.)"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </div>
+
+        {/* Submit */}
+        <div className="mb-8 flex flex-wrap gap-2">
+          <button
+            onClick={() => submitMove(false)}
+            className="rounded bg-blue-600 px-4 py-2 font-medium text-white"
+          >
+            Save Movement
+          </button>
+          <button
+            onClick={() => submitMove(true)}
+            className="rounded bg-emerald-600 px-4 py-2 font-medium text-white"
+          >
+            Save & Stay (Scan Next)
+          </button>
+        </div>
+
+        {/* Recent Movements */}
+        <div className="rounded bg-white p-4 shadow">
+          <h2 className="mb-2 font-semibold">Recent Movements</h2>
+          <div className="space-y-2">
+            {recent.length === 0 ? (
+              <div className="text-sm text-gray-600">No recent entries</div>
+            ) : (
+              recent.map((m) => (
+                <div
+                  key={m.id}
+                  className="flex flex-col gap-1 rounded border p-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="text-sm">
+                    <span className="font-semibold">
+                      {m.type} #{m.assetNumber}
+                    </span>{" "}
+                    <span className="uppercase">{m.direction}</span>{" "}
+                    <span>— {new Date(m.at).toLocaleString()}</span>{" "}
+                    {m.projectCode ? (
+                      <span>
+                        {" "}
+                        | Project:{" "}
+                        <span className="font-medium">{m.projectCode}</span>
+                      </span>
+                    ) : null}
+                    {m.note ? <span> | Note: {m.note}</span> : null}
+                  </div>
+                  <div className="mt-2 flex gap-2 sm:mt-0">
+                    {confirmDeleteId === m.id ? (
+                      <>
+                        <button
+                          onClick={() => deleteMovement(m.id)}
+                          className="rounded bg-red-600 px-3 py-2 text-white"
+                        >
+                          Confirm Delete
+                        </button>
+                        <button
+                          onClick={() => {
+                            setConfirmDeleteId(null);
+                            toast("Delete cancelled");
+                          }}
+                          className="rounded bg-gray-300 px-3 py-2"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setConfirmDeleteId(m.id);
+                          toast("Click again to confirm delete", {
+                            icon: "⚠️",
+                          });
+                        }}
+                        className="rounded bg-red-600 px-3 py-2 text-white"
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))
             )}
           </div>
-
-          {/* Notes textarea */}
-          <label className="block text-sm font-medium">Notes (optional)</label>
-          <textarea
-            rows={3}
-            className="mb-3 mt-1 w-full rounded border p-2"
-            placeholder="Add any context (room, area, reason, unusual circumstances)…"
-            value={note}
-            onChange={(e)=>setNote(e.target.value)}
-          />
-
-          <button onClick={submit} className="w-full rounded bg-emerald-600 px-3 py-2 font-semibold text-white">Submit</button>
         </div>
       </div>
     </div>
