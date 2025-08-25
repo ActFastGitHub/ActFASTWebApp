@@ -13,11 +13,13 @@ import type { EquipmentDTO, EquipmentStatus } from "@/app/types/equipment";
 import { STATUSES } from "@/app/types/equipment";
 
 type TypeItem = { code: string };
+type Project = { id: string; code: string };
 
 export default function EquipmentManagePage() {
   const { status } = useSession();
   const router = useRouter();
 
+  // auth redirect
   useEffect(() => {
     if (status === "unauthenticated") {
       const dest = typeof window !== "undefined" ? window.location.href : "/equipment/admin/manage";
@@ -43,6 +45,15 @@ export default function EquipmentManagePage() {
   const [includeArchived, setIncludeArchived] = useState(false);
   const [q, setQ] = useState("");
 
+  // Projects (for Project column editing) — sorted DESC
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projQueryEdit, setProjQueryEdit] = useState("");
+  const filteredProjects = useMemo(() => {
+    const s = projQueryEdit.toLowerCase();
+    return s ? projects.filter(p => p.code.toLowerCase().includes(s)) : projects;
+  }, [projects, projQueryEdit]);
+
+  // edit
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<{
@@ -50,29 +61,47 @@ export default function EquipmentManagePage() {
     currentProjectCode: string; model: string; serial: string;
   } | null>(null);
 
+  // Load list (and keep type options in sync) + projects
   async function load() {
     setLoading(true);
     try {
       const { data } = await axios.get<{ status: 200; items: EquipmentDTO[] }>("/api/equipment", {
         params: { type: typeF || undefined, status: statusF || undefined, includeArchived: includeArchived ? "1" : undefined },
       });
-      setItems(data.items ?? []);
-      // keep Types in sync live based on items
-      const next = Array.from(new Set((data.items ?? []).map(i => i.type))).sort().map(code => ({ code }));
+      const list = data.items ?? [];
+      setItems(list);
+
+      // real-time type list
+      const next = Array.from(new Set(list.map(i => i.type))).sort().map(code => ({ code }));
       setTypes(next);
-    } catch (e: unknown) {
-      const err = e as { response?: { data?: { error?: string } } };
-      toast.error(err?.response?.data?.error ?? "Failed to load equipment");
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? "Failed to load equipment");
     } finally { setLoading(false); }
   }
+
   useEffect(() => { load(); }, [typeF, statusF, includeArchived]); // eslint-disable-line
 
-  // Also initial types (in case no items yet)
-  useEffect(() => { (async () => {
-    try { const { data } = await axios.get<{ status: 200; items: TypeItem[] }>("/api/equipment/types");
-      if (data.items?.length) setTypes(data.items);
-    } catch {} })();
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await axios.get("/api/projects");
+        if (res.data?.projects) {
+          const sorted = res.data.projects
+            .map((p: any) => ({ id: p.id, code: p.code }))
+            .sort((a: Project, b: Project) => b.code.localeCompare(a.code));
+          setProjects(sorted);
+        }
+      } catch {/* ignore */}
+    })();
   }, []);
+
+  // initial types (if list empty)
+  useEffect(() => { (async () => {
+    try {
+      const { data } = await axios.get<{ status: 200; items: TypeItem[] }>("/api/equipment/types");
+      if (data.items?.length) setTypes(data.items.sort((a,b) => a.code.localeCompare(b.code)));
+    } catch {}
+  })(); }, []);
 
   function beginEdit(row: EquipmentDTO) {
     setEditingId(row.id);
@@ -118,9 +147,8 @@ export default function EquipmentManagePage() {
       } else {
         toast.error(data?.error ?? "Update failed");
       }
-    } catch (e: unknown) {
-      const err = e as { response?: { data?: { error?: string }; status?: number } };
-      const msg = err?.response?.status === 409 ? "That Type + Asset # already exists" : (err?.response?.data?.error ?? "Update failed");
+    } catch (e: any) {
+      const msg = e?.response?.status === 409 ? "That Type + Asset # already exists" : (e?.response?.data?.error ?? "Update failed");
       toast.error(msg);
     }
   }
@@ -130,9 +158,8 @@ export default function EquipmentManagePage() {
       const { data } = await axios.patch<{ status: number; error?: string }>(`/api/equipment/${row.id}`, { archived: !row.archived });
       if (data.status === 200) { toast.success(`${row.type} #${row.assetNumber} ${row.archived ? "unarchived" : "archived"}`); await load(); }
       else { toast.error(data.error ?? "Action failed"); }
-    } catch (e: unknown) {
-      const err = e as { response?: { data?: { error?: string } } };
-      toast.error(err?.response?.data?.error ?? "Action failed");
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? "Action failed");
     }
   }
 
@@ -141,9 +168,8 @@ export default function EquipmentManagePage() {
       const { data } = await axios.delete<{ status: number; error?: string }>(`/api/equipment/${id}`);
       if (data.status === 200) { toast.success("Deleted"); setConfirmDeleteId(null); await load(); }
       else { toast.error(data.error ?? "Delete failed"); }
-    } catch (e: unknown) {
-      const err = e as { response?: { data?: { error?: string } } };
-      toast.error(err?.response?.data?.error ?? "Delete failed");
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? "Delete failed");
     }
   }
 
@@ -157,11 +183,11 @@ export default function EquipmentManagePage() {
       if (data.status !== 200) { toast.error(data.error ?? "Failed to save"); return; }
       toast.success(data.created ? "Equipment created" : "Equipment updated");
 
-      // Real-time Types (no refresh): if type is new, inject it
+      // real-time type list
       setTypes(prev => prev.some(t => t.code === type.trim()) ? prev : [...prev, { code: type.trim() }].sort((a,b)=>a.code.localeCompare(b.code)));
 
       setAssetNumber(""); setModel(""); setSerial("");
-      await load(); // keeps table + filters consistent
+      await load();
 
       if (saveAndQr) {
         const base = window.location.origin;
@@ -171,9 +197,8 @@ export default function EquipmentManagePage() {
       } else {
         setQrDataUrl(null);
       }
-    } catch (e: unknown) {
-      const err = e as { response?: { data?: { error?: string } } };
-      toast.error(err?.response?.data?.error ?? "Failed to save");
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error ?? "Failed to save");
     }
   }
 
@@ -251,7 +276,7 @@ export default function EquipmentManagePage() {
             <div className="mt-4 flex items-center gap-4">
               <img src={qrDataUrl} alt="QR" className="h-32 w-32" />
               <a href={qrDataUrl} download="asset-qr.png" className="rounded bg-gray-800 px-3 py-2 text-white">Download PNG</a>
-              <div className="text-sm text-gray-600">QR opens Move page in <b>Quick Mode</b> (keeps direction, clears row for next scan).</div>
+              <div className="text-sm text-gray-600">QR opens Move page in <b>Quick Mode</b>. Scan multiple, then save once.</div>
             </div>
           )}
         </div>
@@ -319,10 +344,42 @@ export default function EquipmentManagePage() {
                       </select>
                     </td>
                     <td className="p-3">
-                      <input className={`w-36 rounded border p-1 ${!editing ? "bg-gray-50" : ""}`}
-                        placeholder="e.g. ACTF-2025-001"
+                      {/* Project combobox */}
+                      <Combobox as="div"
                         value={editing ? (draft?.currentProjectCode ?? row.currentProjectCode ?? "") : (row.currentProjectCode ?? "")}
-                        onChange={(ev)=> editing && setDraft(d => d ? { ...d, currentProjectCode: ev.target.value } : d)} readOnly={!editing} />
+                        onChange={(v:string)=> editing && setDraft(d => d ? ({ ...d, currentProjectCode: v ?? "" }) : d)}>
+                        <div className="relative">
+                          <Combobox.Input
+                            className={`w-40 rounded border p-1 ${!editing ? "bg-gray-50" : ""}`}
+                            displayValue={(v:string)=>v}
+                            onChange={(e)=> editing && setProjQueryEdit(e.target.value)}
+                            readOnly={!editing}
+                            placeholder="ACTF-2025-001"
+                          />
+                          <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2">
+                            <ChevronUpDownIcon className="h-4 w-4 text-gray-400" />
+                          </Combobox.Button>
+                          {editing && filteredProjects.length>0 && (
+                            <Combobox.Options className="absolute z-10 mt-1 max-h-56 w-56 overflow-auto rounded-md bg-white py-1 text-xs shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                              {filteredProjects.map((p)=>(
+                                <Combobox.Option key={p.id} value={p.code}
+                                  className={({active})=>`relative cursor-pointer select-none py-1.5 pl-3 pr-6 ${active?"bg-blue-600 text-white":"text-gray-900"}`}>
+                                  {({active, selected})=>(
+                                    <>
+                                      <span className={`block truncate ${selected?"font-semibold":""}`}>{p.code}</span>
+                                      {selected && (
+                                        <span className={`absolute inset-y-0 right-0 flex items-center pr-3 ${active?"text-white":"text-blue-600"}`}>
+                                          <CheckIcon className="h-4 w-4" />
+                                        </span>
+                                      )}
+                                    </>
+                                  )}
+                                </Combobox.Option>
+                              ))}
+                            </Combobox.Options>
+                          )}
+                        </div>
+                      </Combobox>
                     </td>
                     <td className="p-3">
                       <input className={`w-36 rounded border p-1 ${!editing ? "bg-gray-50" : ""}`}
@@ -381,45 +438,110 @@ export default function EquipmentManagePage() {
                   <div key={row.id} className={`rounded bg-white p-4 shadow ${row.archived ? "opacity-70" : ""}`}>
                     <div className="mb-2 flex items-center justify-between">
                       <div className="text-base font-semibold">{row.type} #{row.assetNumber}</div>
-                      <span className={`rounded px-2 py-0.5 text-xs ${row.status==="DEPLOYED"?"bg-blue-100 text-blue-800":row.status==="WAREHOUSE"?"bg-green-100 text-green-800":row.status==="MAINTENANCE"?"bg-amber-100 text-amber-800":"bg-gray-200 text-gray-800"}`}>
-                        {row.status}
-                      </span>
+                      {/* show status badge when not editing */}
+                      {!editing && (
+                        <span className={`rounded px-2 py-0.5 text-xs ${row.status==="DEPLOYED"?"bg-blue-100 text-blue-800":row.status==="WAREHOUSE"?"bg-green-100 text-green-800":row.status==="MAINTENANCE"?"bg-amber-100 text-amber-800":"bg-gray-200 text-gray-800"}`}>
+                          {row.status}
+                        </span>
+                      )}
                     </div>
 
-                    <div className="space-y-2 text-sm">
+                    <div className="space-y-3 text-sm">
+                      <div>
+                        <div className="text-xs text-gray-500">Status</div>
+                        <select
+                          className={`mt-1 w-full rounded border p-2 ${!editing ? "bg-gray-50" : ""}`}
+                          value={editing ? (draft?.status ?? row.status) : row.status}
+                          onChange={(ev)=> editing && setDraft(d => d ? { ...d, status: ev.target.value as EquipmentStatus } : d)}
+                          disabled={!editing}
+                        >
+                          {STATUSES.map(s=> <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+
                       <div>
                         <div className="text-xs text-gray-500">Type</div>
-                        <input list="eq-types" className={`mt-1 w-full rounded border p-2 ${!editing ? "bg-gray-50" : ""}`}
+                        <input
+                          list="eq-types"
+                          className={`mt-1 w-full rounded border p-2 ${!editing ? "bg-gray-50" : ""}`}
                           value={editing ? (draft?.type ?? row.type) : row.type}
-                          onChange={(ev)=> editing && setDraft(d => d ? ({ ...d, type: ev.target.value }) : d)} readOnly={!editing}/>
+                          onChange={(ev)=> editing && setDraft(d => d ? ({ ...d, type: ev.target.value }) : d)}
+                          readOnly={!editing}
+                        />
                       </div>
+
                       <div>
                         <div className="text-xs text-gray-500">Asset #</div>
-                        <input type="text" inputMode="numeric" pattern="[0-9]*"
+                        <input
+                          type="text" inputMode="numeric" pattern="[0-9]*"
                           className={`mt-1 w-full rounded border p-2 ${!editing ? "bg-gray-50" : ""}`}
                           value={editing ? (draft?.assetNumber ?? String(row.assetNumber)) : String(row.assetNumber)}
-                          onChange={(ev)=> editing && setDraft(d => d ? ({ ...d, assetNumber: ev.target.value }) : d)} readOnly={!editing}/>
+                          onChange={(ev)=> editing && setDraft(d => d ? ({ ...d, assetNumber: ev.target.value }) : d)}
+                          readOnly={!editing}
+                        />
                       </div>
+
                       <div>
                         <div className="text-xs text-gray-500">Project</div>
-                        <input className={`mt-1 w-full rounded border p-2 ${!editing ? "bg-gray-50" : ""}`}
+                        {/* mobile project combobox */}
+                        <Combobox as="div"
                           value={editing ? (draft?.currentProjectCode ?? row.currentProjectCode ?? "") : (row.currentProjectCode ?? "")}
-                          onChange={(ev)=> editing && setDraft(d => d ? ({ ...d, currentProjectCode: ev.target.value }) : d)} readOnly={!editing}/>
+                          onChange={(v:string)=> editing && setDraft(d => d ? ({ ...d, currentProjectCode: v ?? "" }) : d)}>
+                          <div className="relative">
+                            <Combobox.Input
+                              className={`mt-1 w-full rounded border p-2 ${!editing ? "bg-gray-50" : ""}`}
+                              displayValue={(v:string)=>v}
+                              onChange={(e)=> editing && setProjQueryEdit(e.target.value)}
+                              readOnly={!editing}
+                              placeholder="ACTF-2025-001"
+                            />
+                            <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2">
+                              <ChevronUpDownIcon className="h-5 w-5 text-gray-400" />
+                            </Combobox.Button>
+                            {editing && filteredProjects.length>0 && (
+                              <Combobox.Options className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                                {filteredProjects.map((p)=>(
+                                  <Combobox.Option key={p.id} value={p.code}
+                                    className={({active})=>`relative cursor-pointer select-none py-2 pl-3 pr-9 ${active?"bg-blue-600 text-white":"text-gray-900"}`}>
+                                    {({active, selected})=>(
+                                      <>
+                                        <span className={`block truncate ${selected?"font-semibold":""}`}>{p.code}</span>
+                                        {selected && (
+                                          <span className={`absolute inset-y-0 right-0 flex items-center pr-4 ${active?"text-white":"text-blue-600"}`}>
+                                            <CheckIcon className="h-5 w-5" />
+                                          </span>
+                                        )}
+                                      </>
+                                    )}
+                                  </Combobox.Option>
+                                ))}
+                              </Combobox.Options>
+                            )}
+                          </div>
+                        </Combobox>
                       </div>
+
                       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         <div>
                           <div className="text-xs text-gray-500">Model</div>
-                          <input className={`mt-1 w-full rounded border p-2 ${!editing ? "bg-gray-50" : ""}`}
+                          <input
+                            className={`mt-1 w-full rounded border p-2 ${!editing ? "bg-gray-50" : ""}`}
                             value={editing ? (draft?.model ?? row.model ?? "") : (row.model ?? "")}
-                            onChange={(ev)=> editing && setDraft(d => d ? ({ ...d, model: ev.target.value }) : d)} readOnly={!editing}/>
+                            onChange={(ev)=> editing && setDraft(d => d ? ({ ...d, model: ev.target.value }) : d)}
+                            readOnly={!editing}
+                          />
                         </div>
                         <div>
                           <div className="text-xs text-gray-500">Serial</div>
-                          <input className={`mt-1 w-full rounded border p-2 ${!editing ? "bg-gray-50" : ""}`}
+                          <input
+                            className={`mt-1 w-full rounded border p-2 ${!editing ? "bg-gray-50" : ""}`}
                             value={editing ? (draft?.serial ?? row.serial ?? "") : (row.serial ?? "")}
-                            onChange={(ev)=> editing && setDraft(d => d ? ({ ...d, serial: ev.target.value }) : d)} readOnly={!editing}/>
+                            onChange={(ev)=> editing && setDraft(d => d ? ({ ...d, serial: ev.target.value }) : d)}
+                            readOnly={!editing}
+                          />
                         </div>
                       </div>
+
                       <div className="text-xs text-gray-500">Last Moved</div>
                       <div>{row.lastMovedAt ? new Date(row.lastMovedAt as any).toLocaleString() : "—"}</div>
                     </div>
@@ -451,6 +573,7 @@ export default function EquipmentManagePage() {
             </div>
           )}
         </div>
+
       </div>
     </div>
   );
