@@ -14,42 +14,65 @@ import type {
   MoveResponse,
   DeleteResponse,
 } from "@/app/types/equipment";
-import { isMoveOK, isMoveError, isDeleteOK, isDeleteError } from "@/app/types/equipment";
+import {
+  isMoveOK,
+  isMoveError,
+  isDeleteOK,
+  isDeleteError,
+} from "@/app/types/equipment";
 
-type Project = { id: string; code: string };
-type MoveRow = { type: string; assetNumber: string };
-
+/* ──────────────────────────────────────────────────────────── */
+/*  LocalStorage keys                                           */
+/* ──────────────────────────────────────────────────────────── */
 const LS_QUEUE = "eqmove:queue";
 const LS_DIR = "eqmove:direction";
 const LS_PROJ = "eqmove:project";
 
+/* ──────────────────────────────────────────────────────────── */
+/*  Helpers                                                     */
+/* ──────────────────────────────────────────────────────────── */
+type Project = { id: string; code: string };
+type MoveRow = { type: string; assetNumber: string };
+
 function loadQueue(): MoveRow[] {
-  try { return JSON.parse(localStorage.getItem(LS_QUEUE) || "[]"); } catch { return []; }
+  try {
+    return JSON.parse(localStorage.getItem(LS_QUEUE) || "[]");
+  } catch {
+    return [];
+  }
 }
 function saveQueue(q: MoveRow[]) {
   localStorage.setItem(LS_QUEUE, JSON.stringify(q));
 }
 function loadString(key: string, def = ""): string {
-  try { return localStorage.getItem(key) || def; } catch { return def; }
+  try {
+    return localStorage.getItem(key) || def;
+  } catch {
+    return def;
+  }
 }
 function saveString(key: string, val: string) {
   localStorage.setItem(key, val);
 }
 
+/* ──────────────────────────────────────────────────────────── */
+/*  Component                                                   */
+/* ──────────────────────────────────────────────────────────── */
 export default function MoveClient(): JSX.Element {
   const { status } = useSession();
   const router = useRouter();
   const params = useSearchParams();
 
-  // Redirect to login if unauthenticated
+  /* ---------- Auth redirect ---------- */
   useEffect(() => {
     if (status === "unauthenticated") {
-      const dest = typeof window !== "undefined" ? window.location.href : "/equipment/move";
+      const dest =
+        typeof window !== "undefined" ? window.location.href : "/equipment/move";
       router.push(`/login?callbackUrl=${encodeURIComponent(dest)}`);
     }
   }, [status, router]);
 
-  /* ---------- Quick-mode from QR ---------- */
+  /* ---------- QR / URL params ---------- */
   const initialType = params.get("type") || "";
   const initialAsset = params.get("asset") || "";
   const initialDirection = (params.get("direction") || "").toUpperCase();
@@ -66,14 +89,18 @@ export default function MoveClient(): JSX.Element {
   const [manualIso, setManualIso] = useState<string>("");
   const [note, setNote] = useState<string>("");
 
-  useEffect(() => { saveString(LS_DIR, direction); }, [direction]);
+  useEffect(() => {
+    saveString(LS_DIR, direction);
+  }, [direction]);
 
-  /* ---------- Project Combobox (sorted DESC) ---------- */
+  /* ---------- Project combobox (sorted DESC) ---------- */
   const [projects, setProjects] = useState<Project[]>([]);
   const [projQuery, setProjQuery] = useState("");
   const [projectCode, setProjectCode] = useState<string>(loadString(LS_PROJ));
 
-  useEffect(() => { saveString(LS_PROJ, projectCode); }, [projectCode]);
+  useEffect(() => {
+    saveString(LS_PROJ, projectCode);
+  }, [projectCode]);
 
   const filteredProjects = useMemo(() => {
     const q = projQuery.toLowerCase();
@@ -97,32 +124,38 @@ export default function MoveClient(): JSX.Element {
     })();
   }, []);
 
-  /* ---------- Rows (QR Batch) ---------- */
+  /* ---------- Batch rows (QR adds here) ---------- */
   const [rows, setRows] = useState<MoveRow[]>([]);
 
-  // Initialize from localStorage & handle quick-scan append
+  // Initialize from localStorage & handle direct param add
   useEffect(() => {
     const existing = loadQueue();
     let next = existing;
-    if (quickMode && initialType && initialAsset) {
+
+    if (initialType && initialAsset) {
       const item: MoveRow = { type: initialType, assetNumber: initialAsset };
       const key = `${item.type}#${item.assetNumber}`;
-      const set = new Set(existing.map(r => `${r.type}#${r.assetNumber}`));
+      const set = new Set(existing.map((r) => `${r.type}#${r.assetNumber}`));
       if (!set.has(key)) {
         next = [...existing, item];
         saveQueue(next);
         toast.success(`Added ${item.type} #${item.assetNumber} to batch`);
-      } else {
-        toast("Already in batch");
       }
     }
+
     setRows(next.length ? next : [{ type: "", assetNumber: "" }]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // run once
 
-  function addRow() { setRows(r => { const next = [...r, { type: "", assetNumber: "" }]; saveQueue(next); return next; }); }
+  function addRow() {
+    setRows((r) => {
+      const next = [...r, { type: "", assetNumber: "" }];
+      saveQueue(next);
+      return next;
+    });
+  }
   function removeRow(i: number) {
-    setRows(r => {
+    setRows((r) => {
       if (r.length <= 1) return r;
       const next = r.filter((_, idx) => idx !== i);
       saveQueue(next);
@@ -130,7 +163,7 @@ export default function MoveClient(): JSX.Element {
     });
   }
   function updateRow(i: number, patch: Partial<MoveRow>) {
-    setRows(r => {
+    setRows((r) => {
       const next = r.map((row, idx) => (idx === i ? { ...row, ...patch } : row));
       saveQueue(next);
       return next;
@@ -145,8 +178,13 @@ export default function MoveClient(): JSX.Element {
   /* ---------- Build Payload + Validate ---------- */
   function buildPayload(): MoveRequest {
     const items = rows
-      .map((r) => ({ type: r.type.trim(), assetNumber: Number(r.assetNumber) }))
-      .filter((i) => i.type && Number.isInteger(i.assetNumber) && i.assetNumber > 0);
+      .map((r) => ({
+        type: r.type.trim(),
+        assetNumber: Number(r.assetNumber),
+      }))
+      .filter(
+        (i) => i.type && Number.isInteger(i.assetNumber) && i.assetNumber > 0,
+      );
 
     return {
       direction,
@@ -174,11 +212,17 @@ export default function MoveClient(): JSX.Element {
   /* ---------- Submit All ---------- */
   async function submitAll() {
     const validation = validateBeforeSubmit();
-    if (validation) { toast.error(validation); return; }
+    if (validation) {
+      toast.error(validation);
+      return;
+    }
 
     try {
       const payload = buildPayload();
-      const { data } = await axios.post<MoveResponse>("/api/equipment/move", payload);
+      const { data } = await axios.post<MoveResponse>(
+        "/api/equipment/move",
+        payload,
+      );
 
       if (isMoveOK(data)) {
         toast.success(`Recorded ${direction} for ${data.moved} item(s)`);
@@ -190,7 +234,9 @@ export default function MoveClient(): JSX.Element {
         refreshRecent();
       } else {
         if (Array.isArray(data.missing)) {
-          toast.error(`Missing: ${data.missing.join(", ")}`, { duration: 6000 });
+          toast.error(`Missing: ${data.missing.join(", ")}`, {
+            duration: 6000,
+          });
         } else {
           toast.error(data.error || "Failed to record movement");
         }
@@ -198,6 +244,7 @@ export default function MoveClient(): JSX.Element {
     } catch (e: unknown) {
       const err = e as { response?: { data?: MoveResponse } };
       const res = err.response?.data;
+
       if (res && isMoveError(res) && Array.isArray(res.missing)) {
         toast.error(`Missing: ${res.missing.join(", ")}`, { duration: 6000 });
       } else if (res && isMoveError(res)) {
@@ -208,15 +255,26 @@ export default function MoveClient(): JSX.Element {
     }
   }
 
-  /* ---------- Recent Movements (sortable, filter, simple paginate) ---------- */
-  type Recent = { id: string; type: string; assetNumber: number; direction: string; at: string; projectCode?: string | null; note?: string | null; byId?: string | null };
+  /* ---------- Recent Movements (sortable, filter, paginate) ---------- */
+  type Recent = {
+    id: string;
+    type: string;
+    assetNumber: number;
+    direction: string;
+    at: string;
+    projectCode?: string | null;
+    note?: string | null;
+    byId?: string | null;
+  };
   const [recent, setRecent] = useState<Recent[]>([]);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // controls
   const [recQuery, setRecQuery] = useState("");
-  const [recSort, setRecSort] = useState<"at"|"type"|"assetNumber"|"direction">("at");
-  const [recDir, setRecDir] = useState<"asc"|"desc">("desc");
+  const [recSort, setRecSort] = useState<
+    "at" | "type" | "assetNumber" | "direction"
+  >("at");
+  const [recDir, setRecDir] = useState<"asc" | "desc">("desc");
   const [recPage, setRecPage] = useState(1);
   const [recPageSize, setRecPageSize] = useState(20);
   const [dateFrom, setDateFrom] = useState<string>(""); // yyyy-mm-dd
@@ -225,11 +283,18 @@ export default function MoveClient(): JSX.Element {
   async function refreshRecent() {
     try {
       // fetch a decent chunk; client filters/sorts
-      const { data } = await axios.get<{ status: number; items: Recent[] }>("/api/equipment/movements", { params: { limit: 500 } });
+      const { data } = await axios.get<{ status: number; items: Recent[] }>(
+        "/api/equipment/movements",
+        { params: { limit: 500 } },
+      );
       if (data.status === 200) setRecent(data.items);
-    } catch {/* noop */}
+    } catch {
+      /* noop */
+    }
   }
-  useEffect(() => { refreshRecent(); }, []);
+  useEffect(() => {
+    refreshRecent();
+  }, []);
 
   const recentFilteredSorted = useMemo(() => {
     let arr = [...recent];
@@ -237,29 +302,33 @@ export default function MoveClient(): JSX.Element {
     // date range
     if (dateFrom) {
       const from = new Date(dateFrom + "T00:00:00");
-      arr = arr.filter(r => new Date(r.at) >= from);
+      arr = arr.filter((r) => new Date(r.at) >= from);
     }
     if (dateTo) {
       const to = new Date(dateTo + "T23:59:59");
-      arr = arr.filter(r => new Date(r.at) <= to);
+      arr = arr.filter((r) => new Date(r.at) <= to);
     }
 
     // text filter
     const s = recQuery.toLowerCase().trim();
     if (s) {
-      arr = arr.filter(r =>
-        `${r.type} ${r.assetNumber} ${r.direction} ${r.projectCode ?? ""} ${r.byId ?? ""} ${r.note ?? ""}`
+      arr = arr.filter((r) =>
+        `${r.type} ${r.assetNumber} ${r.direction} ${r.projectCode ?? ""} ${
+          r.byId ?? ""
+        } ${r.note ?? ""}`
           .toLowerCase()
-          .includes(s)
+          .includes(s),
       );
     }
 
     // sort
-    arr.sort((a,b) => {
+    arr.sort((a, b) => {
       let cmp = 0;
-      if (recSort === "at") cmp = new Date(a.at).getTime() - new Date(b.at).getTime();
+      if (recSort === "at")
+        cmp = new Date(a.at).getTime() - new Date(b.at).getTime();
       else if (recSort === "type") cmp = a.type.localeCompare(b.type);
-      else if (recSort === "direction") cmp = a.direction.localeCompare(b.direction);
+      else if (recSort === "direction")
+        cmp = a.direction.localeCompare(b.direction);
       else cmp = a.assetNumber - b.assetNumber;
       return recDir === "asc" ? cmp : -cmp;
     });
@@ -267,7 +336,10 @@ export default function MoveClient(): JSX.Element {
     return arr;
   }, [recent, recQuery, recSort, recDir, dateFrom, dateTo]);
 
-  const totalPages = Math.max(1, Math.ceil(recentFilteredSorted.length / recPageSize));
+  const totalPages = Math.max(
+    1,
+    Math.ceil(recentFilteredSorted.length / recPageSize),
+  );
   const pageItems = useMemo(() => {
     const start = (recPage - 1) * recPageSize;
     return recentFilteredSorted.slice(start, start + recPageSize);
@@ -275,7 +347,9 @@ export default function MoveClient(): JSX.Element {
 
   async function deleteMovement(id: string) {
     try {
-      const { data } = await axios.delete<DeleteResponse>(`/api/equipment/movements/${id}`);
+      const { data } = await axios.delete<DeleteResponse>(
+        `/api/equipment/movements/${id}`,
+      );
       if (isDeleteOK(data)) {
         toast.success("Movement deleted");
         setConfirmDeleteId(null);
@@ -292,7 +366,9 @@ export default function MoveClient(): JSX.Element {
     }
   }
 
-  /* ---------- Render ---------- */
+  /* ──────────────────────────────────────────────────────────── */
+  /*  Render                                                      */
+  /* ──────────────────────────────────────────────────────────── */
   return (
     <div className="min-h-screen bg-gray-100 pt-24 md:pt-28 lg:pt-32">
       <Navbar />
@@ -302,8 +378,13 @@ export default function MoveClient(): JSX.Element {
         {/* Direction */}
         <div className="mb-4 flex gap-2">
           {(["OUT", "IN"] as MovementDirection[]).map((d) => (
-            <button key={d} onClick={() => setDirection(d)}
-              className={`rounded px-3 py-2 text-sm ${direction===d ? "bg-blue-600 text-white" : "bg-white border"}`}>
+            <button
+              key={d}
+              onClick={() => setDirection(d)}
+              className={`rounded px-3 py-2 text-sm ${
+                direction === d ? "bg-blue-600 text-white" : "bg-white border"
+              }`}
+            >
               {d}
             </button>
           ))}
@@ -312,23 +393,54 @@ export default function MoveClient(): JSX.Element {
         {/* Project (OUT only) — sorted DESC */}
         {direction === "OUT" && (
           <div className="mb-4">
-            <label className="mb-1 block text-sm font-semibold text-gray-700">Project</label>
-            <Combobox as="div" value={projectCode} onChange={(v:string)=>setProjectCode(v ?? "")}>
+            <label className="mb-1 block text-sm font-semibold text-gray-700">
+              Project
+            </label>
+            <Combobox
+              as="div"
+              value={projectCode}
+              onChange={(v: string) => setProjectCode(v ?? "")}
+            >
               <div className="relative">
-                <Combobox.Input className="w-full rounded border p-2" displayValue={(v:string)=>v}
-                  onChange={(e)=>{ setProjectCode(e.target.value); setProjQuery(e.target.value); }}
-                  placeholder="Search or select project code" />
-                <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2"><ChevronUpDownIcon className="h-5 w-5 text-gray-400" /></Combobox.Button>
-                {filteredProjects.length>0 && (
+                <Combobox.Input
+                  className="w-full rounded border p-2"
+                  displayValue={(v: string) => v}
+                  onChange={(e) => {
+                    setProjectCode(e.target.value);
+                    setProjQuery(e.target.value);
+                  }}
+                  placeholder="Search or select project code"
+                />
+                <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2">
+                  <ChevronUpDownIcon className="h-5 w-5 text-gray-400" />
+                </Combobox.Button>
+                {filteredProjects.length > 0 && (
                   <Combobox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                    {filteredProjects.map((p)=>(
-                      <Combobox.Option key={p.id} value={p.code}
-                        className={({active})=>`relative cursor-pointer select-none py-2 pl-3 pr-9 ${active?"bg-blue-600 text-white":"text-gray-900"}`}>
-                        {({active, selected})=>(
+                    {filteredProjects.map((p) => (
+                      <Combobox.Option
+                        key={p.id}
+                        value={p.code}
+                        className={({ active }) =>
+                          `relative cursor-pointer select-none py-2 pl-3 pr-9 ${
+                            active ? "bg-blue-600 text-white" : "text-gray-900"
+                          }`
+                        }
+                      >
+                        {({ active, selected }) => (
                           <>
-                            <span className={`block truncate ${selected?"font-semibold":""}`}>{p.code}</span>
+                            <span
+                              className={`block truncate ${
+                                selected ? "font-semibold" : ""
+                              }`}
+                            >
+                              {p.code}
+                            </span>
                             {selected && (
-                              <span className={`absolute inset-y-0 right-0 flex items-center pr-4 ${active?"text-white":"text-blue-600"}`}>
+                              <span
+                                className={`absolute inset-y-0 right-0 flex items-center pr-4 ${
+                                  active ? "text-white" : "text-blue-600"
+                                }`}
+                              >
                                 <CheckIcon className="h-5 w-5" />
                               </span>
                             )}
@@ -346,13 +458,24 @@ export default function MoveClient(): JSX.Element {
         {/* Date / Time */}
         <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
           <label className="flex items-center gap-2">
-            <input type="checkbox" checked={useNow} onChange={(e) => setUseNow(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={useNow}
+              onChange={(e) => setUseNow(e.target.checked)}
+            />
             <span className="text-sm">Use current date/time</span>
           </label>
           {!useNow && (
             <div>
-              <label className="block text-sm font-medium">Specify date/time</label>
-              <input type="datetime-local" value={manualIso} onChange={(e) => setManualIso(e.target.value)} className="mt-1 w-full rounded border p-2" />
+              <label className="block text-sm font-medium">
+                Specify date/time
+              </label>
+              <input
+                type="datetime-local"
+                value={manualIso}
+                onChange={(e) => setManualIso(e.target.value)}
+                className="mt-1 w-full rounded border p-2"
+              />
             </div>
           )}
         </div>
@@ -361,48 +484,94 @@ export default function MoveClient(): JSX.Element {
         <div className="mb-4 rounded bg-white p-4 shadow">
           <h2 className="mb-2 font-semibold">Batch Items</h2>
           <p className="mb-3 text-xs text-gray-500">
-            Tip: **QR Quick Mode** lets you scan multiple items first (they’ll appear here), then save once.
+            Tip: <b>QR Quick Mode</b> lets you scan multiple items first (they’ll
+            appear here), then save once.
           </p>
           <div className="space-y-3">
             {rows.map((row, i) => (
-              <div key={`${row.type}-${row.assetNumber}-${i}`} className="grid grid-cols-1 gap-2 sm:grid-cols-7">
+              <div
+                key={`${row.type}-${row.assetNumber}-${i}`}
+                className="grid grid-cols-1 gap-2 sm:grid-cols-7"
+              >
                 <div className="sm:col-span-4">
                   <label className="block text-xs text-gray-600">Type</label>
-                  <input className="mt-1 w-full rounded border p-2" value={row.type}
-                    onChange={(e) => updateRow(i, { type: e.target.value })} placeholder="Dehumidifier, Blower, Air Scrubber…" />
+                  <input
+                    className="mt-1 w-full rounded border p-2"
+                    value={row.type}
+                    onChange={(e) => updateRow(i, { type: e.target.value })}
+                    placeholder="Dehumidifier, Blower, Air Scrubber…"
+                  />
                 </div>
                 <div className="sm:col-span-2">
                   <label className="block text-xs text-gray-600">Asset #</label>
-                  <input className="mt-1 w-full rounded border p-2" inputMode="numeric" pattern="[0-9]*"
-                    value={row.assetNumber} onChange={(e) => updateRow(i, { assetNumber: e.target.value })} placeholder="e.g. 33" />
+                  <input
+                    className="mt-1 w-full rounded border p-2"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={row.assetNumber}
+                    onChange={(e) =>
+                      updateRow(i, { assetNumber: e.target.value })
+                    }
+                    placeholder="e.g. 33"
+                  />
                 </div>
                 <div className="sm:col-span-1 flex items-end">
-                  <button onClick={() => removeRow(i)} className="w-full rounded border px-3 py-2 text-sm">Remove</button>
+                  <button
+                    onClick={() => removeRow(i)}
+                    className="w-full rounded border px-3 py-2 text-sm"
+                  >
+                    Remove
+                  </button>
                 </div>
               </div>
             ))}
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <button onClick={addRow} className="rounded bg-gray-800 px-3 py-2 text-white">+ Add Row</button>
-            <button onClick={clearBatch} className="rounded border px-3 py-2">Clear Batch</button>
+            <button
+              onClick={addRow}
+              className="rounded bg-gray-800 px-3 py-2 text-white"
+            >
+              + Add Row
+            </button>
+            <button onClick={clearBatch} className="rounded border px-3 py-2">
+              Clear Batch
+            </button>
             {quickMode && (
-              <button onClick={()=>toast("Ready for next scan. Open your camera and scan the next QR.", { icon: "📷" })}
-                className="rounded bg-amber-600 px-3 py-2 text-white">Next Scan</button>
+              <button
+                onClick={() =>
+                  toast("Ready for next scan. Open your camera and scan the next QR.", {
+                    icon: "📷",
+                  })
+                }
+                className="rounded bg-amber-600 px-3 py-2 text-white"
+              >
+                Next Scan
+              </button>
             )}
           </div>
         </div>
 
         {/* Notes */}
         <div className="mb-4">
-          <label className="mb-1 block text-sm font-semibold text-gray-700">Notes</label>
-          <textarea className="min-h-32 w-full rounded border p-3"
+          <label className="mb-1 block text-sm font-semibold text-gray-700">
+            Notes
+          </label>
+          <textarea
+            className="min-h-32 w-full rounded border p-3"
             placeholder="Optional context... (who, where onsite, reason for delayed entry, etc.)"
-            value={note} onChange={(e)=>setNote(e.target.value)} />
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
         </div>
 
         {/* Save All */}
         <div className="mb-8 flex flex-wrap gap-2">
-          <button onClick={submitAll} className="rounded bg-blue-600 px-4 py-2 font-medium text-white">Save All</button>
+          <button
+            onClick={submitAll}
+            className="rounded bg-blue-600 px-4 py-2 font-medium text-white"
+          >
+            Save All
+          </button>
         </div>
 
         {/* Recent Movements (sortable, filter, paginate) */}
@@ -410,20 +579,59 @@ export default function MoveClient(): JSX.Element {
           <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <h2 className="font-semibold">Recent Movements</h2>
             <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
-              <input className="rounded border p-2 text-sm" placeholder="Filter text…" value={recQuery} onChange={(e)=>{ setRecQuery(e.target.value); setRecPage(1); }} />
-              <select className="rounded border p-2 text-sm" value={recSort} onChange={(e)=>setRecSort(e.target.value as any)}>
+              <input
+                className="rounded border p-2 text-sm"
+                placeholder="Filter text…"
+                value={recQuery}
+                onChange={(e) => {
+                  setRecQuery(e.target.value);
+                  setRecPage(1);
+                }}
+              />
+              <select
+                className="rounded border p-2 text-sm"
+                value={recSort}
+                onChange={(e) => setRecSort(e.target.value as any)}
+              >
                 <option value="at">Date/Time</option>
                 <option value="type">Type</option>
                 <option value="assetNumber">Asset #</option>
                 <option value="direction">Direction</option>
               </select>
-              <select className="rounded border p-2 text-sm" value={recDir} onChange={(e)=>setRecDir(e.target.value as any)}>
+              <select
+                className="rounded border p-2 text-sm"
+                value={recDir}
+                onChange={(e) => setRecDir(e.target.value as any)}
+              >
                 <option value="desc">Desc</option>
                 <option value="asc">Asc</option>
               </select>
-              <input type="date" className="rounded border p-2 text-sm" value={dateFrom} onChange={(e)=>{ setDateFrom(e.target.value); setRecPage(1); }} />
-              <input type="date" className="rounded border p-2 text-sm" value={dateTo} onChange={(e)=>{ setDateTo(e.target.value); setRecPage(1); }} />
-              <select className="rounded border p-2 text-sm" value={recPageSize} onChange={(e)=>{ setRecPageSize(Number(e.target.value)); setRecPage(1); }}>
+              <input
+                type="date"
+                className="rounded border p-2 text-sm"
+                value={dateFrom}
+                onChange={(e) => {
+                  setDateFrom(e.target.value);
+                  setRecPage(1);
+                }}
+              />
+              <input
+                type="date"
+                className="rounded border p-2 text-sm"
+                value={dateTo}
+                onChange={(e) => {
+                  setDateTo(e.target.value);
+                  setRecPage(1);
+                }}
+              />
+              <select
+                className="rounded border p-2 text-sm"
+                value={recPageSize}
+                onChange={(e) => {
+                  setRecPageSize(Number(e.target.value));
+                  setRecPage(1);
+                }}
+              >
                 <option value={10}>10</option>
                 <option value={20}>20</option>
                 <option value={50}>50</option>
@@ -434,41 +642,87 @@ export default function MoveClient(): JSX.Element {
           <div className="space-y-2">
             {pageItems.length === 0 ? (
               <div className="text-sm text-gray-600">No entries</div>
-            ) : pageItems.map((m) => (
-              <div key={m.id} className="flex flex-col gap-1 rounded border p-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="text-sm">
-                  <span className="font-semibold">{m.type} #{m.assetNumber}</span>{" "}
-                  <span className="uppercase">{m.direction}</span>{" "}
-                  <span>— {new Date(m.at).toLocaleString()}</span>{" "}
-                  {m.projectCode ? <span> | Project: <span className="font-medium">{m.projectCode}</span></span> : null}
-                  {m.note ? <span> | Note: {m.note}</span> : null}
+            ) : (
+              pageItems.map((m) => (
+                <div
+                  key={m.id}
+                  className="flex flex-col gap-1 rounded border p-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="text-sm">
+                    <span className="font-semibold">
+                      {m.type} #{m.assetNumber}
+                    </span>{" "}
+                    <span className="uppercase">{m.direction}</span>{" "}
+                    <span>— {new Date(m.at).toLocaleString()}</span>{" "}
+                    {m.projectCode ? (
+                      <span>
+                        {" "}
+                        | Project:{" "}
+                        <span className="font-medium">{m.projectCode}</span>
+                      </span>
+                    ) : null}
+                    {m.note ? <span> | Note: {m.note}</span> : null}
+                  </div>
+                  <div className="mt-2 flex gap-2 sm:mt-0">
+                    {confirmDeleteId === m.id ? (
+                      <>
+                        <button
+                          onClick={() => deleteMovement(m.id)}
+                          className="rounded bg-red-600 px-3 py-2 text-white"
+                        >
+                          Confirm Delete
+                        </button>
+                        <button
+                          onClick={() => {
+                            setConfirmDeleteId(null);
+                            toast("Delete cancelled");
+                          }}
+                          className="rounded bg-gray-300 px-3 py-2"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setConfirmDeleteId(m.id);
+                          toast("Click again to confirm delete", { icon: "⚠️" });
+                        }}
+                        className="rounded bg-red-600 px-3 py-2 text-white"
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="mt-2 flex gap-2 sm:mt-0">
-                  {confirmDeleteId === m.id ? (
-                    <>
-                      <button onClick={() => deleteMovement(m.id)} className="rounded bg-red-600 px-3 py-2 text-white">Confirm Delete</button>
-                      <button onClick={() => { setConfirmDeleteId(null); toast("Delete cancelled"); }} className="rounded bg-gray-300 px-3 py-2">Cancel</button>
-                    </>
-                  ) : (
-                    <button onClick={() => { setConfirmDeleteId(m.id); toast("Click again to confirm delete", { icon: "⚠️" }); }} className="rounded bg-red-600 px-3 py-2 text-white">Delete</button>
-                  )}
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
 
           {/* pagination controls */}
           <div className="mt-3 flex items-center justify-between">
             <div className="text-xs text-gray-500">
-              Page {recPage} / {totalPages} &middot; {recentFilteredSorted.length} items
+              Page {recPage} / {totalPages} &middot;{" "}
+              {recentFilteredSorted.length} items
             </div>
             <div className="flex gap-2">
-              <button disabled={recPage<=1} onClick={()=>setRecPage(p=>Math.max(1,p-1))} className="rounded border px-3 py-1 text-sm disabled:opacity-50">Prev</button>
-              <button disabled={recPage>=totalPages} onClick={()=>setRecPage(p=>Math.min(totalPages,p+1))} className="rounded border px-3 py-1 text-sm disabled:opacity-50">Next</button>
+              <button
+                disabled={recPage <= 1}
+                onClick={() => setRecPage((p) => Math.max(1, p - 1))}
+                className="rounded border px-3 py-1 text-sm disabled:opacity-50"
+              >
+                Prev
+              </button>
+              <button
+                disabled={recPage >= totalPages}
+                onClick={() => setRecPage((p) => Math.min(totalPages, p + 1))}
+                className="rounded border px-3 py-1 text-sm disabled:opacity-50"
+              >
+                Next
+              </button>
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );

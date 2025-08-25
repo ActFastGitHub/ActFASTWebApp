@@ -10,21 +10,22 @@ import Navbar from "@/app/components/navBar";
 import Modal from "@/app/components/modal";
 import { UserProps } from "@/app/libs/interfaces";
 
-/* ───────────── ACL MAP ───────────── */
+/* ───────────── ACL MAP (for client-side visibility only) ───────────── */
 const ACL: Record<string, string[]> = {
   "pods-mapping": [],
   "memberpage": [],
   "projectspage": [],
   "contentspage": [],
-  "projectcosting": ["admin", "owner"], // protected
+  "projectcosting": ["admin", "owner"],
   "projectmanagement": ["admin", "owner"],
   "inventorymanagementpage": ["admin", "owner"],
 };
+
 const norm = (s?: string) => s?.toLowerCase().trim() ?? "";
 const canAccess = (slug: string, role: string) =>
   !(ACL[slug]?.length) || ACL[slug].includes(role);
 
-/* small card (note: if you use Tailwind with purge, safelist the colors you pass here) */
+/* Small card (Tailwind: safelist these colors if using JIT purge) */
 const Card = ({
   color,
   title,
@@ -46,11 +47,11 @@ export default function Dashboard() {
   const router = useRouter();
   const { data: session, status } = useSession();
 
-  const [user, setUser] = useState<UserProps | null>(null); // null = still loading
+  const [user, setUser] = useState<UserProps | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const toastShownRef = useRef(false);
 
-  /* ——— toast on provider login ——— */
+  /* Toast after provider login */
   useEffect(() => {
     if (typeof window === "undefined" || status !== "authenticated") return;
     const provider = new URLSearchParams(window.location.search).get("provider");
@@ -60,13 +61,13 @@ export default function Dashboard() {
     }
   }, [status]);
 
-  /* ——— redirects ——— */
+  /* Redirects */
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
-    if (session?.user.isNewUser) router.push("/create-profile");
-  }, [status, session?.user.isNewUser, router]);
+    if (session?.user?.isNewUser) router.push("/create-profile");
+  }, [status, session?.user?.isNewUser, router]);
 
-  /* ——— fetch profile once logged in ——— */
+  /* Fetch profile */
   useEffect(() => {
     if (status !== "authenticated" || !session?.user?.email) return;
     (async () => {
@@ -75,12 +76,11 @@ export default function Dashboard() {
         const data = await res.json();
         setUser(data);
       } catch {
-        setUser({ role: session?.user?.role } as UserProps); // fallback
+        setUser({ role: session?.user?.role } as UserProps);
       }
     })();
   }, [status, session?.user?.email]);
 
-  /* show spinner until BOTH session & profile resolved */
   if (status === "loading" || user === null) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-100">
@@ -89,10 +89,8 @@ export default function Dashboard() {
     );
   }
 
-  /* guard again in rare case */
   if (session?.user?.isNewUser) return null;
 
-  /* role resolution priority: profile role → session role → "" */
   const role = norm(user?.role ?? session?.user?.role);
 
   return (
@@ -100,7 +98,7 @@ export default function Dashboard() {
       <Navbar />
 
       <div className="flex">
-        {/* ——— sidebar ——— */}
+        {/* Sidebar */}
         <aside
           className={`fixed inset-y-0 left-0 w-32 transform bg-gray-800 text-white sm:w-48 ${
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
@@ -108,18 +106,15 @@ export default function Dashboard() {
         >
           <div className="p-4">
             <h2 className="pt-20 text-2xl font-bold">Sidebar</h2>
-
-            {/* existing items */}
             <ul className="space-y-1">
               <li>(For Future Content)</li>
               <li>(For Future Content)</li>
               <li>(For Future Content)</li>
             </ul>
-           
           </div>
         </aside>
 
-        {/* ——— main ——— */}
+        {/* Main */}
         <main
           className={`flex-1 transition-all duration-300 md:mt-4 ${
             sidebarOpen ? "ml-32 sm:ml-48" : "ml-0"
@@ -179,7 +174,7 @@ export default function Dashboard() {
                 </Link>
               )}
 
-              {/* 🔒 admin / owner only */}
+              {/* Admin / owner only */}
               {canAccess("projectcosting", role) && (
                 <Link href="/projectcosting">
                   <Card
@@ -229,13 +224,13 @@ export default function Dashboard() {
                 />
               </Link>
 
-              {/* Admin/Owner only: Add device (with optional QR) */}
+              {/* Admin/Owner only: Equipment Management */}
               {(role === "admin" || role === "owner") && (
                 <Link href="/equipment/admin/manage">
                   <Card
                     color="red"
-                    title="Add Equipment + QR"
-                    desc="Create a device and optionally generate a QR label."
+                    title="Equipment Management"
+                    desc="Add/edit/archive equipment; update details."
                   />
                 </Link>
               )}
@@ -246,7 +241,7 @@ export default function Dashboard() {
                   <Card
                     color="gray"
                     title="QR Labels (Bulk)"
-                    desc="Generate/print QR stickers for many assets at once."
+                    desc="Generate & print QR stickers for existing assets."
                   />
                 </Link>
               )}

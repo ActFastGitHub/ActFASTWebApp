@@ -3,7 +3,10 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
-/* ─── ACL (same behavior as before) ─── */
+/**
+ * ACL map: if a slug is listed with roles, only those roles can access.
+ * Empty array means "everyone who is logged-in (or page handles it itself)".
+ */
 const ACL: Record<string, string[]> = {
   "pods-mapping": [],
   "memberpage": [],
@@ -17,14 +20,13 @@ const ACL: Record<string, string[]> = {
 const norm = (s?: string) => s?.toLowerCase().trim() ?? "";
 
 export async function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
+  const { pathname, searchParams } = req.nextUrl;
 
-  /* ── Access-code guard for /register & /login (PATCHED to preserve callbackUrl) ── */
+  /* ── Access-code guard for /register & /login (preserve callbackUrl) ── */
   if (pathname === "/register" || pathname === "/login") {
     const code = req.cookies.get("accessCode");
     if (!code || code.value !== process.env.NEXT_PUBLIC_ACTFAST_ACCESS_CODE) {
-      // keep where the user was trying to go (e.g. after scanning a QR)
-      const originalCb = req.nextUrl.searchParams.get("callbackUrl") || "/";
+      const originalCb = searchParams.get("callbackUrl") || "/";
       const url = new URL("/", req.url);
       url.searchParams.set("needAccess", "1");
       url.searchParams.set("callbackUrl", originalCb);
@@ -33,8 +35,14 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  /* ── Optional: server-side hard gate for admin equipment pages ── */
-  if (pathname.startsWith("/equipment/qr-labels") || pathname.startsWith("/equipment/admin")) {
+  /* ── Admin-only equipment routes ──
+     - Equipment Management (admin console)
+     - QR Labels page (bulk printing)
+   */
+  if (
+    pathname.startsWith("/equipment/admin") ||
+    pathname.startsWith("/equipment/qr-labels")
+  ) {
     const token = await getToken({ req, secret: process.env.SECRET });
     const role = norm((token as any)?.role);
     if (!token || !["admin", "owner"].includes(role)) {
@@ -42,17 +50,15 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  /* ── Existing role guard for configured slugs ── */
+  /* ── Generic role guard via ACL map (for top-level slugs) ── */
   const slug = norm(pathname.split("/")[1]);
   const allowed = ACL[slug];
 
   if (allowed?.length) {
     const token = await getToken({
       req,
-      // same secret your authOptions uses
-      secret: process.env.SECRET,
+      secret: process.env.SECRET, // same as authOptions secret
     });
-
     const userRole = norm((token as any)?.role);
     if (!token || !allowed.includes(userRole)) {
       return NextResponse.redirect(new URL("/unauthorized", req.url));
@@ -62,7 +68,7 @@ export async function middleware(req: NextRequest) {
   return NextResponse.next();
 }
 
-/* Add equipment routes to the matcher so the admin-only gate above can run */
+/* Ensure middleware runs on all protected routes */
 export const config = {
   matcher: [
     "/register",
@@ -74,7 +80,7 @@ export const config = {
     "/inventorymanagementpage",
     "/inventorymanagementpage/:path*",
 
-    // NEW: equipment routes (tracking, move, admin, qr-labels)
+    // Equipment suite (tracking, move, admin, QR)
     "/equipment",
     "/equipment/:path*",
   ],
