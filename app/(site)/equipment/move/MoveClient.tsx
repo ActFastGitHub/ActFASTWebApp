@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Navbar from "@/app/components/navBar";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -8,6 +8,7 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import { Combobox } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/24/outline";
+import jsQR from "jsqr";
 import type {
   MovementDirection,
   MoveRequest,
@@ -32,17 +33,32 @@ const LS_PROJ = "eqmove:project";
 /*  Helpers                                                     */
 /* ──────────────────────────────────────────────────────────── */
 type Project = { id: string; code: string };
-type MoveRow = { type: string; assetNumber: string };
+type MoveRow = { id: string; type: string; assetNumber: string };
+
+const mkId = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+function normalizeRows(raw: any): MoveRow[] {
+  const arr: MoveRow[] = Array.isArray(raw) ? raw : [];
+  return arr.map((r, idx) => ({
+    id: typeof r.id === "string" ? r.id : mkId() + "_" + idx,
+    type: String(r.type ?? ""),
+    assetNumber: String(r.assetNumber ?? ""),
+  }));
+}
 
 function loadQueue(): MoveRow[] {
   try {
-    return JSON.parse(localStorage.getItem(LS_QUEUE) || "[]");
+    const raw = JSON.parse(localStorage.getItem(LS_QUEUE) || "[]");
+    return normalizeRows(raw);
   } catch {
     return [];
   }
 }
 function saveQueue(q: MoveRow[]) {
-  localStorage.setItem(LS_QUEUE, JSON.stringify(q));
+  localStorage.setItem(
+    LS_QUEUE,
+    JSON.stringify(q.map(({ id, ...rest }) => ({ id, ...rest }))),
+  );
 }
 function loadString(key: string, def = ""): string {
   try {
@@ -56,10 +72,114 @@ function saveString(key: string, val: string) {
 }
 
 /* ──────────────────────────────────────────────────────────── */
+/*  Scanner Overlay (in-browser camera QR scan)                 */
+/* ──────────────────────────────────────────────────────────── */
+function ScannerOverlay({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    (async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        });
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+        }
+
+        const tick = () => {
+          const v = videoRef.current;
+          const c = canvasRef.current;
+          if (v && c) {
+            c.width = v.videoWidth;
+            c.height = v.videoHeight;
+            const ctx = c.getContext("2d");
+            if (ctx && c.width && c.height) {
+              ctx.drawImage(v, 0, 0, c.width, c.height);
+              const imgData = ctx.getImageData(0, 0, c.width, c.height);
+              const code = jsQR(imgData.data, c.width, c.height, {
+                inversionAttempts: "dontInvert",
+              });
+              if (code?.data) {
+                // stop everything first
+                if (rafRef.current) cancelAnimationFrame(rafRef.current);
+                if (streamRef.current) {
+                  streamRef.current.getTracks().forEach((t) => t.stop());
+                }
+                // navigate to the QR URL (e.g. /e/Dehumidifier/1?...), which adds to batch
+                window.location.href = code.data;
+                return;
+              }
+            }
+          }
+          rafRef.current = requestAnimationFrame(tick);
+        };
+        rafRef.current = requestAnimationFrame(tick);
+      } catch (err) {
+        toast.error("Camera permission denied or unavailable");
+        onClose();
+      }
+    })();
+
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+      }
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
+      <div className="relative w-full max-w-md overflow-hidden rounded-lg bg-black shadow-lg">
+        <video
+          ref={videoRef}
+          playsInline
+          className="block h-[60vh] w-full object-cover"
+        />
+        <canvas ref={canvasRef} className="hidden" />
+        <button
+          onClick={onClose}
+          className="absolute right-3 top-3 rounded bg-white/90 px-3 py-1 text-sm"
+        >
+          Close
+        </button>
+        <div className="absolute inset-x-0 bottom-0 bg-black/60 p-2 text-center text-xs text-white">
+          Point the camera at a printed QR label.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────── */
 /*  Component                                                   */
 /* ──────────────────────────────────────────────────────────── */
 export default function MoveClient(): JSX.Element {
-  const { status } = useSession();
+  const { status, data: session } = useSession();
+  const role = (session?.user?.role || "").toLowerCase();
+  const isAdmin = role === "admin" || role === "owner";
+
   const router = useRouter();
   const params = useSearchParams();
 
@@ -133,7 +253,7 @@ export default function MoveClient(): JSX.Element {
     let next = existing;
 
     if (initialType && initialAsset) {
-      const item: MoveRow = { type: initialType, assetNumber: initialAsset };
+      const item: MoveRow = { id: mkId(), type: initialType, assetNumber: initialAsset };
       const key = `${item.type}#${item.assetNumber}`;
       const set = new Set(existing.map((r) => `${r.type}#${r.assetNumber}`));
       if (!set.has(key)) {
@@ -143,13 +263,13 @@ export default function MoveClient(): JSX.Element {
       }
     }
 
-    setRows(next.length ? next : [{ type: "", assetNumber: "" }]);
+    setRows(next.length ? next : [{ id: mkId(), type: "", assetNumber: "" }]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // run once
 
   function addRow() {
     setRows((r) => {
-      const next = [...r, { type: "", assetNumber: "" }];
+      const next = [...r, { id: mkId(), type: "", assetNumber: "" }];
       saveQueue(next);
       return next;
     });
@@ -170,7 +290,7 @@ export default function MoveClient(): JSX.Element {
     });
   }
   function clearBatch() {
-    setRows([{ type: "", assetNumber: "" }]);
+    setRows([{ id: mkId(), type: "", assetNumber: "" }]);
     saveQueue([]);
     toast("Batch cleared");
   }
@@ -255,7 +375,7 @@ export default function MoveClient(): JSX.Element {
     }
   }
 
-  /* ---------- Recent Movements (sortable, filter, paginate) ---------- */
+  /* ---------- Recent Movements (sortable, filter, paginate + auto-archive) ---------- */
   type Recent = {
     id: string;
     type: string;
@@ -280,12 +400,18 @@ export default function MoveClient(): JSX.Element {
   const [dateFrom, setDateFrom] = useState<string>(""); // yyyy-mm-dd
   const [dateTo, setDateTo] = useState<string>("");
 
+  // auto-archive (>30 days old)
+  const [showArchived, setShowArchived] = useState(false);
+  const cutoffMs = useMemo(
+    () => Date.now() - 30 * 24 * 60 * 60 * 1000,
+    [],
+  );
+
   async function refreshRecent() {
     try {
-      // fetch a decent chunk; client filters/sorts
       const { data } = await axios.get<{ status: number; items: Recent[] }>(
         "/api/equipment/movements",
-        { params: { limit: 500 } },
+        { params: { limit: 800 } },
       );
       if (data.status === 200) setRecent(data.items);
     } catch {
@@ -307,6 +433,11 @@ export default function MoveClient(): JSX.Element {
     if (dateTo) {
       const to = new Date(dateTo + "T23:59:59");
       arr = arr.filter((r) => new Date(r.at) <= to);
+    }
+
+    // auto-archive filter
+    if (!showArchived) {
+      arr = arr.filter((r) => new Date(r.at).getTime() >= cutoffMs);
     }
 
     // text filter
@@ -334,7 +465,7 @@ export default function MoveClient(): JSX.Element {
     });
 
     return arr;
-  }, [recent, recQuery, recSort, recDir, dateFrom, dateTo]);
+  }, [recent, recQuery, recSort, recDir, dateFrom, dateTo, showArchived, cutoffMs]);
 
   const totalPages = Math.max(
     1,
@@ -365,6 +496,9 @@ export default function MoveClient(): JSX.Element {
       else toast.error("Delete failed");
     }
   }
+
+  /* ---------- Scanner control ---------- */
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   /* ──────────────────────────────────────────────────────────── */
   /*  Render                                                      */
@@ -490,7 +624,7 @@ export default function MoveClient(): JSX.Element {
           <div className="space-y-3">
             {rows.map((row, i) => (
               <div
-                key={`${row.type}-${row.assetNumber}-${i}`}
+                key={row.id} // ← stable key fixes "one character" typing bug
                 className="grid grid-cols-1 gap-2 sm:grid-cols-7"
               >
                 <div className="sm:col-span-4">
@@ -536,18 +670,14 @@ export default function MoveClient(): JSX.Element {
             <button onClick={clearBatch} className="rounded border px-3 py-2">
               Clear Batch
             </button>
-            {quickMode && (
-              <button
-                onClick={() =>
-                  toast("Ready for next scan. Open your camera and scan the next QR.", {
-                    icon: "📷",
-                  })
-                }
-                className="rounded bg-amber-600 px-3 py-2 text-white"
-              >
-                Next Scan
-              </button>
-            )}
+
+            {/* Next Scan → open camera scanner overlay */}
+            <button
+              onClick={() => setScannerOpen(true)}
+              className="rounded bg-amber-600 px-3 py-2 text-white"
+            >
+              Next Scan
+            </button>
           </div>
         </div>
 
@@ -574,11 +704,11 @@ export default function MoveClient(): JSX.Element {
           </button>
         </div>
 
-        {/* Recent Movements (sortable, filter, paginate) */}
+        {/* Recent Movements (sortable, filter, paginate + auto-archive) */}
         <div className="rounded bg-white p-4 shadow">
           <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <h2 className="font-semibold">Recent Movements</h2>
-            <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-7">
               <input
                 className="rounded border p-2 text-sm"
                 placeholder="Filter text…"
@@ -636,6 +766,17 @@ export default function MoveClient(): JSX.Element {
                 <option value={20}>20</option>
                 <option value={50}>50</option>
               </select>
+              <label className="flex items-center gap-2 text-xs text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={showArchived}
+                  onChange={(e) => {
+                    setShowArchived(e.target.checked);
+                    setRecPage(1);
+                  }}
+                />
+                Show archived (&gt; 30 days)
+              </label>
             </div>
           </div>
 
@@ -643,59 +784,71 @@ export default function MoveClient(): JSX.Element {
             {pageItems.length === 0 ? (
               <div className="text-sm text-gray-600">No entries</div>
             ) : (
-              pageItems.map((m) => (
-                <div
-                  key={m.id}
-                  className="flex flex-col gap-1 rounded border p-3 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="text-sm">
-                    <span className="font-semibold">
-                      {m.type} #{m.assetNumber}
-                    </span>{" "}
-                    <span className="uppercase">{m.direction}</span>{" "}
-                    <span>— {new Date(m.at).toLocaleString()}</span>{" "}
-                    {m.projectCode ? (
-                      <span>
-                        {" "}
-                        | Project:{" "}
-                        <span className="font-medium">{m.projectCode}</span>
-                      </span>
-                    ) : null}
-                    {m.note ? <span> | Note: {m.note}</span> : null}
+              pageItems.map((m) => {
+                const isArchived = new Date(m.at).getTime() < cutoffMs;
+                return (
+                  <div
+                    key={m.id}
+                    className="flex flex-col gap-1 rounded border p-3 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="text-sm">
+                      <span className="font-semibold">
+                        {m.type} #{m.assetNumber}
+                      </span>{" "}
+                      <span className="uppercase">{m.direction}</span>{" "}
+                      <span>— {new Date(m.at).toLocaleString()}</span>{" "}
+                      {m.projectCode ? (
+                        <span>
+                          {" "}
+                          | Project:{" "}
+                          <span className="font-medium">{m.projectCode}</span>
+                        </span>
+                      ) : null}
+                      {m.note ? <span> | Note: {m.note}</span> : null}
+                      {isArchived ? (
+                        <span className="ml-2 rounded bg-gray-200 px-2 py-0.5 text-xs text-gray-700">
+                          Archived
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="mt-2 flex gap-2 sm:mt-0">
+                      {isAdmin ? (
+                        confirmDeleteId === m.id ? (
+                          <>
+                            <button
+                              onClick={() => deleteMovement(m.id)}
+                              className="rounded bg-red-600 px-3 py-2 text-white"
+                            >
+                              Confirm Delete
+                            </button>
+                            <button
+                              onClick={() => {
+                                setConfirmDeleteId(null);
+                                toast("Delete cancelled");
+                              }}
+                              className="rounded bg-gray-300 px-3 py-2"
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setConfirmDeleteId(m.id);
+                              toast("Click again to confirm delete", {
+                                icon: "⚠️",
+                              });
+                            }}
+                            className="rounded bg-red-600 px-3 py-2 text-white"
+                          >
+                            Delete
+                          </button>
+                        )
+                      ) : null}
+                    </div>
                   </div>
-                  <div className="mt-2 flex gap-2 sm:mt-0">
-                    {confirmDeleteId === m.id ? (
-                      <>
-                        <button
-                          onClick={() => deleteMovement(m.id)}
-                          className="rounded bg-red-600 px-3 py-2 text-white"
-                        >
-                          Confirm Delete
-                        </button>
-                        <button
-                          onClick={() => {
-                            setConfirmDeleteId(null);
-                            toast("Delete cancelled");
-                          }}
-                          className="rounded bg-gray-300 px-3 py-2"
-                        >
-                          Cancel
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          setConfirmDeleteId(m.id);
-                          toast("Click again to confirm delete", { icon: "⚠️" });
-                        }}
-                        className="rounded bg-red-600 px-3 py-2 text-white"
-                      >
-                        Delete
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
 
@@ -724,6 +877,9 @@ export default function MoveClient(): JSX.Element {
           </div>
         </div>
       </div>
+
+      {/* Camera scanner overlay */}
+      <ScannerOverlay open={scannerOpen} onClose={() => setScannerOpen(false)} />
     </div>
   );
 }
