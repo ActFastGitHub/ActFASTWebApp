@@ -14,6 +14,7 @@ import type {
   MoveRequest,
   MoveResponse,
   DeleteResponse,
+  EquipmentDTO,
 } from "@/app/types/equipment";
 import {
   isMoveOK,
@@ -71,6 +72,16 @@ function saveString(key: string, val: string) {
   localStorage.setItem(key, val);
 }
 
+function formatDDHHMM(ms: number): string {
+  let mins = Math.floor(ms / 60000);
+  const days = Math.floor(mins / (60 * 24));
+  mins -= days * 60 * 24;
+  const hours = Math.floor(mins / 60);
+  mins -= hours * 60;
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${days}d ${pad(hours)}h ${pad(mins)}m`;
+}
+
 /* ──────────────────────────────────────────────────────────── */
 /*  Scanner Overlay (in-browser camera QR scan)                 */
 /* ──────────────────────────────────────────────────────────── */
@@ -119,12 +130,10 @@ function ScannerOverlay({
                 inversionAttempts: "dontInvert",
               });
               if (code?.data) {
-                // stop everything first
                 if (rafRef.current) cancelAnimationFrame(rafRef.current);
                 if (streamRef.current) {
                   streamRef.current.getTracks().forEach((t) => t.stop());
                 }
-                // navigate to the QR URL (e.g. /e/Dehumidifier/1?...), which adds to batch
                 window.location.href = code.data;
                 return;
               }
@@ -166,6 +175,206 @@ function ScannerOverlay({
         </button>
         <div className="absolute inset-x-0 bottom-0 bg-black/60 p-2 text-center text-xs text-white">
           Point the camera at a printed QR label.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────── */
+/*  WhatsApp Report Modal                                       */
+/* ──────────────────────────────────────────────────────────── */
+type MovementForReport = {
+  id: string;
+  type: string;
+  assetNumber: number;
+  direction: "IN" | "OUT";
+  at: string;
+  projectCode?: string | null;
+  note?: string | null;
+};
+
+function WhatsAppReportModal({
+  open,
+  onClose,
+  movements,
+}: {
+  open: boolean;
+  onClose: () => void;
+  movements: MovementForReport[];
+}) {
+  const [mode, setMode] = useState<"today" | "custom" | "project" | "warehouse">(
+    "today",
+  );
+  const [date, setDate] = useState<string>(() => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = `${d.getMonth() + 1}`.padStart(2, "0");
+    const dd = `${d.getDate()}`.padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  });
+  const [project, setProject] = useState("");
+
+  useEffect(() => {
+    if (!open) {
+      setMode("today");
+      const d = new Date();
+      const yyyy = d.getFullYear();
+      const mm = `${d.getMonth() + 1}`.padStart(2, "0");
+      const dd = `${d.getDate()}`.padStart(2, "0");
+      setDate(`${yyyy}-${mm}-${dd}`);
+      setProject("");
+    }
+  }, [open]);
+
+  if (!open) return null;
+
+  const titleDate = (isoDate: string) => {
+    const d = new Date(isoDate + "T00:00:00");
+    return d.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
+
+  const generate = async () => {
+    const targetDay =
+      mode === "today" || mode === "warehouse" || mode === "project"
+        ? new Date()
+        : new Date(date + "T00:00:00");
+    const y = targetDay.getFullYear();
+    const m = `${targetDay.getMonth() + 1}`.padStart(2, "0");
+    const d = `${targetDay.getDate()}`.padStart(2, "0");
+    const start = new Date(`${y}-${m}-${d}T00:00:00`);
+    const end = new Date(`${y}-${m}-${d}T23:59:59`);
+
+    // filter movements for that day
+    let rows = movements.filter((r) => {
+      const t = new Date(r.at).getTime();
+      return t >= start.getTime() && t <= end.getTime();
+    });
+
+    const projOnly = mode === "project" && project.trim();
+    if (projOnly) {
+      rows = rows.filter((r) => (r.projectCode || "") === project.trim());
+    }
+    const warehouseOnly = mode === "warehouse";
+
+    const byProject = new Map<string, Map<string, number[]>>();
+    const byTypeIn = new Map<string, number[]>();
+
+    rows.forEach((r) => {
+      if (r.direction === "OUT" && (!warehouseOnly || !!r.projectCode)) {
+        const proj = r.projectCode || "Unknown Project";
+        if (!byProject.has(proj)) byProject.set(proj, new Map());
+        const mapTypes = byProject.get(proj)!;
+        if (!mapTypes.has(r.type)) mapTypes.set(r.type, []);
+        mapTypes.get(r.type)!.push(r.assetNumber);
+      } else if (r.direction === "IN" && (!projOnly || warehouseOnly)) {
+        if (!byTypeIn.has(r.type)) byTypeIn.set(r.type, []);
+        byTypeIn.get(r.type)!.push(r.assetNumber);
+      }
+    });
+
+    const lines: string[] = [];
+    lines.push(`Date: ${titleDate(`${y}-${m}-${d}`)}`);
+    lines.push("");
+
+    byProject.forEach((mapTypes, proj) => {
+      lines.push(`Project: ${proj}`);
+      mapTypes.forEach((nums, type) => {
+        nums.sort((a, b) => a - b);
+        lines.push(`${type} #: ${nums.join(", ")}`);
+      });
+      lines.push("");
+    });
+
+    if (byTypeIn.size && (!projOnly || warehouseOnly)) {
+      lines.push("Returned to Warehouse:");
+      byTypeIn.forEach((nums, type) => {
+        nums.sort((a, b) => a - b);
+        lines.push(`${type}: ${nums.join(", ")}`);
+      });
+      lines.push("");
+    }
+
+    const text = lines.join("\n").trim();
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Report copied to clipboard");
+    } catch {
+      toast.error("Failed to copy to clipboard");
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4">
+      <div className="w-full max-w-lg rounded bg-white p-4 shadow-lg">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Generate WhatsApp Report</h3>
+          <button onClick={onClose} className="rounded bg-gray-200 px-2 py-1 text-sm">
+            Close
+          </button>
+        </div>
+
+        <div className="space-y-3 text-sm">
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setMode("today")}
+              className={`rounded px-3 py-1 ${mode === "today" ? "bg-blue-600 text-white" : "bg-gray-100"}`}
+            >
+              Today
+            </button>
+            <button
+              onClick={() => setMode("custom")}
+              className={`rounded px-3 py-1 ${mode === "custom" ? "bg-blue-600 text-white" : "bg-gray-100"}`}
+            >
+              Custom Date
+            </button>
+            <button
+              onClick={() => setMode("project")}
+              className={`rounded px-3 py-1 ${mode === "project" ? "bg-blue-600 text-white" : "bg-gray-100"}`}
+            >
+              Specific Project
+            </button>
+            <button
+              onClick={() => setMode("warehouse")}
+              className={`rounded px-3 py-1 ${mode === "warehouse" ? "bg-blue-600 text-white" : "bg-gray-100"}`}
+            >
+              Warehouse Returns
+            </button>
+          </div>
+
+          {mode === "custom" && (
+            <div>
+              <label className="block text-xs text-gray-600">Date</label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="mt-1 w-full rounded border p-2"
+              />
+            </div>
+          )}
+
+          {mode === "project" && (
+            <div>
+              <label className="block text-xs text-gray-600">Project Code</label>
+              <input
+                value={project}
+                onChange={(e) => setProject(e.target.value)}
+                className="mt-1 w-full rounded border p-2"
+                placeholder="ACTF-2025-001"
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 flex justify-end gap-2">
+          <button onClick={generate} className="rounded bg-emerald-600 px-3 py-2 text-white">
+            Copy Report
+          </button>
         </div>
       </div>
     </div>
@@ -259,13 +468,19 @@ export default function MoveClient(): JSX.Element {
       if (!set.has(key)) {
         next = [...existing, item];
         saveQueue(next);
-        toast.success(`Added ${item.type} #${item.assetNumber} to batch`);
+        if (!quickMode) toast.success(`Added ${item.type} #${item.assetNumber} to batch`);
       }
     }
 
     setRows(next.length ? next : [{ id: mkId(), type: "", assetNumber: "" }]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // run once
+
+  useEffect(() => {
+    if (quickMode) {
+      toast.success("Quick Mode: scan multiple, then Save once", { duration: 3000 });
+    }
+  }, [quickMode]);
 
   function addRow() {
     setRows((r) => {
@@ -320,7 +535,7 @@ export default function MoveClient(): JSX.Element {
     const payload = buildPayload();
     if (!payload.items.length) return "Please add at least one valid item.";
     if (payload.direction === "OUT" && !payload.projectCode)
-      return "Project code is required when moving OUT.";
+      return "Project code is required when deploying.";
     if (!useNow) {
       if (!payload.when) return "Please select a manual date/time.";
       const dt = new Date(payload.when);
@@ -345,8 +560,7 @@ export default function MoveClient(): JSX.Element {
       );
 
       if (isMoveOK(data)) {
-        toast.success(`Recorded ${direction} for ${data.moved} item(s)`);
-        // keep project & direction sticky, but clear batch + note/time
+        toast.success(`Recorded ${direction === "OUT" ? "DEPLOY" : "PULL OUT"} for ${data.moved} item(s)`);
         clearBatch();
         setNote("");
         setUseNow(true);
@@ -378,16 +592,23 @@ export default function MoveClient(): JSX.Element {
   /* ---------- Recent Movements (sortable, filter, paginate + auto-archive) ---------- */
   type Recent = {
     id: string;
-    type: string;
-    assetNumber: number;
-    direction: string;
+    direction: "IN" | "OUT";
     at: string;
     projectCode?: string | null;
     note?: string | null;
     byId?: string | null;
+    equipment?: Pick<EquipmentDTO, "type" | "assetNumber">;
+    // legacy flat shape fallback
+    type?: string;
+    assetNumber?: number;
   };
   const [recent, setRecent] = useState<Recent[]>([]);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  // safe accessors (handle legacy rows with flat fields)
+  const getType = (r: Recent) => r.equipment?.type ?? r.type ?? "";
+  const getAsset = (r: Recent) =>
+    r.equipment?.assetNumber ?? r.assetNumber ?? 0;
 
   // controls
   const [recQuery, setRecQuery] = useState("");
@@ -399,6 +620,9 @@ export default function MoveClient(): JSX.Element {
   const [recPageSize, setRecPageSize] = useState(20);
   const [dateFrom, setDateFrom] = useState<string>(""); // yyyy-mm-dd
   const [dateTo, setDateTo] = useState<string>("");
+  const [filterProject, setFilterProject] = useState("");
+  const [filterType, setFilterType] = useState("");
+  const [showNotes, setShowNotes] = useState(true);
 
   // auto-archive (>30 days old)
   const [showArchived, setShowArchived] = useState(false);
@@ -411,7 +635,7 @@ export default function MoveClient(): JSX.Element {
     try {
       const { data } = await axios.get<{ status: number; items: Recent[] }>(
         "/api/equipment/movements",
-        { params: { limit: 800 } },
+        { params: { limit: 1000 } },
       );
       if (data.status === 200) setRecent(data.items);
     } catch {
@@ -422,10 +646,26 @@ export default function MoveClient(): JSX.Element {
     refreshRecent();
   }, []);
 
+  const projectsInRecent = useMemo(() => {
+    const set = new Set<string>();
+    recent.forEach((r) => {
+      if (r.projectCode) set.add(r.projectCode);
+    });
+    return Array.from(set).sort((a, b) => b.localeCompare(a));
+  }, [recent]);
+
+  const typesInRecent = useMemo(() => {
+    const set = new Set<string>();
+    recent.forEach((r) => {
+      const t = getType(r);
+      if (t) set.add(t);
+    });
+    return Array.from(set).sort();
+  }, [recent]);
+
   const recentFilteredSorted = useMemo(() => {
     let arr = [...recent];
 
-    // date range
     if (dateFrom) {
       const from = new Date(dateFrom + "T00:00:00");
       arr = arr.filter((r) => new Date(r.at) >= from);
@@ -435,16 +675,21 @@ export default function MoveClient(): JSX.Element {
       arr = arr.filter((r) => new Date(r.at) <= to);
     }
 
-    // auto-archive filter
     if (!showArchived) {
       arr = arr.filter((r) => new Date(r.at).getTime() >= cutoffMs);
     }
 
-    // text filter
+    if (filterProject.trim()) {
+      arr = arr.filter((r) => (r.projectCode || "") === filterProject.trim());
+    }
+    if (filterType.trim()) {
+      arr = arr.filter((r) => getType(r) === filterType.trim());
+    }
+
     const s = recQuery.toLowerCase().trim();
     if (s) {
       arr = arr.filter((r) =>
-        `${r.type} ${r.assetNumber} ${r.direction} ${r.projectCode ?? ""} ${
+        `${getType(r)} ${getAsset(r)} ${r.direction} ${r.projectCode ?? ""} ${
           r.byId ?? ""
         } ${r.note ?? ""}`
           .toLowerCase()
@@ -452,20 +697,30 @@ export default function MoveClient(): JSX.Element {
       );
     }
 
-    // sort
     arr.sort((a, b) => {
       let cmp = 0;
       if (recSort === "at")
         cmp = new Date(a.at).getTime() - new Date(b.at).getTime();
-      else if (recSort === "type") cmp = a.type.localeCompare(b.type);
+      else if (recSort === "type") cmp = getType(a).localeCompare(getType(b));
       else if (recSort === "direction")
         cmp = a.direction.localeCompare(b.direction);
-      else cmp = a.assetNumber - b.assetNumber;
+      else cmp = getAsset(a) - getAsset(b);
       return recDir === "asc" ? cmp : -cmp;
     });
 
     return arr;
-  }, [recent, recQuery, recSort, recDir, dateFrom, dateTo, showArchived, cutoffMs]);
+  }, [
+    recent,
+    recQuery,
+    recSort,
+    recDir,
+    dateFrom,
+    dateTo,
+    showArchived,
+    cutoffMs,
+    filterProject,
+    filterType,
+  ]);
 
   const totalPages = Math.max(
     1,
@@ -497,8 +752,71 @@ export default function MoveClient(): JSX.Element {
     }
   }
 
-  /* ---------- Scanner control ---------- */
+  /* ---------- Duration per entry (downlevel-safe Map iteration) ---------- */
+  const durationById = useMemo(() => {
+    const byEquip = new Map<string, { idx: number; rec: Recent }[]>();
+    const key = (r: Recent) => `${getType(r)}#${getAsset(r)}`;
+
+    recent
+      .slice()
+      .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
+      .forEach((rec, idx) => {
+        const k = key(rec);
+        if (!byEquip.has(k)) byEquip.set(k, []);
+        byEquip.get(k)!.push({ idx, rec });
+      });
+
+    const map = new Map<string, { durationMs?: number; pending?: boolean; label?: string }>();
+
+    byEquip.forEach((arr) => {
+      for (let i = 0; i < arr.length; i++) {
+        const cur = arr[i].rec;
+        const next = arr[i + 1]?.rec;
+        const curAt = new Date(cur.at).getTime();
+
+        if (cur.direction === "OUT") {
+          if (next) {
+            const nextAt = new Date(next.at).getTime();
+            const ms = Math.max(0, nextAt - curAt);
+            map.set(cur.id, { durationMs: ms, pending: false, label: formatDDHHMM(ms) });
+          } else {
+            map.set(cur.id, { pending: true, label: "Pending" });
+          }
+        } else if (cur.direction === "IN") {
+          const prev = arr[i - 1]?.rec;
+          if (prev && prev.direction === "OUT") {
+            const prevAt = new Date(prev.at).getTime();
+            const ms = Math.max(0, curAt - prevAt);
+            map.set(cur.id, { durationMs: ms, pending: false, label: formatDDHHMM(ms) });
+          } else {
+            map.set(cur.id, { pending: false, label: "-" });
+          }
+        }
+      }
+    });
+
+    return map;
+  }, [recent]);
+
+  const friendlyDir = (d: "IN" | "OUT") => (d === "OUT" ? "DEPLOY" : "PULL OUT");
+
+  /* ---------- Scanner control & Report modal ---------- */
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+
+  const movementsForReport: MovementForReport[] = useMemo(
+    () =>
+      recent.map((r) => ({
+        id: r.id,
+        type: getType(r),
+        assetNumber: getAsset(r),
+        direction: r.direction,
+        at: r.at,
+        projectCode: r.projectCode,
+        note: r.note,
+      })),
+    [recent],
+  );
 
   /* ──────────────────────────────────────────────────────────── */
   /*  Render                                                      */
@@ -507,7 +825,15 @@ export default function MoveClient(): JSX.Element {
     <div className="min-h-screen bg-gray-100 pt-24 md:pt-28 lg:pt-32">
       <Navbar />
       <div className="mx-auto max-w-4xl p-4">
-        <h1 className="mb-4 text-2xl font-bold">Equipment Movement</h1>
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <h1 className="text-2xl font-bold">Equipment Movement</h1>
+          <button
+            onClick={() => setReportOpen(true)}
+            className="rounded bg-emerald-600 px-3 py-2 text-white"
+          >
+            Generate WhatsApp Report
+          </button>
+        </div>
 
         {/* Direction */}
         <div className="mb-4 flex gap-2">
@@ -519,12 +845,12 @@ export default function MoveClient(): JSX.Element {
                 direction === d ? "bg-blue-600 text-white" : "bg-white border"
               }`}
             >
-              {d}
+              {d === "OUT" ? "DEPLOY" : "PULL OUT"}
             </button>
           ))}
         </div>
 
-        {/* Project (OUT only) — sorted DESC */}
+        {/* Project (DEPLOY only) — sorted DESC */}
         {direction === "OUT" && (
           <div className="mb-4">
             <label className="mb-1 block text-sm font-semibold text-gray-700">
@@ -624,7 +950,7 @@ export default function MoveClient(): JSX.Element {
           <div className="space-y-3">
             {rows.map((row, i) => (
               <div
-                key={row.id} // ← stable key fixes "one character" typing bug
+                key={row.id}
                 className="grid grid-cols-1 gap-2 sm:grid-cols-7"
               >
                 <div className="sm:col-span-4">
@@ -670,8 +996,6 @@ export default function MoveClient(): JSX.Element {
             <button onClick={clearBatch} className="rounded border px-3 py-2">
               Clear Batch
             </button>
-
-            {/* Next Scan → open camera scanner overlay */}
             <button
               onClick={() => setScannerOpen(true)}
               className="rounded bg-amber-600 px-3 py-2 text-white"
@@ -704,80 +1028,122 @@ export default function MoveClient(): JSX.Element {
           </button>
         </div>
 
-        {/* Recent Movements (sortable, filter, paginate + auto-archive) */}
+        {/* Recent Movements */}
         <div className="rounded bg-white p-4 shadow">
-          <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <h2 className="font-semibold">Recent Movements</h2>
-            <div className="grid grid-cols-2 gap-2 md:grid-cols-7">
+          <div className="mb-3 grid grid-cols-2 gap-2 md:grid-cols-8 md:items-end">
+            <h2 className="col-span-2 text-base font-semibold md:col-span-2">
+              Recent Movements
+            </h2>
+
+            <input
+              className="rounded border p-2 text-sm"
+              placeholder="Filter text…"
+              value={recQuery}
+              onChange={(e) => {
+                setRecQuery(e.target.value);
+                setRecPage(1);
+              }}
+            />
+            <select
+              className="rounded border p-2 text-sm"
+              value={filterProject}
+              onChange={(e) => {
+                setFilterProject(e.target.value);
+                setRecPage(1);
+              }}
+            >
+              <option value="">All Projects</option>
+              {projectsInRecent.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+            <select
+              className="rounded border p-2 text-sm"
+              value={filterType}
+              onChange={(e) => {
+                setFilterType(e.target.value);
+                setRecPage(1);
+              }}
+            >
+              <option value="">All Types</option>
+              {typesInRecent.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <select
+              className="rounded border p-2 text-sm"
+              value={recSort}
+              onChange={(e) => setRecSort(e.target.value as any)}
+            >
+              <option value="at">Date/Time</option>
+              <option value="type">Type</option>
+              <option value="assetNumber">Asset #</option>
+              <option value="direction">Direction</option>
+            </select>
+            <select
+              className="rounded border p-2 text-sm"
+              value={recDir}
+              onChange={(e) => setRecDir(e.target.value as any)}
+            >
+              <option value="desc">Desc</option>
+              <option value="asc">Asc</option>
+            </select>
+            <label className="flex items-center gap-2 rounded border p-2 text-xs text-gray-700">
               <input
-                className="rounded border p-2 text-sm"
-                placeholder="Filter text…"
-                value={recQuery}
+                type="checkbox"
+                checked={showNotes}
+                onChange={(e) => setShowNotes(e.target.checked)}
+              />
+              Show notes
+            </label>
+          </div>
+
+          <div className="mb-2 grid grid-cols-1 gap-2 md:grid-cols-5">
+            <input
+              type="date"
+              className="rounded border p-2 text-sm"
+              value={dateFrom}
+              onChange={(e) => {
+                setDateFrom(e.target.value);
+                setRecPage(1);
+              }}
+            />
+            <input
+              type="date"
+              className="rounded border p-2 text-sm"
+              value={dateTo}
+              onChange={(e) => {
+                setDateTo(e.target.value);
+                setRecPage(1);
+              }}
+            />
+            <select
+              className="rounded border p-2 text-sm"
+              value={recPageSize}
+              onChange={(e) => {
+                setRecPageSize(Number(e.target.value));
+                setRecPage(1);
+              }}
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+            </select>
+            <label className="flex items-center gap-2 rounded border p-2 text-xs text-gray-700">
+              <input
+                type="checkbox"
+                checked={showArchived}
                 onChange={(e) => {
-                  setRecQuery(e.target.value);
+                  setShowArchived(e.target.checked);
                   setRecPage(1);
                 }}
               />
-              <select
-                className="rounded border p-2 text-sm"
-                value={recSort}
-                onChange={(e) => setRecSort(e.target.value as any)}
-              >
-                <option value="at">Date/Time</option>
-                <option value="type">Type</option>
-                <option value="assetNumber">Asset #</option>
-                <option value="direction">Direction</option>
-              </select>
-              <select
-                className="rounded border p-2 text-sm"
-                value={recDir}
-                onChange={(e) => setRecDir(e.target.value as any)}
-              >
-                <option value="desc">Desc</option>
-                <option value="asc">Asc</option>
-              </select>
-              <input
-                type="date"
-                className="rounded border p-2 text-sm"
-                value={dateFrom}
-                onChange={(e) => {
-                  setDateFrom(e.target.value);
-                  setRecPage(1);
-                }}
-              />
-              <input
-                type="date"
-                className="rounded border p-2 text-sm"
-                value={dateTo}
-                onChange={(e) => {
-                  setDateTo(e.target.value);
-                  setRecPage(1);
-                }}
-              />
-              <select
-                className="rounded border p-2 text-sm"
-                value={recPageSize}
-                onChange={(e) => {
-                  setRecPageSize(Number(e.target.value));
-                  setRecPage(1);
-                }}
-              >
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-              </select>
-              <label className="flex items-center gap-2 text-xs text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={showArchived}
-                  onChange={(e) => {
-                    setShowArchived(e.target.checked);
-                    setRecPage(1);
-                  }}
-                />
-                Show archived (&gt; 30 days)
-              </label>
-            </div>
+              Show archived (&gt; 30 days)
+            </label>
           </div>
 
           <div className="space-y-2">
@@ -786,6 +1152,7 @@ export default function MoveClient(): JSX.Element {
             ) : (
               pageItems.map((m) => {
                 const isArchived = new Date(m.at).getTime() < cutoffMs;
+                const dur = durationById.get(m.id);
                 return (
                   <div
                     key={m.id}
@@ -793,9 +1160,9 @@ export default function MoveClient(): JSX.Element {
                   >
                     <div className="text-sm">
                       <span className="font-semibold">
-                        {m.type} #{m.assetNumber}
+                        {getType(m)} #{getAsset(m)}
                       </span>{" "}
-                      <span className="uppercase">{m.direction}</span>{" "}
+                      <span className="uppercase">{m.direction === "OUT" ? "DEPLOY" : "PULL OUT"}</span>{" "}
                       <span>— {new Date(m.at).toLocaleString()}</span>{" "}
                       {m.projectCode ? (
                         <span>
@@ -804,7 +1171,8 @@ export default function MoveClient(): JSX.Element {
                           <span className="font-medium">{m.projectCode}</span>
                         </span>
                       ) : null}
-                      {m.note ? <span> | Note: {m.note}</span> : null}
+                      {dur?.label ? <span> | Duration: {dur.label}</span> : null}
+                      {showNotes && m.note ? <span> | Note: {m.note}</span> : null}
                       {isArchived ? (
                         <span className="ml-2 rounded bg-gray-200 px-2 py-0.5 text-xs text-gray-700">
                           Archived
@@ -855,8 +1223,7 @@ export default function MoveClient(): JSX.Element {
           {/* pagination controls */}
           <div className="mt-3 flex items-center justify-between">
             <div className="text-xs text-gray-500">
-              Page {recPage} / {totalPages} &middot;{" "}
-              {recentFilteredSorted.length} items
+              Page {recPage} / {totalPages} · {recentFilteredSorted.length} items
             </div>
             <div className="flex gap-2">
               <button
@@ -880,6 +1247,13 @@ export default function MoveClient(): JSX.Element {
 
       {/* Camera scanner overlay */}
       <ScannerOverlay open={scannerOpen} onClose={() => setScannerOpen(false)} />
+
+      {/* WhatsApp Report */}
+      <WhatsAppReportModal
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        movements={movementsForReport}
+      />
     </div>
   );
 }

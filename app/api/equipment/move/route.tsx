@@ -1,103 +1,265 @@
-import { NextResponse } from "next/server";
+// app/api/equipment/move/route.ts
+import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/app/libs/prismadb";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/libs/authOption";
-import type { MoveRequest, MoveResponse, EquipmentMoveItem, MovementDirection } from "@/app/types/equipment";
+import type {
+  MoveRequest,
+  MoveResponse,
+  MovementDirection,
+} from "@/app/types/equipment";
 
-function isDirection(v: unknown): v is MovementDirection { return v === "IN" || v === "OUT"; }
-function isItem(x: unknown): x is EquipmentMoveItem {
-  if (!x || typeof x !== "object") return false;
-  const it = x as Record<string, unknown>;
-  const t = typeof it.type === "string" ? it.type.trim() : "";
-  const n = typeof it.assetNumber === "number" ? it.assetNumber : NaN;
-  return !!t && Number.isInteger(n) && n > 0;
+/* ===========================
+ *  Helpers
+ * =========================== */
+
+function parseIntOr<T extends number>(v: string | null, def: T): number {
+  const n = v ? parseInt(v, 10) : NaN;
+  return Number.isFinite(n) ? n : def;
 }
-function normalizeItems(arr: unknown): EquipmentMoveItem[] {
-  if (!Array.isArray(arr)) return [];
-  const items = arr
-    .map((r) => {
-      if (!r || typeof r !== "object") return null;
-      const o = r as Record<string, unknown>;
-      return { type: String(o.type ?? "").trim(), assetNumber: Number(o.assetNumber) } as EquipmentMoveItem;
-    })
-    .filter(isItem);
 
-  const seen = new Set<string>();
-  const uniq: EquipmentMoveItem[] = [];
-  for (const i of items) {
-    const k = `${i.type}#${i.assetNumber}`;
-    if (seen.has(k)) continue;
-    seen.add(k);
-    uniq.push(i);
+function uniqBy<T, K extends string | number>(arr: T[], key: (x: T) => K): T[] {
+  const seen = new Set<K>();
+  const out: T[] = [];
+  for (const x of arr) {
+    const k = key(x);
+    if (!seen.has(k)) {
+      seen.add(k);
+      out.push(x);
+    }
   }
-  return uniq;
+  return out;
 }
 
-export async function POST(req: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email) return NextResponse.json<MoveResponse>({ status: 401, error: "Unauthorized" });
+function labelForMover(
+  p?: { firstName: string | null; lastName: string | null; nickname: string | null } | null,
+  fallback?: string | null
+) {
+  const name = `${p?.firstName ?? ""} ${p?.lastName ?? ""}`.trim();
+  return name || p?.nickname || fallback || null;
+}
 
-  const raw = (await req.json().catch(() => null)) as Partial<MoveRequest> | null;
-  if (!raw || typeof raw !== "object") return NextResponse.json<MoveResponse>({ status: 400, error: "Invalid body" });
+/* ===========================
+ *  GET: recent movements (paged)
+ * =========================== */
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const days = parseIntOr(searchParams.get("days"), 30);
+    const includeOlder = searchParams.get("includeOlder") === "1";
+    const page = Math.max(1, parseIntOr(searchParams.get("page"), 1));
+    const pageSize = Math.min(100, Math.max(1, parseIntOr(searchParams.get("pageSize"), 20)));
 
-  const direction = typeof raw.direction === "string" ? raw.direction.toUpperCase() : "";
-  if (!isDirection(direction)) return NextResponse.json<MoveResponse>({ status: 400, error: "Invalid direction" });
+    const type = (searchParams.get("type") || "").trim();
+    const projectCode = (searchParams.get("projectCode") || "").trim();
+    const direction = (searchParams.get("direction") || "").trim() as MovementDirection | "";
 
-  const when = raw.when ? new Date(raw.when) : new Date();
-  if (Number.isNaN(when.getTime())) return NextResponse.json<MoveResponse>({ status: 400, error: "Invalid date/time" });
+    const since = new Date();
+    since.setDate(since.getDate() - days);
 
-  const items = normalizeItems(raw.items);
-  if (!items.length) return NextResponse.json<MoveResponse>({ status: 400, error: "No items provided" });
+    const whereMovement: any = {};
+    if (!includeOlder) whereMovement.at = { gte: since };
+    if (direction === "IN" || direction === "OUT") whereMovement.direction = direction;
+    if (projectCode) whereMovement.projectCode = projectCode;
 
-  const projectCode = typeof raw.projectCode === "string" ? raw.projectCode.trim() : "";
-  if (direction === "OUT" && !projectCode)
-    return NextResponse.json<MoveResponse>({ status: 400, error: "Project code is required for OUT moves" });
+    const whereEquip: any = {};
+    if (type) whereEquip.typeCode = type; // ⬅️ schema field
 
-  // Check existence (THIS DOES NOT CREATE)
-  const found = await prisma.equipment.findMany({
-    where: { OR: items.map(i => ({ typeCode: i.type, assetNumber: i.assetNumber })) },
-    select: { id: true, typeCode: true, assetNumber: true },
-  });
-  const foundSet = new Set(found.map(f => `${f.typeCode}#${f.assetNumber}`));
-  const missing = items.filter(i => !foundSet.has(`${i.type}#${i.assetNumber}`));
-  if (missing.length) {
-    return NextResponse.json<MoveResponse>({
-      status: 400,
-      error: "Some items do not exist. Please create them first in Equipment Management.",
-      missing: missing.map(m => `${m.type} #${m.assetNumber}`),
+    const [total, rows] = await prisma.$transaction([
+      prisma.equipmentMovement.count({
+        where: {
+          ...whereMovement,
+          equipment: whereEquip,
+        },
+      }),
+      prisma.equipmentMovement.findMany({
+        where: {
+          ...whereMovement,
+          equipment: whereEquip,
+        },
+        orderBy: { at: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select: {
+          id: true,
+          at: true,
+          direction: true,
+          projectCode: true,
+          byId: true,
+          by: { select: { firstName: true, lastName: true, nickname: true } },
+          equipment: { select: { id: true, typeCode: true, assetNumber: true } }, // ⬅️ select typeCode
+        },
+      }),
+    ]);
+
+    const items = rows.map((m) => ({
+      id: m.id,
+      at: m.at,
+      direction: m.direction as MovementDirection,
+      projectCode: m.projectCode ?? null,
+      by: labelForMover(m.by, m.byId ?? null),
+      equipment: {
+        id: m.equipment.id,
+        type: m.equipment.typeCode, // ⬅️ map to DTO field
+        assetNumber: m.equipment.assetNumber,
+      },
+      archived: m.at < since,
+    }));
+
+    return NextResponse.json({
+      status: 200,
+      page,
+      pageSize,
+      total,
+      items,
     });
+  } catch (err) {
+    console.error("[/api/equipment/move GET] error", err);
+    return NextResponse.json(
+      { status: 500, error: "Failed to fetch movements" },
+      { status: 500 }
+    );
   }
+}
 
-  const prof = await prisma.profile.findUnique({
-    where: { userEmail: session.user.email! },
-    select: { nickname: true },
-  });
-  const byId = prof?.nickname ?? null;
+/* ===========================
+ *  POST: record movements
+ * =========================== */
+export async function POST(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
+      return NextResponse.json<MoveResponse>(
+        { status: 401 as const, error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
 
-  // Atomically write movements + update equipment
-  await prisma.$transaction(found.flatMap(f => ([
-    prisma.equipmentMovement.create({
-      data: {
-        equipmentId: f.id,
-        direction,
-        at: when,
-        projectCode: direction === "OUT" ? projectCode : null,
-        byId,
-        source: "WEB",
-        note: typeof raw.note === "string" ? raw.note : null,
-        rawMessage: typeof raw.rawMessage === "string" ? raw.rawMessage : null,
-      },
-    }),
-    prisma.equipment.update({
-      where: { id: f.id },
-      data: {
-        status: direction === "IN" ? "WAREHOUSE" : "DEPLOYED",
-        currentProjectCode: direction === "IN" ? null : projectCode,
-        lastMovedAt: when,
-        updatedAt: new Date(),
-      },
-    }),
-  ])));
+    const body = (await req.json()) as MoveRequest;
+    const direction = body.direction;
+    const projectCode = (body.projectCode || "").trim();
+    const note = (body.note || "").trim() || null;
+    const rawMessage = (body.rawMessage || "").trim() || null;
+    const when = body.when ? new Date(body.when) : new Date();
 
-  return NextResponse.json<MoveResponse>({ status: 200, moved: found.length });
+    if (direction !== "IN" && direction !== "OUT") {
+      return NextResponse.json<MoveResponse>(
+        { status: 400 as const, error: "Invalid direction" },
+        { status: 400 }
+      );
+    }
+    if (direction === "OUT" && !projectCode) {
+      return NextResponse.json<MoveResponse>(
+        { status: 400 as const, error: "Project code is required for OUT" },
+        { status: 400 }
+      );
+    }
+    if (!Array.isArray(body.items) || body.items.length === 0) {
+      return NextResponse.json<MoveResponse>(
+        { status: 400 as const, error: "No items provided" },
+        { status: 400 }
+      );
+    }
+
+    // Normalize & dedupe
+    const items = uniqBy(
+      body.items.map((it) => ({
+        type: (it.type || "").trim(),
+        assetNumber: Number(it.assetNumber),
+      })),
+      (x) => `${x.type}#${x.assetNumber}`
+    ).filter((x) => x.type && Number.isInteger(x.assetNumber) && x.assetNumber > 0);
+
+    if (items.length === 0) {
+      return NextResponse.json<MoveResponse>(
+        { status: 400 as const, error: "No valid items after parsing" },
+        { status: 400 }
+      );
+    }
+
+    // current user (who)
+    const prof = await prisma.profile.findUnique({
+      where: { userEmail: session.user.email! },
+      select: { nickname: true },
+    });
+    const byId = prof?.nickname ?? null;
+
+    // Validate existence (NO implicit creation)
+    const orClauses = items.map((x) => ({ typeCode: x.type, assetNumber: x.assetNumber })); // ⬅️ schema fields
+    const existing = await prisma.equipment.findMany({
+      where: { OR: orClauses },
+      select: { id: true, typeCode: true, assetNumber: true }, // ⬅️ select schema fields
+    });
+
+    const key = (t: string, n: number) => `${t}#${n}`;
+    const existingSet = new Set(existing.map((e) => key(e.typeCode, e.assetNumber)));
+
+    const missing = items
+      .filter((x) => !existingSet.has(key(x.type, x.assetNumber)))
+      .map((x) => `${x.type} #${x.assetNumber}`);
+
+    if (missing.length > 0) {
+      return NextResponse.json<MoveResponse>(
+        {
+          status: 400 as const,
+          error: "Some items do not exist. Ask an admin to create them first.",
+          missing,
+        },
+        { status: 400 }
+      );
+    }
+
+    const existingMap = new Map(existing.map((e) => [key(e.typeCode, e.assetNumber), e.id]));
+
+    // Transaction: create movements + update equipments
+    const results = await prisma.$transaction(async (tx) => {
+      await tx.equipmentMovement.createMany({
+        data: items.map((x) => ({
+          equipmentId: existingMap.get(key(x.type, x.assetNumber))!,
+          direction,
+          at: when,
+          projectCode: direction === "OUT" ? projectCode : null,
+          byId,
+          source: "UI",
+          note,
+          rawMessage,
+        })),
+      });
+
+      for (const x of items) {
+        const id = existingMap.get(key(x.type, x.assetNumber))!;
+        if (direction === "OUT") {
+          await tx.equipment.update({
+            where: { id },
+            data: {
+              status: "DEPLOYED",
+              currentProjectCode: projectCode,
+              lastMovedAt: when,
+              updatedAt: new Date(),
+            },
+          });
+        } else {
+          await tx.equipment.update({
+            where: { id },
+            data: {
+              status: "WAREHOUSE",
+              currentProjectCode: null,
+              lastMovedAt: when,
+              updatedAt: new Date(),
+            },
+          });
+        }
+      }
+
+      return { moved: items.length };
+    });
+
+    return NextResponse.json<MoveResponse>({ status: 200 as const, moved: results.moved });
+  } catch (err) {
+    console.error("[/api/equipment/move POST] error", err);
+    return NextResponse.json<MoveResponse>(
+      { status: 500 as const, error: "Failed to record movements" },
+      { status: 500 }
+    );
+  }
 }
