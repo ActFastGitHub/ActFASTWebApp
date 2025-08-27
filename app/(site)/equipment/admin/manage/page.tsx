@@ -18,6 +18,7 @@ import {
   ArrowsUpDownIcon,
   ArrowUpIcon,
   ArrowDownIcon,
+  ClipboardDocumentCheckIcon,
 } from "@heroicons/react/24/outline";
 import QRCode from "qrcode";
 import toast from "react-hot-toast";
@@ -246,7 +247,7 @@ export default function EquipmentManagePage() {
         model: draft.model.trim(),
         serial: draft.serial.trim(),
       };
-      // include lastMovedAt when provided
+      // include lastMovedAt when provided (convert local -> UTC ISO)
       if (draft.lastMovedAt) {
         payload.lastMovedAt = new Date(draft.lastMovedAt).toISOString();
       }
@@ -455,6 +456,127 @@ export default function EquipmentManagePage() {
 
   const isEditing = (id: string) => editingId === id;
 
+  /* ───── Summary Report (clipboard) ───── */
+  function generateSummaryReport() {
+    // Work off the full loaded dataset (items), ignore search box, but honor includeArchived filter param
+    const lines: string[] = [];
+    const byType = new Map<
+      string,
+      {
+        warehouse: number[];
+        deployed: number[];
+        maintenance: number[];
+        lost: number[];
+        archived: number[];
+      }
+    >();
+
+    // Bucketize
+    for (const e of items) {
+      const t = e.type || "Uncategorized";
+      if (!byType.has(t)) {
+        byType.set(t, {
+          warehouse: [],
+          deployed: [],
+          maintenance: [],
+          lost: [],
+          archived: [],
+        });
+      }
+      const bucket = byType.get(t)!;
+      const n = e.assetNumber;
+
+      if (e.archived) {
+        bucket.archived.push(n);
+        continue; // exclude archived from core stats
+      }
+
+      switch (e.status) {
+        case "WAREHOUSE":
+          bucket.warehouse.push(n);
+          break;
+        case "DEPLOYED":
+          bucket.deployed.push(n);
+          break;
+        case "MAINTENANCE":
+          bucket.maintenance.push(n);
+          break;
+        case "LOST":
+          bucket.lost.push(n);
+          break;
+        default:
+          // Treat unknown as neither active nor repair; they won’t show in active/repair
+          break;
+      }
+    }
+
+    const fmtNums = (arr: number[]) =>
+      arr.length ? arr.sort((a, b) => a - b).map((n) => `#${n}`).join(", ") : "";
+
+    // For each type, compute Active, Missing (gaps), For Repair, plus Warehouse/Deployed
+    const typesSorted = Array.from(byType.keys()).sort((a, b) =>
+      a.localeCompare(b),
+    );
+
+    for (const t of typesSorted) {
+      const b = byType.get(t)!;
+      const activeNums = [...b.warehouse, ...b.deployed].sort((a, b) => a - b);
+      const repairNums = [...b.maintenance].sort((a, b) => a - b);
+
+      const maxSeen = Math.max(
+        0,
+        ...(activeNums.length ? [activeNums[activeNums.length - 1]] : []),
+        ...(repairNums.length ? [repairNums[repairNums.length - 1]] : []),
+      );
+
+      const present = new Set<number>([...activeNums, ...repairNums]);
+      const missingNums: number[] = [];
+      for (let i = 1; i <= maxSeen; i++) {
+        if (!present.has(i)) missingNums.push(i);
+      }
+
+      // Header
+      lines.push(t);
+      lines.push("");
+
+      // Active summary (as requested: Active = Warehouse + Deployed)
+      lines.push(`Active Count: ${activeNums.length}`);
+      lines.push(`Active Numbers: ${fmtNums(activeNums)}`);
+
+      // Warehouse / Deployed
+      lines.push(`Warehouse Count: ${b.warehouse.length}`);
+      lines.push(`Warehouse Numbers: ${fmtNums(b.warehouse)}`);
+      lines.push(`Deployed Count: ${b.deployed.length}`);
+      lines.push(`Deployed Numbers: ${fmtNums(b.deployed)}`);
+
+      // Missing (gaps vs 1..max across Active+Repair)
+      lines.push(`Missing Count: ${missingNums.length}`);
+      lines.push(`Missing Numbers: ${fmtNums(missingNums)}`);
+
+      // For Repair
+      lines.push(`For Repair Count: ${repairNums.length}`);
+      lines.push(`For Repair Numbers: ${fmtNums(repairNums)}`);
+
+      // Optional extra insights if available
+      if (b.lost.length) {
+        lines.push(`Lost Count: ${b.lost.length}`);
+        lines.push(`Lost Numbers: ${fmtNums(b.lost)}`);
+      }
+      if (b.archived.length) {
+        lines.push(`Archived (excluded) Count: ${b.archived.length}`);
+      }
+
+      lines.push(""); // spacer
+    }
+
+    const text = lines.join("\n").trim();
+
+    navigator.clipboard
+      .writeText(text)
+      .then(() => toast.success("Summary report copied to clipboard"))
+      .catch(() => toast.error("Failed to copy report"));
+  }
+
   /* ───── UI helpers ───── */
   function SortHeader({
     label,
@@ -572,7 +694,17 @@ export default function EquipmentManagePage() {
     <div className="min-h-screen bg-gray-100 pt-24 md:pt-28 lg:pt-32 overflow-x-hidden">
       <Navbar />
       <div className="mx-auto max-w-7xl p-4">
-        <h1 className="mb-4 text-2xl font-bold">Equipment Management</h1>
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <h1 className="text-2xl font-bold">Equipment Management</h1>
+          <button
+            onClick={generateSummaryReport}
+            className="inline-flex items-center gap-2 rounded bg-emerald-600 px-3 py-2 text-white"
+            title="Copy summary report to clipboard"
+          >
+            <ClipboardDocumentCheckIcon className="h-5 w-5" />
+            Generate Summary Report
+          </button>
+        </div>
 
         {/* Add */}
         <div className="mb-6 rounded bg-white p-4 shadow">
