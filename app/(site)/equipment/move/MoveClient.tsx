@@ -36,7 +36,8 @@ const LS_PROJ = "eqmove:project";
 type Project = { id: string; code: string };
 type MoveRow = { id: string; type: string; assetNumber: string };
 
-const mkId = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+const mkId = () =>
+  Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 function normalizeRows(raw: any): MoveRow[] {
   const arr: MoveRow[] = Array.isArray(raw) ? raw : [];
@@ -206,9 +207,9 @@ function WhatsAppReportModal({
   projects: Project[];
 }) {
   // stable hooks (never inside conditionals)
-  const [mode, setMode] = useState<"today" | "custom" | "project" | "warehouse">(
-    "today",
-  );
+  const [mode, setMode] = useState<
+    "today" | "custom" | "project" | "warehouse"
+  >("today");
   const [date, setDate] = useState<string>(() => {
     const d = new Date();
     const yyyy = d.getFullYear();
@@ -353,7 +354,10 @@ function WhatsAppReportModal({
       <div className="w-full max-w-lg rounded bg-white p-4 shadow-lg">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-lg font-semibold">Generate WhatsApp Report</h3>
-          <button onClick={onClose} className="rounded bg-gray-200 px-2 py-1 text-sm">
+          <button
+            onClick={onClose}
+            className="rounded bg-gray-200 px-2 py-1 text-sm"
+          >
             Close
           </button>
         </div>
@@ -400,8 +404,13 @@ function WhatsAppReportModal({
 
           {mode === "project" && (
             <div>
-              <label className="block text-xs text-gray-600">Project Code</label>
-              <Combobox value={project} onChange={(v: string) => setProject(v ?? "")}>
+              <label className="block text-xs text-gray-600">
+                Project Code
+              </label>
+              <Combobox
+                value={project}
+                onChange={(v: string) => setProject(v ?? "")}
+              >
                 <div className="relative mt-1">
                   <Combobox.Input
                     className="w-full rounded border p-2"
@@ -423,13 +432,17 @@ function WhatsAppReportModal({
                           value={p.code}
                           className={({ active }) =>
                             `relative cursor-pointer select-none py-2 pl-3 pr-9 ${
-                              active ? "bg-blue-600 text-white" : "text-gray-900"
+                              active
+                                ? "bg-blue-600 text-white"
+                                : "text-gray-900"
                             }`
                           }
                         >
                           {({ active, selected }) => (
                             <>
-                              <span className={`block truncate ${selected ? "font-semibold" : ""}`}>
+                              <span
+                                className={`block truncate ${selected ? "font-semibold" : ""}`}
+                              >
                                 {p.code}
                               </span>
                               {selected && (
@@ -454,7 +467,10 @@ function WhatsAppReportModal({
         </div>
 
         <div className="mt-4 flex justify-end gap-2">
-          <button onClick={generate} className="rounded bg-emerald-600 px-3 py-2 text-white">
+          <button
+            onClick={generate}
+            className="rounded bg-emerald-600 px-3 py-2 text-white"
+          >
             Copy Report
           </button>
         </div>
@@ -483,7 +499,9 @@ export default function MoveClient(): JSX.Element {
   useEffect(() => {
     if (status === "unauthenticated") {
       const dest =
-        typeof window !== "undefined" ? window.location.href : "/equipment/move";
+        typeof window !== "undefined"
+          ? window.location.href
+          : "/equipment/move";
       router.push(`/login?callbackUrl=${encodeURIComponent(dest)}`);
     }
   }, [status, router]);
@@ -557,13 +575,18 @@ export default function MoveClient(): JSX.Element {
     let next = existing;
 
     if (initialType && initialAsset) {
-      const item: MoveRow = { id: mkId(), type: initialType, assetNumber: initialAsset };
+      const item: MoveRow = {
+        id: mkId(),
+        type: initialType,
+        assetNumber: initialAsset,
+      };
       const key = `${item.type}#${item.assetNumber}`;
       const set = new Set(existing.map((r) => `${r.type}#${r.assetNumber}`));
       if (!set.has(key)) {
         next = [...existing, item];
         saveQueue(next);
-        if (!quickMode) toast.success(`Added ${item.type} #${item.assetNumber} to batch`);
+        if (!quickMode)
+          toast.success(`Added ${item.type} #${item.assetNumber} to batch`);
       }
     }
 
@@ -573,7 +596,9 @@ export default function MoveClient(): JSX.Element {
 
   useEffect(() => {
     if (quickMode) {
-      toast.success("Quick Mode: scan multiple, then Save once", { duration: 3000 });
+      toast.success("Quick Mode: scan multiple, then Save once", {
+        duration: 3000,
+      });
     }
   }, [quickMode]);
 
@@ -594,7 +619,9 @@ export default function MoveClient(): JSX.Element {
   }
   function updateRow(i: number, patch: Partial<MoveRow>) {
     setRows((r) => {
-      const next = r.map((row, idx) => (idx === i ? { ...row, ...patch } : row));
+      const next = r.map((row, idx) =>
+        idx === i ? { ...row, ...patch } : row,
+      );
       saveQueue(next);
       return next;
     });
@@ -616,10 +643,16 @@ export default function MoveClient(): JSX.Element {
         (i) => i.type && Number.isInteger(i.assetNumber) && i.assetNumber > 0,
       );
 
+    const whenUtc = useNow
+      ? undefined
+      : manualIso
+        ? new Date(manualIso).toISOString()
+        : undefined;
+
     return {
       direction,
       projectCode: direction === "OUT" ? projectCode.trim() : undefined,
-      when: useNow ? undefined : manualIso || undefined,
+      when: whenUtc,
       note: note || undefined,
       rawMessage: undefined,
       items,
@@ -663,7 +696,9 @@ export default function MoveClient(): JSX.Element {
       );
 
       if (isMoveOK(data)) {
-        toast.success(`Recorded ${direction === "OUT" ? "DEPLOY" : "PULL OUT"} for ${data.moved} item(s)`);
+        toast.success(
+          `Recorded ${direction === "OUT" ? "DEPLOY" : "PULL OUT"} for ${data.moved} item(s)`,
+        );
         clearBatch();
         setNote("");
         setUseNow(true);
@@ -729,10 +764,7 @@ export default function MoveClient(): JSX.Element {
 
   // auto-archive (>30 days old)
   const [showArchived, setShowArchived] = useState(false);
-  const cutoffMs = useMemo(
-    () => Date.now() - 30 * 24 * 60 * 60 * 1000,
-    [],
-  );
+  const cutoffMs = useMemo(() => Date.now() - 30 * 24 * 60 * 60 * 1000, []);
 
   async function refreshRecent() {
     try {
@@ -850,7 +882,8 @@ export default function MoveClient(): JSX.Element {
       }
     } catch (e: unknown) {
       const resp = (e as any)?.response?.data as DeleteResponse | undefined;
-      if (resp && isDeleteError(resp)) toast.error(resp.error || "Delete failed");
+      if (resp && isDeleteError(resp))
+        toast.error(resp.error || "Delete failed");
       else toast.error("Delete failed");
     }
   }
@@ -869,7 +902,10 @@ export default function MoveClient(): JSX.Element {
         byEquip.get(k)!.push({ idx, rec });
       });
 
-    const map = new Map<string, { durationMs?: number; pending?: boolean; label?: string }>();
+    const map = new Map<
+      string,
+      { durationMs?: number; pending?: boolean; label?: string }
+    >();
 
     byEquip.forEach((arr) => {
       for (let i = 0; i < arr.length; i++) {
@@ -881,7 +917,11 @@ export default function MoveClient(): JSX.Element {
           if (next) {
             const nextAt = new Date(next.at).getTime();
             const ms = Math.max(0, nextAt - curAt);
-            map.set(cur.id, { durationMs: ms, pending: false, label: formatDDHHMM(ms) });
+            map.set(cur.id, {
+              durationMs: ms,
+              pending: false,
+              label: formatDDHHMM(ms),
+            });
           } else {
             map.set(cur.id, { pending: true, label: "Pending" });
           }
@@ -890,7 +930,11 @@ export default function MoveClient(): JSX.Element {
           if (prev && prev.direction === "OUT") {
             const prevAt = new Date(prev.at).getTime();
             const ms = Math.max(0, curAt - prevAt);
-            map.set(cur.id, { durationMs: ms, pending: false, label: formatDDHHMM(ms) });
+            map.set(cur.id, {
+              durationMs: ms,
+              pending: false,
+              label: formatDDHHMM(ms),
+            });
           } else {
             map.set(cur.id, { pending: false, label: "-" });
           }
@@ -901,7 +945,8 @@ export default function MoveClient(): JSX.Element {
     return map;
   }, [recent]);
 
-  const friendlyDir = (d: "IN" | "OUT") => (d === "OUT" ? "DEPLOY" : "PULL OUT");
+  const friendlyDir = (d: "IN" | "OUT") =>
+    d === "OUT" ? "DEPLOY" : "PULL OUT";
 
   /* ---------- Scanner control & Report modal ---------- */
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -950,7 +995,7 @@ export default function MoveClient(): JSX.Element {
               key={d}
               onClick={() => setDirection(d)}
               className={`rounded px-3 py-2 text-sm ${
-                direction === d ? "bg-blue-600 text-white" : "bg-white border"
+                direction === d ? "bg-blue-600 text-white" : "border bg-white"
               }`}
             >
               {d === "OUT" ? "DEPLOY" : "PULL OUT"}
@@ -996,7 +1041,9 @@ export default function MoveClient(): JSX.Element {
                       >
                         {({ active, selected }) => (
                           <>
-                            <span className={`block truncate ${selected ? "font-semibold" : ""}`}>
+                            <span
+                              className={`block truncate ${selected ? "font-semibold" : ""}`}
+                            >
                               {p.code}
                             </span>
                             {selected && (
@@ -1018,7 +1065,8 @@ export default function MoveClient(): JSX.Element {
             </Combobox>
             {projectCode === "POSSIBLE NEW CLAIM" && (
               <p className="mt-1 text-xs text-red-600">
-                Notes are required for POSSIBLE NEW CLAIM (enter the temporary project name).
+                Notes are required for POSSIBLE NEW CLAIM (enter the temporary
+                project name).
               </p>
             )}
           </div>
@@ -1053,8 +1101,8 @@ export default function MoveClient(): JSX.Element {
         <div className="mb-4 rounded bg-white p-4 shadow">
           <h2 className="mb-2 font-semibold">Batch Items</h2>
           <p className="mb-3 text-xs text-gray-500">
-            Tip: <b>QR Quick Mode</b> lets you scan multiple items first (they’ll
-            appear here), then save once.
+            Tip: <b>QR Quick Mode</b> lets you scan multiple items first
+            (they’ll appear here), then save once.
           </p>
           <div className="space-y-3">
             {rows.map((row, i) => (
@@ -1084,7 +1132,7 @@ export default function MoveClient(): JSX.Element {
                     placeholder="e.g. 33"
                   />
                 </div>
-                <div className="sm:col-span-1 flex items-end">
+                <div className="flex items-end sm:col-span-1">
                   <button
                     onClick={() => removeRow(i)}
                     className="w-full rounded border px-3 py-2 text-sm"
@@ -1117,7 +1165,10 @@ export default function MoveClient(): JSX.Element {
         {/* Notes */}
         <div className="mb-4">
           <label className="mb-1 block text-sm font-semibold text-gray-700">
-            Notes {direction === "OUT" && projectCode === "POSSIBLE NEW CLAIM" ? <span className="text-red-600">*</span> : null}
+            Notes{" "}
+            {direction === "OUT" && projectCode === "POSSIBLE NEW CLAIM" ? (
+              <span className="text-red-600">*</span>
+            ) : null}
           </label>
           <textarea
             className="min-h-32 w-full rounded border p-3"
@@ -1271,7 +1322,9 @@ export default function MoveClient(): JSX.Element {
                       <span className="font-semibold">
                         {getType(m)} #{getAsset(m)}
                       </span>{" "}
-                      <span className="uppercase">{m.direction === "OUT" ? "DEPLOY" : "PULL OUT"}</span>{" "}
+                      <span className="uppercase">
+                        {m.direction === "OUT" ? "DEPLOY" : "PULL OUT"}
+                      </span>{" "}
                       <span>— {new Date(m.at).toLocaleString()}</span>{" "}
                       {m.projectCode ? (
                         <span>
@@ -1280,8 +1333,12 @@ export default function MoveClient(): JSX.Element {
                           <span className="font-medium">{m.projectCode}</span>
                         </span>
                       ) : null}
-                      {dur?.label ? <span> | Duration: {dur.label}</span> : null}
-                      {showNotes && m.note ? <span> | Note: {m.note}</span> : null}
+                      {dur?.label ? (
+                        <span> | Duration: {dur.label}</span>
+                      ) : null}
+                      {showNotes && m.note ? (
+                        <span> | Note: {m.note}</span>
+                      ) : null}
                       {isArchived ? (
                         <span className="ml-2 rounded bg-gray-200 px-2 py-0.5 text-xs text-gray-700">
                           Archived
@@ -1332,7 +1389,8 @@ export default function MoveClient(): JSX.Element {
           {/* pagination controls */}
           <div className="mt-3 flex items-center justify-between">
             <div className="text-xs text-gray-500">
-              Page {recPage} / {totalPages} · {recentFilteredSorted.length} items
+              Page {recPage} / {totalPages} · {recentFilteredSorted.length}{" "}
+              items
             </div>
             <div className="flex gap-2">
               <button
@@ -1355,7 +1413,10 @@ export default function MoveClient(): JSX.Element {
       </div>
 
       {/* Camera scanner overlay */}
-      <ScannerOverlay open={scannerOpen} onClose={() => setScannerOpen(false)} />
+      <ScannerOverlay
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+      />
 
       {/* WhatsApp Report */}
       <WhatsAppReportModal
