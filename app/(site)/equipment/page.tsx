@@ -30,6 +30,13 @@ function fmtElapsed(from?: string | Date | null, nowMs?: number) {
   if (h > 0) return `${h}h ${m}m`;
   return `${m}m`;
 }
+
+/** Elapsed should only accrue while DEPLOYED; otherwise show 0m */
+function fmtElapsedFor(e: EquipRow, nowMs?: number) {
+  if (e.status !== "DEPLOYED") return "0m";
+  return fmtElapsed(e.lastMovedAt, nowMs);
+}
+
 function daysSince(d?: string | Date | null) {
   if (!d) return null;
   const t = new Date(d).getTime();
@@ -56,7 +63,7 @@ function Pagination({
   compact = false,
 }: {
   page: number;
-  setPage: (fn: (p: number) => number) => void | ((n: number) => void);
+  setPage: React.Dispatch<React.SetStateAction<number>>;
   pageSize: number;
   total: number;
   className?: string;
@@ -66,9 +73,7 @@ function Pagination({
   const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const end = Math.min(page * pageSize, total);
   return (
-    <div
-      className={`mt-2 flex w-full flex-wrap items-center gap-2 md:gap-3 ${className}`}
-    >
+    <div className={`mt-2 flex w-full flex-wrap items-center gap-2 md:gap-3 ${className}`}>
       <div className={`text-xs text-gray-700 md:text-sm md:mr-auto`}>
         Showing <span className="font-semibold">{start}</span>–
         <span className="font-semibold">{end}</span> of{" "}
@@ -77,7 +82,7 @@ function Pagination({
       <div className={`flex items-center gap-1 md:gap-2 ${compact ? "text-xs" : "text-sm"}`}>
         <button
           className="rounded border px-2 py-1 disabled:opacity-50"
-          onClick={() => (typeof setPage === "function" ? setPage(() => 1) : null)}
+          onClick={() => setPage(1)}
           disabled={page <= 1}
           title="First page"
           aria-label="First page"
@@ -86,7 +91,7 @@ function Pagination({
         </button>
         <button
           className="rounded border px-2 py-1 disabled:opacity-50"
-          onClick={() => (typeof setPage === "function" ? setPage((p: number) => Math.max(1, p - 1)) : null)}
+          onClick={() => setPage((p) => Math.max(1, p - 1))}
           disabled={page <= 1}
           title="Previous page"
           aria-label="Previous page"
@@ -98,11 +103,7 @@ function Pagination({
         </span>
         <button
           className="rounded border px-2 py-1 disabled:opacity-50"
-          onClick={() =>
-            typeof setPage === "function"
-              ? setPage((p: number) => Math.min(totalPages, p + 1))
-              : null
-          }
+          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
           disabled={page >= totalPages}
           title="Next page"
           aria-label="Next page"
@@ -111,7 +112,7 @@ function Pagination({
         </button>
         <button
           className="rounded border px-2 py-1 disabled:opacity-50"
-          onClick={() => (typeof setPage === "function" ? setPage(() => totalPages) : null)}
+          onClick={() => setPage(totalPages)}
           disabled={page >= totalPages}
           title="Last page"
           aria-label="Last page"
@@ -157,7 +158,7 @@ export default function EquipmentTrackingPage() {
   const [page, setPage] = useState(1);
   const pageSize = 25;
 
-  // live ticker
+  // live ticker (updates elapsed every minute)
   const [, setTick] = useState(0);
   useEffect(() => {
     const id = setInterval(() => setTick((n) => n + 1), 60_000);
@@ -195,7 +196,7 @@ export default function EquipmentTrackingPage() {
 
     if (raw) {
       // EXACT asset-number mode: digits only (optionally with leading # and zeros)
-      // Examples: "01", "1", "#002" => match assetNumber === 1 or 2, etc.
+      // Examples: "01", "1", "#002" => match exact assetNumber
       const digitsOnly = raw.replace(/^\s*#/, "");
       if (/^\d+$/.test(digitsOnly)) {
         const n = parseInt(digitsOnly, 10);
@@ -434,7 +435,7 @@ export default function EquipmentTrackingPage() {
 
         {/* Pagination (TOP) */}
         <div className="hidden md:block">
-          <Pagination page={page} setPage={setPage as any} pageSize={pageSize} total={filtered.length} />
+          <Pagination page={page} setPage={setPage} pageSize={pageSize} total={filtered.length} />
         </div>
 
         {/* TABLE (md+) */}
@@ -488,7 +489,7 @@ export default function EquipmentTrackingPage() {
                     <td className="p-3">
                       {e.lastMovedAt ? new Date(e.lastMovedAt as any).toLocaleString() : "—"}
                     </td>
-                    <td className="p-3">{fmtElapsed(e.lastMovedAt)}</td>
+                    <td className="p-3">{fmtElapsedFor(e)}</td>
                     <td className="p-3">{bandBadge(e)}</td>
                   </tr>
                 ))
@@ -499,19 +500,13 @@ export default function EquipmentTrackingPage() {
 
         {/* Pagination (BOTTOM desktop) */}
         <div className="hidden md:block">
-          <Pagination page={page} setPage={setPage as any} pageSize={pageSize} total={filtered.length} />
+          <Pagination page={page} setPage={setPage} pageSize={pageSize} total={filtered.length} />
         </div>
 
         {/* CARDS (mobile) */}
         <div className="md:hidden">
           {/* Pagination (TOP mobile) */}
-          <Pagination
-            page={page}
-            setPage={setPage as any}
-            pageSize={pageSize}
-            total={filtered.length}
-            compact
-          />
+          <Pagination page={page} setPage={setPage} pageSize={pageSize} total={filtered.length} compact />
 
           {loading ? (
             <div className="rounded bg-white p-4 text-sm shadow">Loading…</div>
@@ -558,7 +553,7 @@ export default function EquipmentTrackingPage() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-500">Elapsed</span>
-                        <span className="font-medium">{fmtElapsed(e.lastMovedAt)}</span>
+                        <span className="font-medium">{fmtElapsedFor(e)}</span>
                       </div>
 
                       {e.status === "DEPLOYED" && d != null && (
@@ -582,13 +577,7 @@ export default function EquipmentTrackingPage() {
           )}
 
           {/* Pagination (BOTTOM mobile) */}
-          <Pagination
-            page={page}
-            setPage={setPage as any}
-            pageSize={pageSize}
-            total={filtered.length}
-            compact
-          />
+          <Pagination page={page} setPage={setPage} pageSize={pageSize} total={filtered.length} compact />
         </div>
         {/* /mobile */}
       </div>
