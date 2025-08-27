@@ -11,7 +11,6 @@ import type { EquipmentDTO } from "@/app/types/equipment";
 /* ---------- Helpers ---------- */
 
 type EquipRow = EquipmentDTO & {
-  // tolerate optional fields coming from API
   lastMovedBy?: string | null;
   createdAt?: string | Date | null;
 };
@@ -41,8 +40,87 @@ function cmpStr(a?: string | null, b?: string | null) {
   return (a ?? "").localeCompare(b ?? "", undefined, { numeric: true, sensitivity: "base" });
 }
 function cmpNum(a?: number | null, b?: number | null) {
-  const aa = a ?? -Infinity, bb = b ?? -Infinity;
+  const aa = a ?? -Infinity,
+    bb = b ?? -Infinity;
   return aa === bb ? 0 : aa < bb ? -1 : 1;
+}
+
+/* ---------- Shared UI ---------- */
+
+function Pagination({
+  page,
+  setPage,
+  pageSize,
+  total,
+  className = "",
+  compact = false,
+}: {
+  page: number;
+  setPage: (fn: (p: number) => number) => void | ((n: number) => void);
+  pageSize: number;
+  total: number;
+  className?: string;
+  compact?: boolean; // smaller text on mobile
+}) {
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const end = Math.min(page * pageSize, total);
+  return (
+    <div
+      className={`mt-2 flex w-full flex-wrap items-center gap-2 md:gap-3 ${className}`}
+    >
+      <div className={`text-xs text-gray-700 md:text-sm md:mr-auto`}>
+        Showing <span className="font-semibold">{start}</span>–
+        <span className="font-semibold">{end}</span> of{" "}
+        <span className="font-semibold">{total}</span>
+      </div>
+      <div className={`flex items-center gap-1 md:gap-2 ${compact ? "text-xs" : "text-sm"}`}>
+        <button
+          className="rounded border px-2 py-1 disabled:opacity-50"
+          onClick={() => (typeof setPage === "function" ? setPage(() => 1) : null)}
+          disabled={page <= 1}
+          title="First page"
+          aria-label="First page"
+        >
+          «
+        </button>
+        <button
+          className="rounded border px-2 py-1 disabled:opacity-50"
+          onClick={() => (typeof setPage === "function" ? setPage((p: number) => Math.max(1, p - 1)) : null)}
+          disabled={page <= 1}
+          title="Previous page"
+          aria-label="Previous page"
+        >
+          ‹
+        </button>
+        <span>
+          Page <b>{page}</b> / <b>{totalPages}</b>
+        </span>
+        <button
+          className="rounded border px-2 py-1 disabled:opacity-50"
+          onClick={() =>
+            typeof setPage === "function"
+              ? setPage((p: number) => Math.min(totalPages, p + 1))
+              : null
+          }
+          disabled={page >= totalPages}
+          title="Next page"
+          aria-label="Next page"
+        >
+          ›
+        </button>
+        <button
+          className="rounded border px-2 py-1 disabled:opacity-50"
+          onClick={() => (typeof setPage === "function" ? setPage(() => totalPages) : null)}
+          disabled={page >= totalPages}
+          title="Last page"
+          aria-label="Last page"
+        >
+          »
+        </button>
+      </div>
+    </div>
+  );
 }
 
 /* ====================================================== */
@@ -111,12 +189,27 @@ export default function EquipmentTrackingPage() {
   /* ---------- Filter + sort ---------- */
 
   const filtered = useMemo(() => {
-    const s = q.toLowerCase().trim();
-    let list = items.filter((e) =>
-      `${e.type} ${e.assetNumber} ${e.status} ${e.currentProjectCode ?? ""} ${e.lastMovedBy ?? ""}`
-        .toLowerCase()
-        .includes(s)
-    );
+    const raw = q.trim().toLowerCase();
+
+    let list: EquipRow[] = items;
+
+    if (raw) {
+      // EXACT asset-number mode: digits only (optionally with leading # and zeros)
+      // Examples: "01", "1", "#002" => match assetNumber === 1 or 2, etc.
+      const digitsOnly = raw.replace(/^\s*#/, "");
+      if (/^\d+$/.test(digitsOnly)) {
+        const n = parseInt(digitsOnly, 10);
+        list = list.filter((e) => e.assetNumber === n);
+      } else {
+        // fallback: broad text search
+        const s = raw;
+        list = list.filter((e) =>
+          `${e.type} ${e.assetNumber} ${e.status} ${e.currentProjectCode ?? ""} ${e.lastMovedBy ?? ""}`
+            .toLowerCase()
+            .includes(s)
+        );
+      }
+    }
 
     if (onlyBand) {
       list = list.filter((e) => {
@@ -150,7 +243,6 @@ export default function EquipmentTrackingPage() {
           break;
         case "lastMovedAt":
         default:
-          // newest first default
           base = cmpNum(
             a.lastMovedAt ? new Date(a.lastMovedAt).getTime() : 0,
             b.lastMovedAt ? new Date(b.lastMovedAt).getTime() : 0
@@ -183,10 +275,7 @@ export default function EquipmentTrackingPage() {
 
   // per-project breakdown (only deployed items)
   const projectBreakdown = useMemo(() => {
-    const map = new Map<
-      string, // project code
-      { total: number; byType: Map<string, number> }
-    >();
+    const map = new Map<string, { total: number; byType: Map<string, number> }>();
     for (const e of items) {
       if (e.status !== "DEPLOYED") continue;
       const proj = e.currentProjectCode ?? "—";
@@ -195,7 +284,6 @@ export default function EquipmentTrackingPage() {
       bucket.total += 1;
       bucket.byType.set(e.type, (bucket.byType.get(e.type) ?? 0) + 1);
     }
-    // sort projects desc by code
     return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
   }, [items]);
 
@@ -232,7 +320,7 @@ export default function EquipmentTrackingPage() {
     );
 
   return (
-    <div className="min-h-screen bg-gray-100 pt-24 md:pt-28 lg:pt-32">
+    <div className="min-h-screen bg-gray-100 pt-24 md:pt-28 lg:pt-32 overflow-x-hidden">
       <Navbar />
       <div className="mx-auto max-w-6xl p-4">
         <h1 className="mb-4 text-2xl font-bold">Equipment Tracking</h1>
@@ -287,7 +375,7 @@ export default function EquipmentTrackingPage() {
         {/* Filters */}
         <div className="mb-3 grid grid-cols-1 gap-2 md:grid-cols-6">
           <input
-            placeholder="Search (type, #, status, project, last moved by…)"
+            placeholder="Search (type, #, project, last moved by…) — tip: type 01 for #1"
             className="rounded border p-2"
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -344,6 +432,11 @@ export default function EquipmentTrackingPage() {
           <div />
         </div>
 
+        {/* Pagination (TOP) */}
+        <div className="hidden md:block">
+          <Pagination page={page} setPage={setPage as any} pageSize={pageSize} total={filtered.length} />
+        </div>
+
         {/* TABLE (md+) */}
         <div className="hidden overflow-x-auto rounded bg-white shadow md:block">
           <table className="min-w-full text-sm">
@@ -352,35 +445,19 @@ export default function EquipmentTrackingPage() {
                 <th className="cursor-pointer p-3 text-left" onClick={() => onSort("type")}>
                   Type {sortCaret("type")}
                 </th>
-                <th
-                  className="cursor-pointer p-3 text-left"
-                  onClick={() => onSort("assetNumber")}
-                >
-                  #
-                  {sortCaret("assetNumber")}
+                <th className="cursor-pointer p-3 text-left" onClick={() => onSort("assetNumber")}>
+                  #{sortCaret("assetNumber")}
                 </th>
-                <th
-                  className="cursor-pointer p-3 text-left"
-                  onClick={() => onSort("status")}
-                >
+                <th className="cursor-pointer p-3 text-left" onClick={() => onSort("status")}>
                   Status {sortCaret("status")}
                 </th>
-                <th
-                  className="cursor-pointer p-3 text-left"
-                  onClick={() => onSort("project")}
-                >
+                <th className="cursor-pointer p-3 text-left" onClick={() => onSort("project")}>
                   Project {sortCaret("project")}
                 </th>
-                <th
-                  className="cursor-pointer p-3 text-left"
-                  onClick={() => onSort("lastMovedBy")}
-                >
+                <th className="cursor-pointer p-3 text-left" onClick={() => onSort("lastMovedBy")}>
                   Last moved by {sortCaret("lastMovedBy")}
                 </th>
-                <th
-                  className="cursor-pointer p-3 text-left"
-                  onClick={() => onSort("lastMovedAt")}
-                >
+                <th className="cursor-pointer p-3 text-left" onClick={() => onSort("lastMovedAt")}>
                   Last moved at {sortCaret("lastMovedAt")}
                 </th>
                 <th className="p-3 text-left">Elapsed</th>
@@ -409,9 +486,7 @@ export default function EquipmentTrackingPage() {
                     <td className="p-3">{e.currentProjectCode ?? "—"}</td>
                     <td className="p-3">{e.lastMovedBy ?? "—"}</td>
                     <td className="p-3">
-                      {e.lastMovedAt
-                        ? new Date(e.lastMovedAt as any).toLocaleString()
-                        : "—"}
+                      {e.lastMovedAt ? new Date(e.lastMovedAt as any).toLocaleString() : "—"}
                     </td>
                     <td className="p-3">{fmtElapsed(e.lastMovedAt)}</td>
                     <td className="p-3">{bandBadge(e)}</td>
@@ -422,35 +497,22 @@ export default function EquipmentTrackingPage() {
           </table>
         </div>
 
-        {/* Pagination (desktop) */}
-        <div className="mt-3 hidden items-center justify-between md:flex">
-          <div className="text-xs text-gray-600">
-            Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, filtered.length)} of{" "}
-            {filtered.length}
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              className="rounded border px-2 py-1 text-sm disabled:opacity-50"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-            >
-              Prev
-            </button>
-            <div className="text-sm">
-              Page {page} / {totalPages}
-            </div>
-            <button
-              className="rounded border px-2 py-1 text-sm disabled:opacity-50"
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-            >
-              Next
-            </button>
-          </div>
+        {/* Pagination (BOTTOM desktop) */}
+        <div className="hidden md:block">
+          <Pagination page={page} setPage={setPage as any} pageSize={pageSize} total={filtered.length} />
         </div>
 
         {/* CARDS (mobile) */}
         <div className="md:hidden">
+          {/* Pagination (TOP mobile) */}
+          <Pagination
+            page={page}
+            setPage={setPage as any}
+            pageSize={pageSize}
+            total={filtered.length}
+            compact
+          />
+
           {loading ? (
             <div className="rounded bg-white p-4 text-sm shadow">Loading…</div>
           ) : pageItems.length === 0 ? (
@@ -491,9 +553,7 @@ export default function EquipmentTrackingPage() {
                       <div className="flex justify-between">
                         <span className="text-gray-500">Last moved at</span>
                         <span>
-                          {e.lastMovedAt
-                            ? new Date(e.lastMovedAt as any).toLocaleString()
-                            : "—"}
+                          {e.lastMovedAt ? new Date(e.lastMovedAt as any).toLocaleString() : "—"}
                         </span>
                       </div>
                       <div className="flex justify-between">
@@ -521,28 +581,14 @@ export default function EquipmentTrackingPage() {
             </div>
           )}
 
-          {/* Pagination (mobile) */}
-          <div className="mt-3 flex items-center justify-between">
-            <div className="text-xs text-gray-600">
-              {filtered.length} total • Page {page}/{totalPages}
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                className="rounded border px-2 py-1 text-sm disabled:opacity-50"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-              >
-                Prev
-              </button>
-              <button
-                className="rounded border px-2 py-1 text-sm disabled:opacity-50"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-              >
-                Next
-              </button>
-            </div>
-          </div>
+          {/* Pagination (BOTTOM mobile) */}
+          <Pagination
+            page={page}
+            setPage={setPage as any}
+            pageSize={pageSize}
+            total={filtered.length}
+            compact
+          />
         </div>
         {/* /mobile */}
       </div>

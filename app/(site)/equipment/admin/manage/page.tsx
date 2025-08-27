@@ -106,6 +106,22 @@ export default function EquipmentManagePage() {
     lastMovedAt: string; // datetime-local controlled value
   } | null>(null);
 
+  /* ───── pagination ───── */
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const pageSizeOptions = [10, 25, 50, 100];
+
+  /* reset page when filters or search change */
+  useEffect(() => {
+    setPage(1);
+  }, [q, typeF, statusF, includeArchived]);
+
+  /* clamp page when filtered list changes */
+  function clampPage(nextTotal: number) {
+    const totalPages = Math.max(1, Math.ceil(nextTotal / pageSize));
+    if (page > totalPages) setPage(totalPages);
+  }
+
   /* ───── load list + projects ───── */
   async function load() {
     setLoading(true);
@@ -128,6 +144,8 @@ export default function EquipmentManagePage() {
         .sort()
         .map((code) => ({ code }));
       setTypes(next);
+
+      clampPage(list.length);
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? "Failed to load equipment");
     } finally {
@@ -183,9 +201,7 @@ export default function EquipmentManagePage() {
       model: row.model ?? "",
       serial: row.serial ?? "",
       // prefill lastMovedAt for datetime-local control (ISO without seconds Z)
-      lastMovedAt: row.lastMovedAt
-        ? toDatetimeLocal(row.lastMovedAt as any)
-        : "",
+      lastMovedAt: row.lastMovedAt ? toDatetimeLocal(row.lastMovedAt as any) : "",
     });
   }
   function cancelEdit() {
@@ -264,9 +280,7 @@ export default function EquipmentManagePage() {
       );
       if (data.status === 200) {
         toast.success(
-          `${row.type} #${row.assetNumber} ${
-            row.archived ? "unarchived" : "archived"
-          }`,
+          `${row.type} #${row.assetNumber} ${row.archived ? "unarchived" : "archived"}`,
         );
         await load();
       } else {
@@ -355,16 +369,24 @@ export default function EquipmentManagePage() {
 
   /* ───── filtering + sorting ───── */
   const filtered = useMemo(() => {
-    const s = q.toLowerCase();
-    let list = !s
-      ? items
-      : items.filter((e) =>
-          `${e.type} ${e.assetNumber} ${e.status} ${
-            e.currentProjectCode ?? ""
-          } ${e.model ?? ""} ${e.serial ?? ""}`
+    const s = q.trim().toLowerCase();
+
+    let list: EquipmentDTO[] = items;
+
+    if (s) {
+      // If purely numeric (leading zeros allowed), treat as exact assetNumber
+      if (/^\d+$/.test(s)) {
+        const n = parseInt(s, 10); // "01" => 1
+        list = list.filter((e) => e.assetNumber === n);
+      } else {
+        // Otherwise, broad text search
+        list = list.filter((e) =>
+          `${e.type} ${e.assetNumber} ${e.status} ${e.currentProjectCode ?? ""} ${e.model ?? ""} ${e.serial ?? ""}`
             .toLowerCase()
             .includes(s),
         );
+      }
+    }
 
     const dir = sortDir === "asc" ? 1 : -1;
     list = [...list].sort((a, b) => {
@@ -388,6 +410,18 @@ export default function EquipmentManagePage() {
 
     return list;
   }, [items, q, sortKey, sortDir]);
+
+  // Slice for current page
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const startIndex = (page - 1) * pageSize;
+  const endIndex = Math.min(total, startIndex + pageSize);
+  const pageItems = filtered.slice(startIndex, endIndex);
+
+  useEffect(() => {
+    // keep page in bounds if pageSize or filtered changes
+    if (page > totalPages) setPage(totalPages);
+  }, [totalPages, page]);
 
   function getValue(row: EquipmentDTO, key: SortKey) {
     switch (key) {
@@ -454,8 +488,88 @@ export default function EquipmentManagePage() {
     );
   }
 
+  function PaginationControls({
+    location,
+  }: {
+    location: "top" | "bottom";
+  }) {
+    return (
+      <div
+        className={`mt-2 w-full flex flex-wrap items-center gap-2 ${location === "bottom" ? "py-3" : "pb-3"} md:gap-3`}
+      >
+        {/* Left-aligned on md+ (mr-auto pushes the rest to the right) */}
+        <div className="min-w-0 shrink text-xs text-gray-700 md:text-sm md:mr-auto">
+          Showing <span className="font-semibold">{total === 0 ? 0 : startIndex + 1}</span>-
+          <span className="font-semibold">{endIndex}</span> of{" "}
+          <span className="font-semibold">{total}</span>
+        </div>
+
+        <div className="flex items-center gap-2 text-xs md:text-sm">
+          <span className="text-gray-700">Rows per page</span>
+          <select
+            className="rounded border px-2 py-1"
+            value={pageSize}
+            onChange={(e) => {
+              const next = Number(e.target.value);
+              setPageSize(next);
+              setPage(1);
+            }}
+          >
+            {pageSizeOptions.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-center gap-1 text-xs md:gap-2 md:text-sm">
+          <button
+            className="rounded border px-2 py-1 disabled:opacity-50"
+            onClick={() => setPage(1)}
+            disabled={page <= 1}
+            title="First page"
+            aria-label="First page"
+          >
+            «
+          </button>
+          <button
+            className="rounded border px-2 py-1 disabled:opacity-50"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1}
+            title="Previous page"
+            aria-label="Previous page"
+          >
+            ‹
+          </button>
+          <span className="px-1">
+            Page <b>{page}</b> / <b>{totalPages}</b>
+          </span>
+          <button
+            className="rounded border px-2 py-1 disabled:opacity-50"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages}
+            title="Next page"
+            aria-label="Next page"
+          >
+            ›
+          </button>
+          <button
+            className="rounded border px-2 py-1 disabled:opacity-50"
+            onClick={() => setPage(totalPages)}
+            disabled={page >= totalPages}
+            title="Last page"
+            aria-label="Last page"
+          >
+            »
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gray-100 pt-24 md:pt-28 lg:pt-32">
+    <div className="min-h-screen bg-gray-100 pt-24 md:pt-28 lg:pt-32 overflow-x-hidden">
       <Navbar />
       <div className="mx-auto max-w-7xl p-4">
         <h1 className="mb-4 text-2xl font-bold">Equipment Management</h1>
@@ -510,18 +624,14 @@ export default function EquipmentManagePage() {
                           value={t.code}
                           className={({ active }) =>
                             `relative cursor-pointer select-none py-2 pl-3 pr-9 ${
-                              active
-                                ? "bg-blue-600 text-white"
-                                : "text-gray-900"
+                              active ? "bg-blue-600 text-white" : "text-gray-900"
                             }`
                           }
                         >
                           {({ active, selected }) => (
                             <>
                               <span
-                                className={`block truncate ${
-                                  selected ? "font-semibold" : ""
-                                }`}
+                                className={`block truncate ${selected ? "font-semibold" : ""}`}
                               >
                                 {t.code}
                               </span>
@@ -585,8 +695,7 @@ export default function EquipmentManagePage() {
                 Download PNG
               </a>
               <div className="text-sm text-gray-600">
-                QR opens Move page in <b>Quick Mode</b>. Scan multiple, then
-                save once.
+                QR opens Move page in <b>Quick Mode</b>. Scan multiple, then save once.
               </div>
             </div>
           )}
@@ -643,6 +752,11 @@ export default function EquipmentManagePage() {
           </label>
         </div>
 
+        {/* Pagination (TOP) — desktop/tablet only to avoid mobile duplication */}
+        <div className="hidden md:block">
+          <PaginationControls location="top" />
+        </div>
+
         {/* Table (md+) */}
         <div className="hidden overflow-x-auto rounded bg-white shadow md:block">
           <table className="min-w-full text-sm">
@@ -663,18 +777,10 @@ export default function EquipmentManagePage() {
 
                 {/* optional columns */}
                 <th className="p-3 text-left">
-                  <SortHeader
-                    label="Model"
-                    col="model"
-                    hidden={!showModelSerial}
-                  />
+                  <SortHeader label="Model" col="model" hidden={!showModelSerial} />
                 </th>
                 <th className="p-3 text-left">
-                  <SortHeader
-                    label="Serial"
-                    col="serial"
-                    hidden={!showModelSerial}
-                  />
+                  <SortHeader label="Serial" col="serial" hidden={!showModelSerial} />
                 </th>
 
                 <th className="p-3 text-left">
@@ -693,35 +799,29 @@ export default function EquipmentManagePage() {
                     Loading…
                   </td>
                 </tr>
-              ) : filtered.length === 0 ? (
+              ) : pageItems.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="p-4">
                     No results
                   </td>
                 </tr>
               ) : (
-                filtered.map((row) => {
+                pageItems.map((row) => {
                   const editing = isEditing(row.id);
                   return (
                     <tr
                       key={row.id}
-                      className={`border-t ${
-                        row.archived ? "bg-gray-100 text-gray-500" : ""
-                      }`}
+                      className={`border-t ${row.archived ? "bg-gray-100 text-gray-500" : ""}`}
                     >
                       {/* Type */}
                       <td className="p-3">
                         <input
                           list="eq-types"
-                          className={`w-40 rounded border p-1 ${
-                            !editing ? "bg-gray-50" : ""
-                          }`}
+                          className={`w-40 rounded border p-1 ${!editing ? "bg-gray-50" : ""}`}
                           value={editing ? draft?.type ?? row.type : row.type}
                           onChange={(ev) =>
                             editing &&
-                            setDraft((d) =>
-                              d ? { ...d, type: ev.target.value } : d,
-                            )
+                            setDraft((d) => (d ? { ...d, type: ev.target.value } : d))
                           }
                           readOnly={!editing}
                         />
@@ -738,9 +838,7 @@ export default function EquipmentManagePage() {
                           type="text"
                           inputMode="numeric"
                           pattern="[0-9]*"
-                          className={`w-24 rounded border p-1 ${
-                            !editing ? "bg-gray-50" : ""
-                          }`}
+                          className={`w-24 rounded border p-1 ${!editing ? "bg-gray-50" : ""}`}
                           value={
                             editing
                               ? draft?.assetNumber ?? String(row.assetNumber)
@@ -748,9 +846,7 @@ export default function EquipmentManagePage() {
                           }
                           onChange={(ev) =>
                             editing &&
-                            setDraft((d) =>
-                              d ? { ...d, assetNumber: ev.target.value } : d,
-                            )
+                            setDraft((d) => (d ? { ...d, assetNumber: ev.target.value } : d))
                           }
                           readOnly={!editing}
                         />
@@ -759,12 +855,8 @@ export default function EquipmentManagePage() {
                       {/* Status */}
                       <td className="p-3">
                         <select
-                          className={`rounded border p-1 ${
-                            !editing ? "bg-gray-50" : ""
-                          }`}
-                          value={
-                            editing ? draft?.status ?? row.status : row.status
-                          }
+                          className={`rounded border p-1 ${!editing ? "bg-gray-50" : ""}`}
+                          value={editing ? draft?.status ?? row.status : row.status}
                           onChange={(ev) =>
                             editing &&
                             setDraft((d) =>
@@ -792,27 +884,19 @@ export default function EquipmentManagePage() {
                           as="div"
                           value={
                             editing
-                              ? draft?.currentProjectCode ??
-                                row.currentProjectCode ??
-                                ""
+                              ? draft?.currentProjectCode ?? row.currentProjectCode ?? ""
                               : row.currentProjectCode ?? ""
                           }
                           onChange={(v: string) =>
                             editing &&
-                            setDraft((d) =>
-                              d ? { ...d, currentProjectCode: v ?? "" } : d,
-                            )
+                            setDraft((d) => (d ? { ...d, currentProjectCode: v ?? "" } : d))
                           }
                         >
                           <div className="relative">
                             <Combobox.Input
-                              className={`w-40 rounded border p-1 ${
-                                !editing ? "bg-gray-50" : ""
-                              }`}
+                              className={`w-40 rounded border p-1 ${!editing ? "bg-gray-50" : ""}`}
                               displayValue={(v: string) => v}
-                              onChange={(e) =>
-                                editing && setProjQueryEdit(e.target.value)
-                              }
+                              onChange={(e) => editing && setProjQueryEdit(e.target.value)}
                               readOnly={!editing}
                               placeholder="ACTF-2025-001"
                             />
@@ -827,27 +911,21 @@ export default function EquipmentManagePage() {
                                     value={p.code}
                                     className={({ active }) =>
                                       `relative cursor-pointer select-none py-1.5 pl-3 pr-6 ${
-                                        active
-                                          ? "bg-blue-600 text-white"
-                                          : "text-gray-900"
+                                        active ? "bg-blue-600 text-white" : "text-gray-900"
                                       }`
                                     }
                                   >
                                     {({ active, selected }) => (
                                       <>
                                         <span
-                                          className={`block truncate ${
-                                            selected ? "font-semibold" : ""
-                                          }`}
+                                          className={`block truncate ${selected ? "font-semibold" : ""}`}
                                         >
                                           {p.code}
                                         </span>
                                         {selected && (
                                           <span
                                             className={`absolute inset-y-0 right-0 flex items-center pr-3 ${
-                                              active
-                                                ? "text-white"
-                                                : "text-blue-600"
+                                              active ? "text-white" : "text-blue-600"
                                             }`}
                                           >
                                             <CheckIcon className="h-4 w-4" />
@@ -867,19 +945,10 @@ export default function EquipmentManagePage() {
                       <td className="p-3">
                         {showModelSerial ? (
                           <input
-                            className={`w-36 rounded border p-1 ${
-                              !editing ? "bg-gray-50" : ""
-                            }`}
-                            value={
-                              editing
-                                ? draft?.model ?? row.model ?? ""
-                                : row.model ?? ""
-                            }
+                            className={`w-36 rounded border p-1 ${!editing ? "bg-gray-50" : ""}`}
+                            value={editing ? draft?.model ?? row.model ?? "" : row.model ?? ""}
                             onChange={(ev) =>
-                              editing &&
-                              setDraft((d) =>
-                                d ? { ...d, model: ev.target.value } : d,
-                              )
+                              editing && setDraft((d) => (d ? { ...d, model: ev.target.value } : d))
                             }
                             readOnly={!editing}
                           />
@@ -890,19 +959,10 @@ export default function EquipmentManagePage() {
                       <td className="p-3">
                         {showModelSerial ? (
                           <input
-                            className={`w-36 rounded border p-1 ${
-                              !editing ? "bg-gray-50" : ""
-                            }`}
-                            value={
-                              editing
-                                ? draft?.serial ?? row.serial ?? ""
-                                : row.serial ?? ""
-                            }
+                            className={`w-36 rounded border p-1 ${!editing ? "bg-gray-50" : ""}`}
+                            value={editing ? draft?.serial ?? row.serial ?? "" : row.serial ?? ""}
                             onChange={(ev) =>
-                              editing &&
-                              setDraft((d) =>
-                                d ? { ...d, serial: ev.target.value } : d,
-                              )
+                              editing && setDraft((d) => (d ? { ...d, serial: ev.target.value } : d))
                             }
                             readOnly={!editing}
                           />
@@ -917,27 +977,19 @@ export default function EquipmentManagePage() {
                             className="w-56 rounded border p-1"
                             value={draft?.lastMovedAt ?? ""}
                             onChange={(e) =>
-                              setDraft((d) =>
-                                d ? { ...d, lastMovedAt: e.target.value } : d,
-                              )
+                              setDraft((d) => (d ? { ...d, lastMovedAt: e.target.value } : d))
                             }
                           />
                         ) : (
                           <span>
-                            {row.lastMovedAt
-                              ? new Date(
-                                  row.lastMovedAt as any,
-                                ).toLocaleString()
-                              : "—"}
+                            {row.lastMovedAt ? new Date(row.lastMovedAt as any).toLocaleString() : "—"}
                           </span>
                         )}
                       </td>
 
                       {/* Created (read-only) */}
                       <td className="p-3">
-                        {row.createdAt
-                          ? new Date(row.createdAt as any).toLocaleString()
-                          : "—"}
+                        {row.createdAt ? new Date(row.createdAt as any).toLocaleString() : "—"}
                       </td>
 
                       {/* Actions (icons) */}
@@ -945,18 +997,10 @@ export default function EquipmentManagePage() {
                         <div className="flex flex-wrap items-center gap-2">
                           {editing ? (
                             <>
-                              <IconButton
-                                title="Save"
-                                onClick={saveEdit}
-                                className="bg-emerald-600 text-white"
-                              >
+                              <IconButton title="Save" onClick={saveEdit} className="bg-emerald-600 text-white">
                                 <CheckCircleIcon className="h-5 w-5" />
                               </IconButton>
-                              <IconButton
-                                title="Cancel"
-                                onClick={cancelEdit}
-                                className="bg-gray-300"
-                              >
+                              <IconButton title="Cancel" onClick={cancelEdit} className="bg-gray-300">
                                 <XMarkIcon className="h-5 w-5" />
                               </IconButton>
                             </>
@@ -975,9 +1019,7 @@ export default function EquipmentManagePage() {
                               <IconButton
                                 title={row.archived ? "Unarchive" : "Archive"}
                                 onClick={() => toggleArchive(row)}
-                                className={`text-white ${
-                                  row.archived ? "bg-amber-600" : "bg-gray-700"
-                                }`}
+                                className={`text-white ${row.archived ? "bg-amber-600" : "bg-gray-700"}`}
                               >
                                 {row.archived ? (
                                   <ArchiveBoxArrowDownIcon className="h-5 w-5" />
@@ -1012,9 +1054,7 @@ export default function EquipmentManagePage() {
                                   title="Delete"
                                   onClick={() => {
                                     setConfirmDeleteId(row.id);
-                                    toast("Click again to confirm delete", {
-                                      icon: "⚠️",
-                                    });
+                                    toast("Click again to confirm delete", { icon: "⚠️" });
                                   }}
                                   className="bg-red-600 text-white"
                                 >
@@ -1033,363 +1073,308 @@ export default function EquipmentManagePage() {
           </table>
         </div>
 
+        {/* Pagination (BOTTOM) */}
+        <div className="hidden md:block">
+          <PaginationControls location="bottom" />
+        </div>
+
         {/* Cards (mobile) */}
         <div className="md:hidden">
           {loading ? (
             <div className="rounded bg-white p-4 text-sm shadow">Loading…</div>
-          ) : filtered.length === 0 ? (
-            <div className="rounded bg-white p-4 text-sm shadow">
-              No results
-            </div>
+          ) : pageItems.length === 0 ? (
+            <div className="rounded bg-white p-4 text-sm shadow">No results</div>
           ) : (
-            <div className="space-y-3">
-              {filtered.map((row) => {
-                const editing = editingId === row.id;
-                return (
-                  <div
-                    key={row.id}
-                    className={`rounded bg-white p-4 shadow ${
-                      row.archived ? "opacity-70" : ""
-                    }`}
-                  >
-                    <div className="mb-2 flex items-center justify-between">
-                      <div className="text-base font-semibold">
-                        {row.type} #{row.assetNumber}
-                      </div>
-                      {!editing && (
-                        <span
-                          className={`rounded px-2 py-0.5 text-xs ${
-                            row.status === "DEPLOYED"
-                              ? "bg-blue-100 text-blue-800"
-                              : row.status === "WAREHOUSE"
-                                ? "bg-green-100 text-green-800"
-                                : row.status === "MAINTENANCE"
-                                  ? "bg-amber-100 text-amber-800"
-                                  : "bg-gray-200 text-gray-800"
-                          }`}
-                        >
-                          {row.status}
-                        </span>
-                      )}
-                    </div>
+            <>
+              {/* Pagination on top for mobile (single instance) */}
+              <PaginationControls location="top" />
 
-                    <div className="space-y-3 text-sm">
-                      {/* Status */}
-                      <div>
-                        <div className="text-xs text-gray-500">Status</div>
-                        <select
-                          className={`mt-1 w-full rounded border p-2 ${
-                            !editing ? "bg-gray-50" : ""
-                          }`}
-                          value={
-                            editing ? draft?.status ?? row.status : row.status
-                          }
-                          onChange={(ev) =>
-                            editing &&
-                            setDraft((d) =>
-                              d
-                                ? {
-                                    ...d,
-                                    status: ev.target.value as EquipmentStatus,
-                                  }
-                                : d,
-                            )
-                          }
-                          disabled={!editing}
-                        >
-                          {STATUSES.map((s) => (
-                            <option key={s} value={s}>
-                              {s}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {/* Type */}
-                      <div>
-                        <div className="text-xs text-gray-500">Type</div>
-                        <input
-                          list="eq-types"
-                          className={`mt-1 w-full rounded border p-2 ${
-                            !editing ? "bg-gray-50" : ""
-                          }`}
-                          value={editing ? draft?.type ?? row.type : row.type}
-                          onChange={(ev) =>
-                            editing &&
-                            setDraft((d) =>
-                              d ? { ...d, type: ev.target.value } : d,
-                            )
-                          }
-                          readOnly={!editing}
-                        />
-                      </div>
-
-                      {/* Asset # */}
-                      <div>
-                        <div className="text-xs text-gray-500">Asset #</div>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          className={`mt-1 w-full rounded border p-2 ${
-                            !editing ? "bg-gray-50" : ""
-                          }`}
-                          value={
-                            editing
-                              ? draft?.assetNumber ?? String(row.assetNumber)
-                              : String(row.assetNumber)
-                          }
-                          onChange={(ev) =>
-                            editing &&
-                            setDraft((d) =>
-                              d ? { ...d, assetNumber: ev.target.value } : d,
-                            )
-                          }
-                          readOnly={!editing}
-                        />
-                      </div>
-
-                      {/* Project */}
-                      <div>
-                        <div className="text-xs text-gray-500">Project</div>
-                        <Combobox
-                          as="div"
-                          value={
-                            editing
-                              ? draft?.currentProjectCode ??
-                                row.currentProjectCode ??
-                                ""
-                              : row.currentProjectCode ?? ""
-                          }
-                          onChange={(v: string) =>
-                            editing &&
-                            setDraft((d) =>
-                              d ? { ...d, currentProjectCode: v ?? "" } : d,
-                            )
-                          }
-                        >
-                          <div className="relative">
-                            <Combobox.Input
-                              className={`mt-1 w-full rounded border p-2 ${
-                                !editing ? "bg-gray-50" : ""
-                              }`}
-                              displayValue={(v: string) => v}
-                              onChange={(e) =>
-                                editing && setProjQueryEdit(e.target.value)
-                              }
-                              readOnly={!editing}
-                              placeholder="ACTF-2025-001"
-                            />
-                            <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2">
-                              <ChevronUpDownIcon className="h-5 w-5 text-gray-400" />
-                            </Combobox.Button>
-                            {editing && filteredProjects.length > 0 && (
-                              <Combobox.Options className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                                {filteredProjects.map((p) => (
-                                  <Combobox.Option
-                                    key={p.id}
-                                    value={p.code}
-                                    className={({ active }) =>
-                                      `relative cursor-pointer select-none py-2 pl-3 pr-9 ${
-                                        active
-                                          ? "bg-blue-600 text-white"
-                                          : "text-gray-900"
-                                      }`
-                                    }
-                                  >
-                                    {({ active, selected }) => (
-                                      <>
-                                        <span
-                                          className={`block truncate ${
-                                            selected ? "font-semibold" : ""
-                                          }`}
-                                        >
-                                          {p.code}
-                                        </span>
-                                        {selected && (
-                                          <span
-                                            className={`absolute inset-y-0 right-0 flex items-center pr-4 ${
-                                              active
-                                                ? "text-white"
-                                                : "text-blue-600"
-                                            }`}
-                                          >
-                                            <CheckIcon className="h-5 w-5" />
-                                          </span>
-                                        )}
-                                      </>
-                                    )}
-                                  </Combobox.Option>
-                                ))}
-                              </Combobox.Options>
-                            )}
-                          </div>
-                        </Combobox>
-                      </div>
-
-                      {/* Model / Serial (shown on mobile regardless; lighter weight than table visibility rule) */}
-                      {/* Model / Serial (hidden on mobile when toggle is off) */}
-                      {showModelSerial && (
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                          <div>
-                            <div className="text-xs text-gray-500">Model</div>
-                            <input
-                              className={`mt-1 w-full rounded border p-2 ${!editing ? "bg-gray-50" : ""}`}
-                              value={
-                                editing
-                                  ? draft?.model ?? row.model ?? ""
-                                  : row.model ?? ""
-                              }
-                              onChange={(ev) =>
-                                editing &&
-                                setDraft((d) =>
-                                  d ? { ...d, model: ev.target.value } : d,
-                                )
-                              }
-                              readOnly={!editing}
-                            />
-                          </div>
-                          <div>
-                            <div className="text-xs text-gray-500">Serial</div>
-                            <input
-                              className={`mt-1 w-full rounded border p-2 ${!editing ? "bg-gray-50" : ""}`}
-                              value={
-                                editing
-                                  ? draft?.serial ?? row.serial ?? ""
-                                  : row.serial ?? ""
-                              }
-                              onChange={(ev) =>
-                                editing &&
-                                setDraft((d) =>
-                                  d ? { ...d, serial: ev.target.value } : d,
-                                )
-                              }
-                              readOnly={!editing}
-                            />
-                          </div>
+              <div className="space-y-3">
+                {pageItems.map((row) => {
+                  const editing = editingId === row.id;
+                  return (
+                    <div
+                      key={row.id}
+                      className={`rounded bg-white p-4 shadow ${row.archived ? "opacity-70" : ""}`}
+                    >
+                      <div className="mb-2 flex items-center justify-between">
+                        <div className="text-base font-semibold">
+                          {row.type} #{row.assetNumber}
                         </div>
-                      )}
-
-                      {/* Last Moved (editable) & Created (read-only) */}
-                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        <div>
-                          <div className="text-xs text-gray-500">
-                            Last Moved
-                          </div>
-                          {editing ? (
-                            <input
-                              type="datetime-local"
-                              className="mt-1 w-full rounded border p-2"
-                              value={draft?.lastMovedAt ?? ""}
-                              onChange={(e) =>
-                                setDraft((d) =>
-                                  d ? { ...d, lastMovedAt: e.target.value } : d,
-                                )
-                              }
-                            />
-                          ) : (
-                            <div className="mt-1">
-                              {row.lastMovedAt
-                                ? new Date(
-                                    row.lastMovedAt as any,
-                                  ).toLocaleString()
-                                : "—"}
-                            </div>
-                          )}
-                        </div>
-                        <div>
-                          <div className="text-xs text-gray-500">Created</div>
-                          <div className="mt-1">
-                            {row.createdAt
-                              ? new Date(row.createdAt as any).toLocaleString()
-                              : "—"}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {editing ? (
-                        <>
-                          <IconButton
-                            title="Save"
-                            onClick={saveEdit}
-                            className="bg-emerald-600 text-white"
-                          >
-                            <CheckCircleIcon className="h-5 w-5" />
-                          </IconButton>
-                          <IconButton
-                            title="Cancel"
-                            onClick={cancelEdit}
-                            className="bg-gray-300"
-                          >
-                            <XMarkIcon className="h-5 w-5" />
-                          </IconButton>
-                        </>
-                      ) : (
-                        <>
-                          <IconButton
-                            title="Edit"
-                            onClick={() => beginEdit(row)}
-                            className="bg-blue-600 text-white"
-                          >
-                            <PencilSquareIcon className="h-5 w-5" />
-                          </IconButton>
-                          <IconButton
-                            title={row.archived ? "Unarchive" : "Archive"}
-                            onClick={() => toggleArchive(row)}
-                            className={`text-white ${
-                              row.archived ? "bg-amber-600" : "bg-gray-700"
+                        {!editing && (
+                          <span
+                            className={`rounded px-2 py-0.5 text-xs ${
+                              row.status === "DEPLOYED"
+                                ? "bg-blue-100 text-blue-800"
+                                : row.status === "WAREHOUSE"
+                                  ? "bg-green-100 text-green-800"
+                                  : row.status === "MAINTENANCE"
+                                    ? "bg-amber-100 text-amber-800"
+                                    : "bg-gray-200 text-gray-800"
                             }`}
                           >
-                            {row.archived ? (
-                              <ArchiveBoxArrowDownIcon className="h-5 w-5" />
+                            {row.status}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="space-y-3 text-sm">
+                        {/* Status */}
+                        <div>
+                          <div className="text-xs text-gray-500">Status</div>
+                          <select
+                            className={`mt-1 w-full rounded border p-2 ${!editing ? "bg-gray-50" : ""}`}
+                            value={editing ? draft?.status ?? row.status : row.status}
+                            onChange={(ev) =>
+                              editing &&
+                              setDraft((d) =>
+                                d
+                                  ? {
+                                      ...d,
+                                      status: ev.target.value as EquipmentStatus,
+                                    }
+                                  : d,
+                              )
+                            }
+                            disabled={!editing}
+                          >
+                            {STATUSES.map((s) => (
+                              <option key={s} value={s}>
+                                {s}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Type */}
+                        <div>
+                          <div className="text-xs text-gray-500">Type</div>
+                          <input
+                            list="eq-types"
+                            className={`mt-1 w-full rounded border p-2 ${!editing ? "bg-gray-50" : ""}`}
+                            value={editing ? draft?.type ?? row.type : row.type}
+                            onChange={(ev) =>
+                              editing && setDraft((d) => (d ? { ...d, type: ev.target.value } : d))
+                            }
+                            readOnly={!editing}
+                          />
+                        </div>
+
+                        {/* Asset # */}
+                        <div>
+                          <div className="text-xs text-gray-500">Asset #</div>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            className={`mt-1 w-full rounded border p-2 ${!editing ? "bg-gray-50" : ""}`}
+                            value={
+                              editing
+                                ? draft?.assetNumber ?? String(row.assetNumber)
+                                : String(row.assetNumber)
+                            }
+                            onChange={(ev) =>
+                              editing &&
+                              setDraft((d) => (d ? { ...d, assetNumber: ev.target.value } : d))
+                            }
+                            readOnly={!editing}
+                          />
+                        </div>
+
+                        {/* Project */}
+                        <div>
+                          <div className="text-xs text-gray-500">Project</div>
+                          <Combobox
+                            as="div"
+                            value={
+                              editing
+                                ? draft?.currentProjectCode ?? row.currentProjectCode ?? ""
+                                : row.currentProjectCode ?? ""
+                            }
+                            onChange={(v: string) =>
+                              editing &&
+                              setDraft((d) => (d ? { ...d, currentProjectCode: v ?? "" } : d))
+                            }
+                          >
+                            <div className="relative">
+                              <Combobox.Input
+                                className={`mt-1 w-full rounded border p-2 ${!editing ? "bg-gray-50" : ""}`}
+                                displayValue={(v: string) => v}
+                                onChange={(e) => editing && setProjQueryEdit(e.target.value)}
+                                readOnly={!editing}
+                                placeholder="ACTF-2025-001"
+                              />
+                              <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2">
+                                <ChevronUpDownIcon className="h-5 w-5 text-gray-400" />
+                              </Combobox.Button>
+                              {editing && filteredProjects.length > 0 && (
+                                <Combobox.Options className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                                  {filteredProjects.map((p) => (
+                                    <Combobox.Option
+                                      key={p.id}
+                                      value={p.code}
+                                      className={({ active }) =>
+                                        `relative cursor-pointer select-none py-2 pl-3 pr-9 ${
+                                          active ? "bg-blue-600 text-white" : "text-gray-900"
+                                        }`
+                                      }
+                                    >
+                                      {({ active, selected }) => (
+                                        <>
+                                          <span
+                                            className={`block truncate ${selected ? "font-semibold" : ""}`}
+                                          >
+                                            {p.code}
+                                          </span>
+                                          {selected && (
+                                            <span
+                                              className={`absolute inset-y-0 right-0 flex items-center pr-4 ${
+                                                active ? "text-white" : "text-blue-600"
+                                              }`}
+                                            >
+                                              <CheckIcon className="h-5 w-5" />
+                                            </span>
+                                          )}
+                                        </>
+                                      )}
+                                    </Combobox.Option>
+                                  ))}
+                                </Combobox.Options>
+                              )}
+                            </div>
+                          </Combobox>
+                        </div>
+
+                        {/* Model / Serial (hidden on mobile when toggle is off) */}
+                        {showModelSerial && (
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            <div>
+                              <div className="text-xs text-gray-500">Model</div>
+                              <input
+                                className={`mt-1 w-full rounded border p-2 ${!editing ? "bg-gray-50" : ""}`}
+                                value={editing ? draft?.model ?? row.model ?? "" : row.model ?? ""}
+                                onChange={(ev) =>
+                                  editing &&
+                                  setDraft((d) => (d ? { ...d, model: ev.target.value } : d))
+                                }
+                                readOnly={!editing}
+                              />
+                            </div>
+                            <div>
+                              <div className="text-xs text-gray-500">Serial</div>
+                              <input
+                                className={`mt-1 w-full rounded border p-2 ${!editing ? "bg-gray-50" : ""}`}
+                                value={editing ? draft?.serial ?? row.serial ?? "" : row.serial ?? ""}
+                                onChange={(ev) =>
+                                  editing &&
+                                  setDraft((d) => (d ? { ...d, serial: ev.target.value } : d))
+                                }
+                                readOnly={!editing}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Last Moved (editable) & Created (read-only) */}
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                          <div>
+                            <div className="text-xs text-gray-500">Last Moved</div>
+                            {editing ? (
+                              <input
+                                type="datetime-local"
+                                className="mt-1 w-full rounded border p-2"
+                                value={draft?.lastMovedAt ?? ""}
+                                onChange={(e) =>
+                                  setDraft((d) => (d ? { ...d, lastMovedAt: e.target.value } : d))
+                                }
+                              />
                             ) : (
-                              <ArchiveBoxXMarkIcon className="h-5 w-5" />
+                              <div className="mt-1">
+                                {row.lastMovedAt
+                                  ? new Date(row.lastMovedAt as any).toLocaleString()
+                                  : "—"}
+                              </div>
                             )}
-                          </IconButton>
-                          {confirmDeleteId === row.id ? (
-                            <>
+                          </div>
+                          <div>
+                            <div className="text-xs text-gray-500">Created</div>
+                            <div className="mt-1">
+                              {row.createdAt ? new Date(row.createdAt as any).toLocaleString() : "—"}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {editing ? (
+                          <>
+                            <IconButton title="Save" onClick={saveEdit} className="bg-emerald-600 text-white">
+                              <CheckCircleIcon className="h-5 w-5" />
+                            </IconButton>
+                            <IconButton title="Cancel" onClick={cancelEdit} className="bg-gray-300">
+                              <XMarkIcon className="h-5 w-5" />
+                            </IconButton>
+                          </>
+                        ) : (
+                          <>
+                            <IconButton title="Edit" onClick={() => beginEdit(row)} className="bg-blue-600 text-white">
+                              <PencilSquareIcon className="h-5 w-5" />
+                            </IconButton>
+                            <IconButton
+                              title={row.archived ? "Unarchive" : "Archive"}
+                              onClick={() => toggleArchive(row)}
+                              className={`text-white ${row.archived ? "bg-amber-600" : "bg-gray-700"}`}
+                            >
+                              {row.archived ? (
+                                <ArchiveBoxArrowDownIcon className="h-5 w-5" />
+                              ) : (
+                                <ArchiveBoxXMarkIcon className="h-5 w-5" />
+                              )}
+                            </IconButton>
+                            {confirmDeleteId === row.id ? (
+                              <>
+                                <IconButton
+                                  title="Confirm Delete"
+                                  onClick={() => removeRow(row.id)}
+                                  className="bg-red-600 text-white"
+                                >
+                                  <TrashIcon className="h-5 w-5" />
+                                </IconButton>
+                                <IconButton
+                                  title="Cancel"
+                                  onClick={() => {
+                                    setConfirmDeleteId(null);
+                                    toast("Delete cancelled");
+                                  }}
+                                  className="bg-gray-300"
+                                >
+                                  <XMarkIcon className="h-5 w-5" />
+                                </IconButton>
+                              </>
+                            ) : (
                               <IconButton
-                                title="Confirm Delete"
-                                onClick={() => removeRow(row.id)}
+                                title="Delete"
+                                onClick={() => {
+                                  setConfirmDeleteId(row.id);
+                                  toast("Click again to confirm delete", { icon: "⚠️" });
+                                }}
                                 className="bg-red-600 text-white"
                               >
                                 <TrashIcon className="h-5 w-5" />
                               </IconButton>
-                              <IconButton
-                                title="Cancel"
-                                onClick={() => {
-                                  setConfirmDeleteId(null);
-                                  toast("Delete cancelled");
-                                }}
-                                className="bg-gray-300"
-                              >
-                                <XMarkIcon className="h-5 w-5" />
-                              </IconButton>
-                            </>
-                          ) : (
-                            <IconButton
-                              title="Delete"
-                              onClick={() => {
-                                setConfirmDeleteId(row.id);
-                                toast("Click again to confirm delete", {
-                                  icon: "⚠️",
-                                });
-                              }}
-                              className="bg-red-600 text-white"
-                            >
-                              <TrashIcon className="h-5 w-5" />
-                            </IconButton>
-                          )}
-                        </>
-                      )}
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+
+              {/* Pagination on bottom for mobile */}
+              <PaginationControls location="bottom" />
+            </>
           )}
         </div>
       </div>

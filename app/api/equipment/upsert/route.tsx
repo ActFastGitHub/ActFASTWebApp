@@ -1,3 +1,5 @@
+// app/api/equipment/upsert/route.ts
+
 import { NextResponse } from "next/server";
 import prisma from "@/app/libs/prismadb";
 
@@ -9,22 +11,23 @@ export async function POST(req: Request) {
   const serial = typeof body?.serial === "string" ? body.serial.trim() : null;
 
   if (!type || !Number.isInteger(assetNumber) || assetNumber <= 0) {
-    return NextResponse.json({ status: 400, error: "type and positive integer assetNumber are required" });
+    return NextResponse.json(
+      { status: 400, error: "type and positive integer assetNumber are required" },
+      { status: 400 }
+    );
   }
 
-  const existing = await prisma.equipment.findFirst({
-    where: { typeCode: type, assetNumber },
+  // If equipment already exists, return 409 with the exact message
+  const existing = await prisma.equipment.findUnique({
+    where: { typeCode_assetNumber: { typeCode: type, assetNumber } },
+    select: { id: true },
   });
 
   if (existing) {
-    const updated = await prisma.equipment.update({
-      where: { id: existing.id },
-      data: {
-        ...(model !== null ? { model } : {}),
-        ...(serial !== null ? { serial } : {}),
-      },
-    });
-    return NextResponse.json({ status: 200, id: updated.id, created: false });
+    return NextResponse.json(
+      { status: 409, error: `${type} #${assetNumber} already exists` },
+      { status: 409 }
+    );
   }
 
   const created = await prisma.equipment.create({
@@ -36,6 +39,7 @@ export async function POST(req: Request) {
       status: "WAREHOUSE",
       archived: false,
     },
+    select: { id: true },
   });
 
   return NextResponse.json({ status: 200, id: created.id, created: true });

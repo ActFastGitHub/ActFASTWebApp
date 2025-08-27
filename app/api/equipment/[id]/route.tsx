@@ -1,3 +1,5 @@
+// app/api/equipment/[id]/route.ts
+
 import { NextResponse } from "next/server";
 import prisma from "@/app/libs/prismadb";
 import { getServerSession } from "next-auth";
@@ -21,7 +23,7 @@ async function isAdmin() {
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const auth = await isAdmin();
-  if (!auth.ok) return NextResponse.json({ status: auth.status, error: "Forbidden" });
+  if (!auth.ok) return NextResponse.json({ status: auth.status, error: "Forbidden" }, { status: auth.status });
 
   const body = (await req.json().catch(() => ({}))) as Partial<UpdateEquipmentPayload>;
   const data: Record<string, unknown> = {};
@@ -32,45 +34,80 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (typeof body.currentProjectCode !== "undefined")
     data.currentProjectCode = body.currentProjectCode ? String(body.currentProjectCode) : null;
 
+  let incomingTypeCode: string | undefined;
+  let incomingAssetNumber: number | undefined;
+
   if (typeof body.type !== "undefined") {
     const t = String(body.type).trim();
-    if (!t) return NextResponse.json({ status: 400, error: "Type cannot be empty" });
+    if (!t) return NextResponse.json({ status: 400, error: "Type cannot be empty" }, { status: 400 });
+    incomingTypeCode = t;
     data.typeCode = t;
   }
   if (typeof body.assetNumber !== "undefined") {
     const n = Number(body.assetNumber);
     if (!Number.isInteger(n) || n <= 0)
-      return NextResponse.json({ status: 400, error: "assetNumber must be a positive integer" });
+      return NextResponse.json({ status: 400, error: "assetNumber must be a positive integer" }, { status: 400 });
+    incomingAssetNumber = n;
     data.assetNumber = n;
   }
   if (typeof body.status !== "undefined") {
-    if (!isStatus(body.status)) return NextResponse.json({ status: 400, error: "Invalid status" });
+    if (!isStatus(body.status)) return NextResponse.json({ status: 400, error: "Invalid status" }, { status: 400 });
     data.status = body.status;
   }
 
   try {
+    // Load current values so we can determine the final (typeCode, assetNumber) pair
+    const current = await prisma.equipment.findUnique({
+      where: { id: params.id },
+      select: { typeCode: true, assetNumber: true },
+    });
+    if (!current) {
+      return NextResponse.json({ status: 404, error: "Equipment not found" }, { status: 404 });
+    }
+
+    const nextType = (incomingTypeCode ?? current.typeCode).trim();
+    const nextNum = incomingAssetNumber ?? current.assetNumber;
+
+    // If the unique pair is changing, pre-check for conflicts and return friendly 409
+    const pairChanged = nextType !== current.typeCode || nextNum !== current.assetNumber;
+    if (pairChanged) {
+      const conflict = await prisma.equipment.findUnique({
+        where: { typeCode_assetNumber: { typeCode: nextType, assetNumber: nextNum } },
+        select: { id: true },
+      });
+      if (conflict) {
+        return NextResponse.json(
+          { status: 409, error: `${nextType} #${nextNum} already exists` },
+          { status: 409 }
+        );
+      }
+    }
+
     const item = await prisma.equipment.update({ where: { id: params.id }, data });
     return NextResponse.json({ status: 200, item });
-  } catch (e: unknown) {
-    const code = (e as { code?: string })?.code;
-    if (code === "P2002") {
-      return NextResponse.json({
-        status: 409,
-        error: "That Type + Asset # already exists. Pick a different number or type.",
-      });
+  } catch (e: any) {
+    // Fallback: unique constraint from Prisma just in case
+    if (e?.code === "P2002") {
+      return NextResponse.json(
+        {
+          status: 409,
+          error: "That Type + Asset # already exists. Pick a different number or type.",
+        },
+        { status: 409 }
+      );
     }
-    return NextResponse.json({ status: 500, error: "Update failed" });
+    return NextResponse.json({ status: 500, error: "Update failed" }, { status: 500 });
   }
 }
 
 export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
   const auth = await isAdmin();
-  if (!auth.ok) return NextResponse.json({ status: auth.status, error: "Forbidden" });
+  if (!auth.ok) return NextResponse.json({ status: auth.status, error: "Forbidden" }, { status: auth.status });
 
   try {
     await prisma.equipment.delete({ where: { id: params.id } });
     return NextResponse.json({ status: 200 });
   } catch {
-    return NextResponse.json({ status: 500, error: "Delete failed" });
+    return NextResponse.json({ status: 500, error: "Delete failed" }, { status: 500 });
   }
 }

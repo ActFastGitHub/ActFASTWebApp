@@ -385,6 +385,11 @@ function WhatsAppReportModal({
 /*  Component                                                   */
 /* ──────────────────────────────────────────────────────────── */
 export default function MoveClient(): JSX.Element {
+  /* 1) Mounted flag FIRST to stabilize hook order */
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  /* Session & routing hooks (always called) */
   const { status, data: session } = useSession();
   const role = (session?.user?.role || "").toLowerCase();
   const isAdmin = role === "admin" || role === "owner";
@@ -818,6 +823,12 @@ export default function MoveClient(): JSX.Element {
     [recent],
   );
 
+  /* 2) AFTER all hooks are declared: guard the render */
+  if (!mounted) {
+    // Stable placeholder so SSR and client match (prevents hydration mismatch)
+    return <div className="min-h-screen bg-gray-100" />;
+  }
+
   /* ──────────────────────────────────────────────────────────── */
   /*  Render                                                      */
   /* ──────────────────────────────────────────────────────────── */
@@ -975,7 +986,7 @@ export default function MoveClient(): JSX.Element {
                     placeholder="e.g. 33"
                   />
                 </div>
-                <div className="sm:col-span-1 flex items-end">
+                <div className="sm:col-span-1 flex items	end">
                   <button
                     onClick={() => removeRow(i)}
                     className="w-full rounded border px-3 py-2 text-sm"
