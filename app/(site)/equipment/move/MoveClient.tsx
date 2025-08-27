@@ -198,11 +198,14 @@ function WhatsAppReportModal({
   open,
   onClose,
   movements,
+  projects,
 }: {
   open: boolean;
   onClose: () => void;
   movements: MovementForReport[];
+  projects: Project[];
 }) {
+  // stable hooks (never inside conditionals)
   const [mode, setMode] = useState<"today" | "custom" | "project" | "warehouse">(
     "today",
   );
@@ -214,6 +217,22 @@ function WhatsAppReportModal({
     return `${yyyy}-${mm}-${dd}`;
   });
   const [project, setProject] = useState("");
+  const [projQuery, setProjQuery] = useState("");
+
+  // ensure PNC exists as an option
+  const projectOptions = useMemo(() => {
+    const hasPNC = projects.some((p) => p.code === "POSSIBLE NEW CLAIM");
+    const list = hasPNC
+      ? projects
+      : [{ id: "PNC", code: "POSSIBLE NEW CLAIM" }, ...projects];
+    return list;
+  }, [projects]);
+
+  const filteredProjects = useMemo(() => {
+    const q = projQuery.toLowerCase();
+    if (!q) return projectOptions;
+    return projectOptions.filter((p) => p.code.toLowerCase().includes(q));
+  }, [projectOptions, projQuery]);
 
   useEffect(() => {
     if (!open) {
@@ -224,6 +243,7 @@ function WhatsAppReportModal({
       const dd = `${d.getDate()}`.padStart(2, "0");
       setDate(`${yyyy}-${mm}-${dd}`);
       setProject("");
+      setProjQuery("");
     }
   }, [open]);
 
@@ -262,18 +282,24 @@ function WhatsAppReportModal({
     const warehouseOnly = mode === "warehouse";
 
     const byProject = new Map<string, Map<string, number[]>>();
+    const notesByProject = new Map<string, string[]>();
     const byTypeIn = new Map<string, number[]>();
+    const notesWarehouse: string[] = [];
 
     rows.forEach((r) => {
+      const note = (r.note || "").trim();
       if (r.direction === "OUT" && (!warehouseOnly || !!r.projectCode)) {
         const proj = r.projectCode || "Unknown Project";
         if (!byProject.has(proj)) byProject.set(proj, new Map());
+        if (!notesByProject.has(proj)) notesByProject.set(proj, []);
         const mapTypes = byProject.get(proj)!;
         if (!mapTypes.has(r.type)) mapTypes.set(r.type, []);
         mapTypes.get(r.type)!.push(r.assetNumber);
+        if (note) notesByProject.get(proj)!.push(note);
       } else if (r.direction === "IN" && (!projOnly || warehouseOnly)) {
         if (!byTypeIn.has(r.type)) byTypeIn.set(r.type, []);
         byTypeIn.get(r.type)!.push(r.assetNumber);
+        if (note) notesWarehouse.push(note);
       }
     });
 
@@ -287,6 +313,14 @@ function WhatsAppReportModal({
         nums.sort((a, b) => a - b);
         lines.push(`${type} #: ${nums.join(", ")}`);
       });
+
+      // NEW: include notes for any project if present
+      const uniqNotes = Array.from(
+        new Set((notesByProject.get(proj) || []).filter(Boolean)),
+      );
+      if (uniqNotes.length) {
+        lines.push(`Notes: ${uniqNotes.join("; ")}`);
+      }
       lines.push("");
     });
 
@@ -296,6 +330,12 @@ function WhatsAppReportModal({
         nums.sort((a, b) => a - b);
         lines.push(`${type}: ${nums.join(", ")}`);
       });
+
+      // NEW: include notes for pull-ins if present
+      const uniqInNotes = Array.from(new Set(notesWarehouse.filter(Boolean)));
+      if (uniqInNotes.length) {
+        lines.push(`Notes: ${uniqInNotes.join("; ")}`);
+      }
       lines.push("");
     }
 
@@ -361,12 +401,54 @@ function WhatsAppReportModal({
           {mode === "project" && (
             <div>
               <label className="block text-xs text-gray-600">Project Code</label>
-              <input
-                value={project}
-                onChange={(e) => setProject(e.target.value)}
-                className="mt-1 w-full rounded border p-2"
-                placeholder="ACTF-2025-001"
-              />
+              <Combobox value={project} onChange={(v: string) => setProject(v ?? "")}>
+                <div className="relative mt-1">
+                  <Combobox.Input
+                    className="w-full rounded border p-2"
+                    displayValue={(v: string) => v}
+                    onChange={(e) => {
+                      setProject(e.target.value);
+                      setProjQuery(e.target.value);
+                    }}
+                    placeholder="Search or select project code"
+                  />
+                  <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2">
+                    <ChevronUpDownIcon className="h-5 w-5 text-gray-400" />
+                  </Combobox.Button>
+                  {filteredProjects.length > 0 && (
+                    <Combobox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                      {filteredProjects.map((p) => (
+                        <Combobox.Option
+                          key={p.id}
+                          value={p.code}
+                          className={({ active }) =>
+                            `relative cursor-pointer select-none py-2 pl-3 pr-9 ${
+                              active ? "bg-blue-600 text-white" : "text-gray-900"
+                            }`
+                          }
+                        >
+                          {({ active, selected }) => (
+                            <>
+                              <span className={`block truncate ${selected ? "font-semibold" : ""}`}>
+                                {p.code}
+                              </span>
+                              {selected && (
+                                <span
+                                  className={`absolute inset-y-0 right-0 flex items-center pr-4 ${
+                                    active ? "text-white" : "text-blue-600"
+                                  }`}
+                                >
+                                  <CheckIcon className="h-5 w-5" />
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </Combobox.Option>
+                      ))}
+                    </Combobox.Options>
+                  )}
+                </div>
+              </Combobox>
             </div>
           )}
         </div>
@@ -385,7 +467,7 @@ function WhatsAppReportModal({
 /*  Component                                                   */
 /* ──────────────────────────────────────────────────────────── */
 export default function MoveClient(): JSX.Element {
-  /* 1) Mounted flag FIRST to stabilize hook order */
+  /* Hydration-safe: guard render until mounted */
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -436,27 +518,35 @@ export default function MoveClient(): JSX.Element {
     saveString(LS_PROJ, projectCode);
   }, [projectCode]);
 
-  const filteredProjects = useMemo(() => {
-    const q = projQuery.toLowerCase();
-    if (!q) return projects;
-    return projects.filter((p) => p.code.toLowerCase().includes(q));
-  }, [projects, projQuery]);
-
   useEffect(() => {
     (async () => {
       try {
         const res = await axios.get("/api/projects");
         if (res.data?.projects) {
-          const sorted = res.data.projects
+          const sorted: Project[] = res.data.projects
             .map((p: any) => ({ id: p.id, code: p.code }))
             .sort((a: Project, b: Project) => b.code.localeCompare(a.code));
-          setProjects(sorted);
+
+          // always include POSSIBLE NEW CLAIM at the top
+          const hasPNC = sorted.some((p) => p.code === "POSSIBLE NEW CLAIM");
+          const withPNC = hasPNC
+            ? sorted
+            : [{ id: "PNC", code: "POSSIBLE NEW CLAIM" }, ...sorted];
+
+          setProjects(withPNC);
         }
       } catch {
-        /* noop */
+        // still ensure PNC exists even if request fails
+        setProjects([{ id: "PNC", code: "POSSIBLE NEW CLAIM" }]);
       }
     })();
   }, []);
+
+  const filteredProjects = useMemo(() => {
+    const q = projQuery.toLowerCase();
+    if (!q) return projects;
+    return projects.filter((p) => p.code.toLowerCase().includes(q));
+  }, [projects, projQuery]);
 
   /* ---------- Batch rows (QR adds here) ---------- */
   const [rows, setRows] = useState<MoveRow[]>([]);
@@ -541,6 +631,14 @@ export default function MoveClient(): JSX.Element {
     if (!payload.items.length) return "Please add at least one valid item.";
     if (payload.direction === "OUT" && !payload.projectCode)
       return "Project code is required when deploying.";
+    // Require notes only when project is POSSIBLE NEW CLAIM
+    if (
+      payload.direction === "OUT" &&
+      payload.projectCode === "POSSIBLE NEW CLAIM" &&
+      !(note && note.trim())
+    ) {
+      return "Please enter Notes (temporary project name) for POSSIBLE NEW CLAIM.";
+    }
     if (!useNow) {
       if (!payload.when) return "Please select a manual date/time.";
       const dt = new Date(payload.when);
@@ -757,7 +855,7 @@ export default function MoveClient(): JSX.Element {
     }
   }
 
-  /* ---------- Duration per entry (downlevel-safe Map iteration) ---------- */
+  /* ---------- Duration per entry ---------- */
   const durationById = useMemo(() => {
     const byEquip = new Map<string, { idx: number; rec: Recent }[]>();
     const key = (r: Recent) => `${getType(r)}#${getAsset(r)}`;
@@ -823,9 +921,8 @@ export default function MoveClient(): JSX.Element {
     [recent],
   );
 
-  /* 2) AFTER all hooks are declared: guard the render */
+  /* Guard render until mounted to avoid hydration mismatch */
   if (!mounted) {
-    // Stable placeholder so SSR and client match (prevents hydration mismatch)
     return <div className="min-h-screen bg-gray-100" />;
   }
 
@@ -861,7 +958,7 @@ export default function MoveClient(): JSX.Element {
           ))}
         </div>
 
-        {/* Project (DEPLOY only) — sorted DESC */}
+        {/* Project (DEPLOY only) — searchable, includes PNC */}
         {direction === "OUT" && (
           <div className="mb-4">
             <label className="mb-1 block text-sm font-semibold text-gray-700">
@@ -899,11 +996,7 @@ export default function MoveClient(): JSX.Element {
                       >
                         {({ active, selected }) => (
                           <>
-                            <span
-                              className={`block truncate ${
-                                selected ? "font-semibold" : ""
-                              }`}
-                            >
+                            <span className={`block truncate ${selected ? "font-semibold" : ""}`}>
                               {p.code}
                             </span>
                             {selected && (
@@ -923,6 +1016,11 @@ export default function MoveClient(): JSX.Element {
                 )}
               </div>
             </Combobox>
+            {projectCode === "POSSIBLE NEW CLAIM" && (
+              <p className="mt-1 text-xs text-red-600">
+                Notes are required for POSSIBLE NEW CLAIM (enter the temporary project name).
+              </p>
+            )}
           </div>
         )}
 
@@ -986,7 +1084,7 @@ export default function MoveClient(): JSX.Element {
                     placeholder="e.g. 33"
                   />
                 </div>
-                <div className="sm:col-span-1 flex items	end">
+                <div className="sm:col-span-1 flex items-end">
                   <button
                     onClick={() => removeRow(i)}
                     className="w-full rounded border px-3 py-2 text-sm"
@@ -1019,7 +1117,7 @@ export default function MoveClient(): JSX.Element {
         {/* Notes */}
         <div className="mb-4">
           <label className="mb-1 block text-sm font-semibold text-gray-700">
-            Notes
+            Notes {direction === "OUT" && projectCode === "POSSIBLE NEW CLAIM" ? <span className="text-red-600">*</span> : null}
           </label>
           <textarea
             className="min-h-32 w-full rounded border p-3"
@@ -1264,6 +1362,7 @@ export default function MoveClient(): JSX.Element {
         open={reportOpen}
         onClose={() => setReportOpen(false)}
         movements={movementsForReport}
+        projects={projects}
       />
     </div>
   );
