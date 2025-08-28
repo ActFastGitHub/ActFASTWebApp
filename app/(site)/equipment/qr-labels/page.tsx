@@ -32,6 +32,7 @@ function expandAssets(input: string): number[] {
 export default function QRLabelsPage() {
   const { status } = useSession();
   const router = useRouter();
+
   useEffect(() => {
     if (status === "unauthenticated") {
       const dest =
@@ -92,7 +93,7 @@ export default function QRLabelsPage() {
       );
       setImages(urls);
       toast.success(`Generated ${urls.length} QR${urls.length > 1 ? "s" : ""}`);
-    } catch (e: any) {
+    } catch {
       toast.error("Failed to generate QR codes");
     } finally {
       setGenerating(false);
@@ -100,121 +101,200 @@ export default function QRLabelsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 pt-24 md:pt-28 lg:pt-32">
-      <Navbar />
-      <div className="mx-auto max-w-5xl p-4">
-        <h1 className="mb-4 text-2xl font-bold">QR Labels</h1>
+    <>
+      {/* Print-only CSS: shrink margins, 4×5 grid of 2in cells, no wasted space */}
+      <style>{`
+        @page {
+          /* 0.25in margins so 8.5x11in becomes 8.0x10.5in printable area */
+          margin: 0.25in;
+        }
+        @media print {
+          /* Remove background, padding, shadows, etc. */
+          body { background: #fff !important; }
+          .no-print { display: none !important; }
+          .qr-grid {
+            display: grid !important;
+            grid-template-columns: repeat(4, 2in) !important;
+            grid-auto-rows: 2in !important;
+            gap: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            justify-content: start !important;
+            align-content: start !important;
+          }
+          .qr-cell {
+            width: 2in !important;
+            height: 2in !important;
+            border: 1px solid #9ca3af !important; /* gray-400 */
+            box-sizing: border-box !important;
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          .qr-img {
+            width: 1.6in !important;
+            height: 1.6in !important;
+            object-fit: contain !important;
+            margin: 0.1in 0.2in 0 0.2in !important; /* centers image, leaves bottom room for label */
+            display: block !important;
+          }
+          .qr-label {
+            font-size: 9px !important;
+            line-height: 1.1 !important;
+            text-align: center !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+          }
+          .print-wrap {
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+        }
+      `}</style>
 
-        <div className="mb-4 rounded bg-white p-4 shadow print:hidden">
-          <label className="block text-sm font-medium">Type</label>
-          <Combobox
-            as="div"
-            value={type}
-            onChange={(val: string) => setType(val ?? "")}
-          >
-            <div className="relative mt-1">
-              <Combobox.Input
-                className="w-full rounded border p-2"
-                displayValue={(v: string) => v}
-                onChange={(e) => {
-                  setType(e.target.value);
-                  setTypeQuery(e.target.value);
-                }}
-                placeholder="Select a type"
-              />
-              <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2">
-                <ChevronUpDownIcon className="h-5 w-5 text-gray-400" />
-              </Combobox.Button>
-              {filteredTypes.length > 0 && (
-                <Combobox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                  {filteredTypes.map((t) => (
-                    <Combobox.Option
-                      key={t.code}
-                      value={t.code}
-                      className={({ active }) =>
-                        `relative cursor-pointer select-none py-2 pl-3 pr-9 ${
-                          active ? "bg-blue-600 text-white" : "text-gray-900"
-                        }`
-                      }
-                    >
-                      {({ active, selected }) => (
-                        <>
-                          <span
-                            className={`block truncate ${
-                              selected ? "font-semibold" : ""
-                            }`}
-                          >
-                            {t.code}
-                          </span>
-                          {selected && (
-                            <span
-                              className={`absolute inset-y-0 right-0 flex items-center pr-4 ${
-                                active ? "text-white" : "text-blue-600"
-                              }`}
-                            >
-                              <CheckIcon className="h-5 w-5" />
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </Combobox.Option>
-                  ))}
-                </Combobox.Options>
-              )}
-            </div>
-          </Combobox>
-
-          <label className="mt-3 block text-sm font-medium">
-            Assets (lists or ranges)
-          </label>
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            className="mt-1 w-full rounded border p-2"
-          />
-          <div className="mt-1 text-xs text-gray-500">
-            Parsed: {list.join(", ") || "—"}
-          </div>
-          <button
-            disabled={generating}
-            onClick={generate}
-            className="mt-3 rounded bg-blue-600 px-3 py-2 text-white"
-          >
-            {generating ? "Generating…" : "Generate"}
-          </button>
-          <button
-            onClick={() => window.print()}
-            className="ml-2 rounded bg-gray-800 px-3 py-2 text-white"
-          >
-            Print
-          </button>
+      <div className="min-h-screen bg-gray-100 pt-24 md:pt-28 lg:pt-32 print:pt-0 print:bg-white">
+        {/* Navbar hidden on print */}
+        <div className="no-print">
+          <Navbar />
         </div>
 
-        {images.length > 0 && (
-          <div
-            className="
-              grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5
-              print:grid-cols-5 print:gap-0
-            "
-          >
-            {images.map(({ n, url }) => (
-              <div
-                key={n}
-                className="
-                  flex flex-col items-center justify-center rounded bg-white p-3 shadow
-                  print:shadow-none print:border print:border-gray-400 print:p-2
-                "
-              >
-                <img src={url} alt={`QR ${n}`} className="h-32 w-32" />
-                <div className="mt-2 text-lg font-extrabold tracking-wide print:text-xs">
-                  {type} #{n}
-                </div>
-                {/* Removed download link */}
+        <div className="mx-auto max-w-5xl p-4 print-wrap">
+          {/* Heading + controls hidden on print */}
+          <h1 className="mb-4 text-2xl font-bold no-print">QR Labels</h1>
+
+          <div className="mb-4 rounded bg-white p-4 shadow no-print">
+            <label className="block text-sm font-medium">Type</label>
+            <Combobox
+              as="div"
+              value={type}
+              onChange={(val: string) => setType(val ?? "")}
+            >
+              <div className="relative mt-1">
+                <Combobox.Input
+                  className="w-full rounded border p-2"
+                  displayValue={(v: string) => v}
+                  onChange={(e) => {
+                    setType(e.target.value);
+                    setTypeQuery(e.target.value);
+                  }}
+                  placeholder="Select a type"
+                />
+                <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2">
+                  <ChevronUpDownIcon className="h-5 w-5 text-gray-400" />
+                </Combobox.Button>
+                {filteredTypes.length > 0 && (
+                  <Combobox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                    {filteredTypes.map((t) => (
+                      <Combobox.Option
+                        key={t.code}
+                        value={t.code}
+                        className={({ active }) =>
+                          `relative cursor-pointer select-none py-2 pl-3 pr-9 ${
+                            active ? "bg-blue-600 text-white" : "text-gray-900"
+                          }`
+                        }
+                      >
+                        {({ active, selected }) => (
+                          <>
+                            <span
+                              className={`block truncate ${
+                                selected ? "font-semibold" : ""
+                              }`}
+                            >
+                              {t.code}
+                            </span>
+                            {selected && (
+                              <span
+                                className={`absolute inset-y-0 right-0 flex items-center pr-4 ${
+                                  active ? "text-white" : "text-blue-600"
+                                }`}
+                              >
+                                <CheckIcon className="h-5 w-5" />
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </Combobox.Option>
+                    ))}
+                  </Combobox.Options>
+                )}
               </div>
-            ))}
+            </Combobox>
+
+            <label className="mt-3 block text-sm font-medium">
+              Assets (lists or ranges)
+            </label>
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              className="mt-1 w-full rounded border p-2"
+            />
+            <div className="mt-1 text-xs text-gray-500">
+              Parsed: {list.join(", ") || "—"}
+            </div>
+            <button
+              disabled={generating}
+              onClick={generate}
+              className="mt-3 rounded bg-blue-600 px-3 py-2 text-white"
+            >
+              {generating ? "Generating…" : "Generate"}
+            </button>
+            <button
+              onClick={() => window.print()}
+              className="ml-2 rounded bg-gray-800 px-3 py-2 text-white"
+            >
+              Print
+            </button>
           </div>
-        )}
+
+          {/* QR Grid */}
+          {images.length > 0 && (
+            <div
+              className={`
+                grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4
+                print:qr-grid
+              `}
+              style={{
+                // On screen we keep responsive grid; print overrides with CSS above.
+                alignItems: "start",
+              }}
+            >
+              {images.map(({ n, url }) => (
+                <div
+                  key={n}
+                  className="
+                    flex flex-col items-center justify-end rounded bg-white p-3 shadow
+                    print:qr-cell print:rounded-none print:bg-white print:shadow-none
+                  "
+                  style={{
+                    // Screen sizing—print overrides width/height to 2in.
+                    minWidth: 0,
+                  }}
+                >
+                  <img
+                    src={url}
+                    alt={`QR ${n}`}
+                    className="qr-img"
+                    style={{
+                      // On screen: 8rem square; print overrides to inches.
+                      width: "8rem",
+                      height: "8rem",
+                      objectFit: "contain",
+                    }}
+                  />
+                  <div className="qr-label mt-2 text-sm font-extrabold tracking-wide">
+                    {type} #{n}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
