@@ -39,13 +39,16 @@ type MoveRow = { id: string; type: string; assetNumber: string };
 const mkId = () =>
   Math.random().toString(36).slice(2) + Date.now().toString(36);
 
-function normalizeRows(raw: any): MoveRow[] {
-  const arr: MoveRow[] = Array.isArray(raw) ? raw : [];
-  return arr.map((r, idx) => ({
-    id: typeof r.id === "string" ? r.id : mkId() + "_" + idx,
-    type: String(r.type ?? ""),
-    assetNumber: String(r.assetNumber ?? ""),
-  }));
+function normalizeRows(raw: unknown): MoveRow[] {
+  const arr: unknown[] = Array.isArray(raw) ? raw : [];
+  return arr.map((r, idx) => {
+    const rec = r as Partial<MoveRow>;
+    return {
+      id: typeof rec?.id === "string" ? rec.id : `${mkId()}_${idx}`,
+      type: String(rec?.type ?? ""),
+      assetNumber: String(rec?.assetNumber ?? ""),
+    };
+  });
 }
 
 function loadQueue(): MoveRow[] {
@@ -143,7 +146,7 @@ function ScannerOverlay({
           rafRef.current = requestAnimationFrame(tick);
         };
         rafRef.current = requestAnimationFrame(tick);
-      } catch (err) {
+      } catch {
         toast.error("Camera permission denied or unavailable");
         onClose();
       }
@@ -190,7 +193,7 @@ type MovementForReport = {
   type: string;
   assetNumber: number;
   direction: "IN" | "OUT";
-  at: string;
+  at: string; // ISO
   projectCode?: string | null;
   note?: string | null;
 };
@@ -206,10 +209,9 @@ function WhatsAppReportModal({
   movements: MovementForReport[];
   projects: Project[];
 }) {
-  // stable hooks (never inside conditionals)
-  const [mode, setMode] = useState<
-    "today" | "custom" | "project" | "warehouse"
-  >("today");
+  const [mode, setMode] = useState<"today" | "custom" | "project" | "warehouse">(
+    "today",
+  );
   const [date, setDate] = useState<string>(() => {
     const d = new Date();
     const yyyy = d.getFullYear();
@@ -217,11 +219,10 @@ function WhatsAppReportModal({
     const dd = `${d.getDate()}`.padStart(2, "0");
     return `${yyyy}-${mm}-${dd}`;
   });
-  const [project, setProject] = useState("");
-  const [projQuery, setProjQuery] = useState("");
+  const [project, setProject] = useState<string>("");
+  const [projQuery, setProjQuery] = useState<string>("");
 
-  // ensure PNC exists as an option
-  const projectOptions = useMemo(() => {
+  const projectOptions = useMemo<Project[]>(() => {
     const hasPNC = projects.some((p) => p.code === "POSSIBLE NEW CLAIM");
     const list = hasPNC
       ? projects
@@ -229,7 +230,7 @@ function WhatsAppReportModal({
     return list;
   }, [projects]);
 
-  const filteredProjects = useMemo(() => {
+  const filteredProjects = useMemo<Project[]>(() => {
     const q = projQuery.toLowerCase();
     if (!q) return projectOptions;
     return projectOptions.filter((p) => p.code.toLowerCase().includes(q));
@@ -260,84 +261,268 @@ function WhatsAppReportModal({
   };
 
   const generate = async () => {
+    // Helpers
+    const fmtDateKey = (iso: string): string => {
+      const d = new Date(iso);
+      const yyyy = d.getFullYear();
+      const mm = `${d.getMonth() + 1}`.padStart(2, "0");
+      const dd = `${d.getDate()}`.padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    };
+    const longDate = (ymd: string): string => {
+      const d = new Date(ymd + "T00:00:00");
+      return d.toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+    };
+
+    // Project-wide history report
+    if (mode === "project") {
+      const targetProject = project.trim();
+      if (!targetProject) {
+        toast.error("Please pick a project code first.");
+        return;
+      }
+
+      type EquipKey = string; // `${type}#${asset}`
+      const keyOf = (r: MovementForReport): EquipKey =>
+        `${r.type}#${r.assetNumber}`;
+
+      const byEquip = new Map<EquipKey, MovementForReport[]>();
+      movements
+        .slice()
+        .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
+        .forEach((m) => {
+          const k = keyOf(m);
+          const arr = byEquip.get(k);
+          if (arr) arr.push(m);
+          else byEquip.set(k, [m]);
+        });
+
+      type DayBucket = { OUT: Map<string, number[]>; IN: Map<string, number[]> };
+      const dayBuckets = new Map<string, DayBucket>();
+      const ensureDay = (day: string): DayBucket => {
+        const found = dayBuckets.get(day);
+        if (found) return found;
+        const created: DayBucket = { OUT: new Map(), IN: new Map() };
+        dayBuckets.set(day, created);
+        return created;
+      };
+      const pushTo = (
+        bucket: Map<string, number[]>,
+        type: string,
+        asset: number,
+      ) => {
+        const list = bucket.get(type);
+        if (list) list.push(asset);
+        else bucket.set(type, [asset]);
+      };
+
+      const stillOut = new Map<string, Set<number>>();
+      const addLeft = (type: string, n: number) => {
+        const s = stillOut.get(type);
+        if (s) s.add(n);
+        else stillOut.set(type, new Set([n]));
+      };
+      const remLeft = (type: string, n: number) => {
+        stillOut.get(type)?.delete(n);
+      };
+
+      const currentProjectFor = new Map<EquipKey, string | null>();
+
+      byEquip.forEach((timeline, key) => {
+        timeline.forEach((ev) => {
+          const day = fmtDateKey(ev.at);
+          if (ev.direction === "OUT") {
+            const toProj = ev.projectCode || null;
+            currentProjectFor.set(key, toProj);
+
+            if (toProj === targetProject) {
+              const b = ensureDay(day);
+              pushTo(b.OUT, ev.type, ev.assetNumber);
+              addLeft(ev.type, ev.assetNumber);
+            } else {
+              remLeft(ev.type, ev.assetNumber);
+            }
+          } else {
+            const attached = currentProjectFor.get(key) ?? null;
+            if (attached === targetProject) {
+              const b = ensureDay(day);
+              pushTo(b.IN, ev.type, ev.assetNumber);
+              remLeft(ev.type, ev.assetNumber);
+              currentProjectFor.set(key, null);
+            } else {
+              currentProjectFor.set(key, null);
+            }
+          }
+        });
+      });
+
+      const lines: string[] = [];
+      lines.push(targetProject, "");
+
+      const days = Array.from(dayBuckets.keys()).sort(); // oldest → newest
+      days.forEach((day) => {
+        const b = dayBuckets.get(day)!;
+        lines.push(longDate(day));
+
+        if (b.OUT.size) {
+          lines.push("DEPLOYED");
+          Array.from(b.OUT.keys())
+            .sort()
+            .forEach((t) => {
+              const nums = b.OUT.get(t)!.slice().sort((a, b) => a - b);
+              lines.push(`${t}: ${nums.join(", ")}`);
+            });
+          lines.push("");
+        }
+
+        if (b.IN.size) {
+          lines.push("PULLED-OUT");
+          Array.from(b.IN.keys())
+            .sort()
+            .forEach((t) => {
+              const nums = b.IN.get(t)!.slice().sort((a, b) => a - b);
+              lines.push(`${t}: ${nums.join(", ")}`);
+            });
+          lines.push("");
+        }
+      });
+
+      const leftTypes = Array.from(stillOut.keys()).filter(
+        (t) => (stillOut.get(t)?.size ?? 0) > 0,
+      );
+      if (leftTypes.length) {
+        lines.push("Equipments Left On-Site:");
+        leftTypes.sort().forEach((t) => {
+          const nums = Array.from(stillOut.get(t) ?? []).sort((a, b) => a - b);
+          lines.push(`${t}: ${nums.join(", ")}`);
+        });
+      }
+
+      const text = lines.join("\n").trim();
+      try {
+        await navigator.clipboard.writeText(text);
+        toast.success("Report copied to clipboard");
+      } catch {
+        toast.error("Failed to copy to clipboard");
+      }
+      return;
+    }
+
+    // Today / Custom Date / Warehouse Returns with Custom Date attribution
     const targetDay =
-      mode === "today" || mode === "warehouse" || mode === "project"
+      mode === "today" || mode === "warehouse"
         ? new Date()
         : new Date(date + "T00:00:00");
+
     const y = targetDay.getFullYear();
     const m = `${targetDay.getMonth() + 1}`.padStart(2, "0");
     const d = `${targetDay.getDate()}`.padStart(2, "0");
     const start = new Date(`${y}-${m}-${d}T00:00:00`);
     const end = new Date(`${y}-${m}-${d}T23:59:59`);
 
-    // filter movements for that day
-    let rows = movements.filter((r) => {
+    const globallySorted = movements
+      .slice()
+      .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+
+    const dayRows = globallySorted.filter((r) => {
       const t = new Date(r.at).getTime();
       return t >= start.getTime() && t <= end.getTime();
     });
 
-    const projOnly = mode === "project" && project.trim();
-    if (projOnly) {
-      rows = rows.filter((r) => (r.projectCode || "") === project.trim());
-    }
-    const warehouseOnly = mode === "warehouse";
+    const keyOf = (r: MovementForReport) => `${r.type}#${r.assetNumber}`;
+    const currentProjectFor = new Map<string, string | null>();
 
-    const byProject = new Map<string, Map<string, number[]>>();
+    const byProjectOut = new Map<string, Map<string, number[]>>();
     const notesByProject = new Map<string, string[]>();
-    const byTypeIn = new Map<string, number[]>();
+    const byInSourceProject = new Map<string, Map<string, number[]>>();
     const notesWarehouse: string[] = [];
 
-    rows.forEach((r) => {
-      const note = (r.note || "").trim();
-      if (r.direction === "OUT" && (!warehouseOnly || !!r.projectCode)) {
-        const proj = r.projectCode || "Unknown Project";
-        if (!byProject.has(proj)) byProject.set(proj, new Map());
-        if (!notesByProject.has(proj)) notesByProject.set(proj, []);
-        const mapTypes = byProject.get(proj)!;
-        if (!mapTypes.has(r.type)) mapTypes.set(r.type, []);
-        mapTypes.get(r.type)!.push(r.assetNumber);
-        if (note) notesByProject.get(proj)!.push(note);
-      } else if (r.direction === "IN" && (!projOnly || warehouseOnly)) {
-        if (!byTypeIn.has(r.type)) byTypeIn.set(r.type, []);
-        byTypeIn.get(r.type)!.push(r.assetNumber);
-        if (note) notesWarehouse.push(note);
+    for (const ev of globallySorted) {
+      const k = keyOf(ev);
+      const inDay =
+        new Date(ev.at).getTime() >= start.getTime() &&
+        new Date(ev.at).getTime() <= end.getTime();
+
+      if (inDay) {
+        if (ev.direction === "OUT") {
+          const proj = ev.projectCode || "Unknown Project";
+          if (!byProjectOut.has(proj)) byProjectOut.set(proj, new Map());
+          const typeMap = byProjectOut.get(proj)!;
+          const arr = typeMap.get(ev.type);
+          if (arr) arr.push(ev.assetNumber);
+          else typeMap.set(ev.type, [ev.assetNumber]);
+
+          const note = (ev.note || "").trim();
+          if (note) {
+            const n = notesByProject.get(proj);
+            if (n) n.push(note);
+            else notesByProject.set(proj, [note]);
+          }
+        } else {
+          const sourceProj = currentProjectFor.get(k) || "Unknown Project";
+          if (!byInSourceProject.has(sourceProj))
+            byInSourceProject.set(sourceProj, new Map());
+          const typeMap = byInSourceProject.get(sourceProj)!;
+          const arr = typeMap.get(ev.type);
+          if (arr) arr.push(ev.assetNumber);
+          else typeMap.set(ev.type, [ev.assetNumber]);
+
+          const note = (ev.note || "").trim();
+          if (note) notesWarehouse.push(note);
+        }
       }
-    });
+
+      // Update global attachment state
+      if (ev.direction === "OUT") {
+        currentProjectFor.set(k, ev.projectCode || null);
+      } else {
+        currentProjectFor.set(k, null);
+      }
+    }
 
     const lines: string[] = [];
-    lines.push(`Date: ${titleDate(`${y}-${m}-${d}`)}`);
-    lines.push("");
+    lines.push(`Date: ${titleDate(`${y}-${m}-${d}`)}`, "");
 
-    byProject.forEach((mapTypes, proj) => {
+    byProjectOut.forEach((typeMap, proj) => {
       lines.push(`Project: ${proj}`);
-      mapTypes.forEach((nums, type) => {
-        nums.sort((a, b) => a - b);
-        lines.push(`${type} #: ${nums.join(", ")}`);
-      });
-
-      // NEW: include notes for any project if present
+      Array.from(typeMap.keys())
+        .sort()
+        .forEach((type) => {
+          const nums = typeMap.get(type)!.slice().sort((a, b) => a - b);
+          lines.push(`${type} #: ${nums.join(", ")}`);
+        });
       const uniqNotes = Array.from(
         new Set((notesByProject.get(proj) || []).filter(Boolean)),
       );
-      if (uniqNotes.length) {
-        lines.push(`Notes: ${uniqNotes.join("; ")}`);
-      }
+      if (uniqNotes.length) lines.push(`Notes: ${uniqNotes.join("; ")}`);
       lines.push("");
     });
 
-    if (byTypeIn.size && (!projOnly || warehouseOnly)) {
-      lines.push("Returned to Warehouse:");
-      byTypeIn.forEach((nums, type) => {
-        nums.sort((a, b) => a - b);
-        lines.push(`${type}: ${nums.join(", ")}`);
-      });
+    if (byInSourceProject.size) {
+      lines.push("Returned to Warehouse (by source):");
+      Array.from(byInSourceProject.keys())
+        .sort()
+        .forEach((src) => {
+          lines.push(`From Project: ${src}`);
+          const typeMap = byInSourceProject.get(src)!;
+          Array.from(typeMap.keys())
+            .sort()
+            .forEach((type) => {
+              const nums = typeMap.get(type)!.slice().sort((a, b) => a - b);
+              lines.push(`${type}: ${nums.join(", ")}`);
+            });
+          lines.push("");
+        });
 
-      // NEW: include notes for pull-ins if present
       const uniqInNotes = Array.from(new Set(notesWarehouse.filter(Boolean)));
       if (uniqInNotes.length) {
         lines.push(`Notes: ${uniqInNotes.join("; ")}`);
+        lines.push("");
       }
-      lines.push("");
     }
 
     const text = lines.join("\n").trim();
@@ -404,13 +589,8 @@ function WhatsAppReportModal({
 
           {mode === "project" && (
             <div>
-              <label className="block text-xs text-gray-600">
-                Project Code
-              </label>
-              <Combobox
-                value={project}
-                onChange={(v: string) => setProject(v ?? "")}
-              >
+              <label className="block text-xs text-gray-600">Project Code</label>
+              <Combobox value={project} onChange={(v: string) => setProject(v ?? "")}>
                 <div className="relative mt-1">
                   <Combobox.Input
                     className="w-full rounded border p-2"
@@ -432,9 +612,7 @@ function WhatsAppReportModal({
                           value={p.code}
                           className={({ active }) =>
                             `relative cursor-pointer select-none py-2 pl-3 pr-9 ${
-                              active
-                                ? "bg-blue-600 text-white"
-                                : "text-gray-900"
+                              active ? "bg-blue-600 text-white" : "text-gray-900"
                             }`
                           }
                         >
@@ -483,11 +661,9 @@ function WhatsAppReportModal({
 /*  Component                                                   */
 /* ──────────────────────────────────────────────────────────── */
 export default function MoveClient(): JSX.Element {
-  /* Hydration-safe: guard render until mounted */
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  /* Session & routing hooks (always called) */
   const { status, data: session } = useSession();
   const role = (session?.user?.role || "").toLowerCase();
   const isAdmin = role === "admin" || role === "owner";
@@ -495,24 +671,19 @@ export default function MoveClient(): JSX.Element {
   const router = useRouter();
   const params = useSearchParams();
 
-  /* ---------- Auth redirect ---------- */
   useEffect(() => {
     if (status === "unauthenticated") {
       const dest =
-        typeof window !== "undefined"
-          ? window.location.href
-          : "/equipment/move";
+        typeof window !== "undefined" ? window.location.href : "/equipment/move";
       router.push(`/login?callbackUrl=${encodeURIComponent(dest)}`);
     }
   }, [status, router]);
 
-  /* ---------- QR / URL params ---------- */
   const initialType = params.get("type") || "";
   const initialAsset = params.get("asset") || "";
   const initialDirection = (params.get("direction") || "").toUpperCase();
   const quickMode = params.get("quick") === "1";
 
-  /* ---------- Movement Form State ---------- */
   const [direction, setDirection] = useState<MovementDirection>(
     (loadString(LS_DIR) as MovementDirection) ||
       (initialDirection === "IN" || initialDirection === "OUT"
@@ -527,9 +698,8 @@ export default function MoveClient(): JSX.Element {
     saveString(LS_DIR, direction);
   }, [direction]);
 
-  /* ---------- Project combobox (sorted DESC) ---------- */
   const [projects, setProjects] = useState<Project[]>([]);
-  const [projQuery, setProjQuery] = useState("");
+  const [projQuery, setProjQuery] = useState<string>("");
   const [projectCode, setProjectCode] = useState<string>(loadString(LS_PROJ));
 
   useEffect(() => {
@@ -541,11 +711,10 @@ export default function MoveClient(): JSX.Element {
       try {
         const res = await axios.get("/api/projects");
         if (res.data?.projects) {
-          const sorted: Project[] = res.data.projects
-            .map((p: any) => ({ id: p.id, code: p.code }))
-            .sort((a: Project, b: Project) => b.code.localeCompare(a.code));
+          const sorted: Project[] = (res.data.projects as Array<{ id: string; code: string }>)
+            .map((p) => ({ id: p.id, code: p.code }))
+            .sort((a, b) => b.code.localeCompare(a.code));
 
-          // always include POSSIBLE NEW CLAIM at the top
           const hasPNC = sorted.some((p) => p.code === "POSSIBLE NEW CLAIM");
           const withPNC = hasPNC
             ? sorted
@@ -554,22 +723,19 @@ export default function MoveClient(): JSX.Element {
           setProjects(withPNC);
         }
       } catch {
-        // still ensure PNC exists even if request fails
         setProjects([{ id: "PNC", code: "POSSIBLE NEW CLAIM" }]);
       }
     })();
   }, []);
 
-  const filteredProjects = useMemo(() => {
+  const filteredProjects = useMemo<Project[]>(() => {
     const q = projQuery.toLowerCase();
     if (!q) return projects;
     return projects.filter((p) => p.code.toLowerCase().includes(q));
   }, [projects, projQuery]);
 
-  /* ---------- Batch rows (QR adds here) ---------- */
   const [rows, setRows] = useState<MoveRow[]>([]);
 
-  // Initialize from localStorage & handle direct param add
   useEffect(() => {
     const existing = loadQueue();
     let next = existing;
@@ -592,7 +758,7 @@ export default function MoveClient(): JSX.Element {
 
     setRows(next.length ? next : [{ id: mkId(), type: "", assetNumber: "" }]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // run once
+  }, []);
 
   useEffect(() => {
     if (quickMode) {
@@ -619,9 +785,7 @@ export default function MoveClient(): JSX.Element {
   }
   function updateRow(i: number, patch: Partial<MoveRow>) {
     setRows((r) => {
-      const next = r.map((row, idx) =>
-        idx === i ? { ...row, ...patch } : row,
-      );
+      const next = r.map((row, idx) => (idx === i ? { ...row, ...patch } : row));
       saveQueue(next);
       return next;
     });
@@ -632,7 +796,6 @@ export default function MoveClient(): JSX.Element {
     toast("Batch cleared");
   }
 
-  /* ---------- Build Payload + Validate ---------- */
   function buildPayload(): MoveRequest {
     const items = rows
       .map((r) => ({
@@ -664,7 +827,6 @@ export default function MoveClient(): JSX.Element {
     if (!payload.items.length) return "Please add at least one valid item.";
     if (payload.direction === "OUT" && !payload.projectCode)
       return "Project code is required when deploying.";
-    // Require notes only when project is POSSIBLE NEW CLAIM
     if (
       payload.direction === "OUT" &&
       payload.projectCode === "POSSIBLE NEW CLAIM" &&
@@ -680,7 +842,6 @@ export default function MoveClient(): JSX.Element {
     return null;
   }
 
-  /* ---------- Submit All ---------- */
   async function submitAll() {
     const validation = validateBeforeSubmit();
     if (validation) {
@@ -706,9 +867,7 @@ export default function MoveClient(): JSX.Element {
         refreshRecent();
       } else {
         if (Array.isArray(data.missing)) {
-          toast.error(`Missing: ${data.missing.join(", ")}`, {
-            duration: 6000,
-          });
+          toast.error(`Missing: ${data.missing.join(", ")}`, { duration: 6000 });
         } else {
           toast.error(data.error || "Failed to record movement");
         }
@@ -727,43 +886,98 @@ export default function MoveClient(): JSX.Element {
     }
   }
 
-  /* ---------- Recent Movements (sortable, filter, paginate + auto-archive) ---------- */
+  /* ---------- Recent Movements (improved UI) ---------- */
   type Recent = {
     id: string;
     direction: "IN" | "OUT";
     at: string;
     projectCode?: string | null;
     note?: string | null;
-    byId?: string | null;
+    byId?: string | null; // mover ID / email / uid (server-provided)
     equipment?: Pick<EquipmentDTO, "type" | "assetNumber">;
-    // legacy flat shape fallback
+    // legacy
     type?: string;
     assetNumber?: number;
   };
+
   const [recent, setRecent] = useState<Recent[]>([]);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  // safe accessors (handle legacy rows with flat fields)
   const getType = (r: Recent) => r.equipment?.type ?? r.type ?? "";
-  const getAsset = (r: Recent) =>
-    r.equipment?.assetNumber ?? r.assetNumber ?? 0;
+  const getAsset = (r: Recent) => r.equipment?.assetNumber ?? r.assetNumber ?? 0;
 
-  // controls
-  const [recQuery, setRecQuery] = useState("");
-  const [recSort, setRecSort] = useState<
-    "at" | "type" | "assetNumber" | "direction"
-  >("at");
+  // UI filters/controls
+  const [recQuery, setRecQuery] = useState<string>("");
+  const [recSort, setRecSort] = useState<"at" | "type" | "assetNumber" | "direction">(
+    "at",
+  );
   const [recDir, setRecDir] = useState<"asc" | "desc">("desc");
-  const [recPage, setRecPage] = useState(1);
-  const [recPageSize, setRecPageSize] = useState(20);
-  const [dateFrom, setDateFrom] = useState<string>(""); // yyyy-mm-dd
+  const [recPage, setRecPage] = useState<number>(1);
+  const [recPageSize, setRecPageSize] = useState<number>(20);
+  const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
-  const [filterProject, setFilterProject] = useState("");
-  const [filterType, setFilterType] = useState("");
-  const [showNotes, setShowNotes] = useState(true);
+  const [filterProject, setFilterProject] = useState<string>("");
+  const [filterType, setFilterType] = useState<string>("");
+  const [showNotes, setShowNotes] = useState<boolean>(true);
 
-  // auto-archive (>30 days old)
-  const [showArchived, setShowArchived] = useState(false);
+  // NEW: per-entry details toggle (shows mover & notes)
+  const [detailsOpen, setDetailsOpen] = useState<Record<string, boolean>>({});
+
+  const toggleDetails = (id: string) =>
+    setDetailsOpen((prev) => ({ ...prev, [id]: !prev[id] }));
+
+  // NEW: resolve byId -> display name cache
+  type UserLite = { id: string; name?: string | null; email?: string | null };
+  const [userNameCache, setUserNameCache] = useState<Record<string, string>>({});
+
+  const nameFor = (byId?: string | null): string | undefined => {
+    if (!byId) return undefined;
+    return userNameCache[byId] || byId || undefined;
+  };
+
+  async function hydrateUserNames(items: Recent[]) {
+    // collect unique byIds not yet in cache
+    const ids = Array.from(
+      new Set(items.map((r) => r.byId).filter((x): x is string => !!x)),
+    ).filter((id) => !(id in userNameCache));
+
+    if (!ids.length) return;
+    try {
+      // Try a batch endpoint first; fall back to a simple one if needed.
+      let users: UserLite[] | null = null;
+      try {
+        const resp = await axios.get<{ users: UserLite[] }>(
+          "/api/users/batch",
+          { params: { ids: ids.join(",") } },
+        );
+        users = resp.data?.users ?? null;
+      } catch {
+        const resp = await axios.get<{ users: UserLite[] }>(
+          "/api/users",
+          { params: { ids: ids.join(",") } },
+        );
+        users = resp.data?.users ?? null;
+      }
+
+      if (users && Array.isArray(users)) {
+        const add: Record<string, string> = {};
+        users.forEach((u) => {
+          const label =
+            (u.name && u.name.trim()) ||
+            (u.email && u.email.trim()) ||
+            u.id;
+          add[u.id] = label;
+        });
+        if (Object.keys(add).length) {
+          setUserNameCache((prev) => ({ ...prev, ...add }));
+        }
+      }
+    } catch {
+      // fail gracefully; leave cache as-is (fallback shows raw byId)
+    }
+  }
+
+  const [showArchived, setShowArchived] = useState<boolean>(false);
   const cutoffMs = useMemo(() => Date.now() - 30 * 24 * 60 * 60 * 1000, []);
 
   async function refreshRecent() {
@@ -772,7 +986,10 @@ export default function MoveClient(): JSX.Element {
         "/api/equipment/movements",
         { params: { limit: 1000 } },
       );
-      if (data.status === 200) setRecent(data.items);
+      if (data.status === 200) {
+        setRecent(data.items);
+        void hydrateUserNames(data.items);
+      }
     } catch {
       /* noop */
     }
@@ -781,7 +998,7 @@ export default function MoveClient(): JSX.Element {
     refreshRecent();
   }, []);
 
-  const projectsInRecent = useMemo(() => {
+  const projectsInRecent = useMemo<string[]>(() => {
     const set = new Set<string>();
     recent.forEach((r) => {
       if (r.projectCode) set.add(r.projectCode);
@@ -789,7 +1006,7 @@ export default function MoveClient(): JSX.Element {
     return Array.from(set).sort((a, b) => b.localeCompare(a));
   }, [recent]);
 
-  const typesInRecent = useMemo(() => {
+  const typesInRecent = useMemo<string[]>(() => {
     const set = new Set<string>();
     recent.forEach((r) => {
       const t = getType(r);
@@ -798,7 +1015,7 @@ export default function MoveClient(): JSX.Element {
     return Array.from(set).sort();
   }, [recent]);
 
-  const recentFilteredSorted = useMemo(() => {
+  const recentFilteredSorted = useMemo<Recent[]>(() => {
     let arr = [...recent];
 
     if (dateFrom) {
@@ -857,11 +1074,8 @@ export default function MoveClient(): JSX.Element {
     filterType,
   ]);
 
-  const totalPages = Math.max(
-    1,
-    Math.ceil(recentFilteredSorted.length / recPageSize),
-  );
-  const pageItems = useMemo(() => {
+  const totalPages = Math.max(1, Math.ceil(recentFilteredSorted.length / recPageSize));
+  const pageItems = useMemo<Recent[]>(() => {
     const start = (recPage - 1) * recPageSize;
     return recentFilteredSorted.slice(start, start + recPageSize);
   }, [recentFilteredSorted, recPage, recPageSize]);
@@ -881,9 +1095,8 @@ export default function MoveClient(): JSX.Element {
         toast.error("Delete failed");
       }
     } catch (e: unknown) {
-      const resp = (e as any)?.response?.data as DeleteResponse | undefined;
-      if (resp && isDeleteError(resp))
-        toast.error(resp.error || "Delete failed");
+      const resp = (e as { response?: { data?: DeleteResponse } }).response?.data;
+      if (resp && isDeleteError(resp)) toast.error(resp.error || "Delete failed");
       else toast.error("Delete failed");
     }
   }
@@ -902,10 +1115,7 @@ export default function MoveClient(): JSX.Element {
         byEquip.get(k)!.push({ idx, rec });
       });
 
-    const map = new Map<
-      string,
-      { durationMs?: number; pending?: boolean; label?: string }
-    >();
+    const map = new Map<string, { durationMs?: number; pending?: boolean; label?: string }>();
 
     byEquip.forEach((arr) => {
       for (let i = 0; i < arr.length; i++) {
@@ -917,11 +1127,7 @@ export default function MoveClient(): JSX.Element {
           if (next) {
             const nextAt = new Date(next.at).getTime();
             const ms = Math.max(0, nextAt - curAt);
-            map.set(cur.id, {
-              durationMs: ms,
-              pending: false,
-              label: formatDDHHMM(ms),
-            });
+            map.set(cur.id, { durationMs: ms, pending: false, label: formatDDHHMM(ms) });
           } else {
             map.set(cur.id, { pending: true, label: "Pending" });
           }
@@ -930,11 +1136,7 @@ export default function MoveClient(): JSX.Element {
           if (prev && prev.direction === "OUT") {
             const prevAt = new Date(prev.at).getTime();
             const ms = Math.max(0, curAt - prevAt);
-            map.set(cur.id, {
-              durationMs: ms,
-              pending: false,
-              label: formatDDHHMM(ms),
-            });
+            map.set(cur.id, { durationMs: ms, pending: false, label: formatDDHHMM(ms) });
           } else {
             map.set(cur.id, { pending: false, label: "-" });
           }
@@ -945,10 +1147,6 @@ export default function MoveClient(): JSX.Element {
     return map;
   }, [recent]);
 
-  const friendlyDir = (d: "IN" | "OUT") =>
-    d === "OUT" ? "DEPLOY" : "PULL OUT";
-
-  /* ---------- Scanner control & Report modal ---------- */
   const [scannerOpen, setScannerOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
 
@@ -966,30 +1164,34 @@ export default function MoveClient(): JSX.Element {
     [recent],
   );
 
-  /* Guard render until mounted to avoid hydration mismatch */
   if (!mounted) {
     return <div className="min-h-screen bg-gray-100" />;
   }
 
-  /* ──────────────────────────────────────────────────────────── */
-  /*  Render                                                      */
-  /* ──────────────────────────────────────────────────────────── */
   return (
     <div className="min-h-screen bg-gray-100 pt-24 md:pt-28 lg:pt-32">
       <Navbar />
-      <div className="mx-auto max-w-4xl p-4">
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+      <div className="mx-auto max-w-6xl p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h1 className="text-2xl font-bold">Equipment Movement</h1>
-          <button
-            onClick={() => setReportOpen(true)}
-            className="rounded bg-emerald-600 px-3 py-2 text-white"
-          >
-            Generate WhatsApp Report
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setReportOpen(true)}
+              className="rounded bg-emerald-600 px-3 py-2 text-white"
+            >
+              Generate WhatsApp Report
+            </button>
+            <button
+              onClick={() => setScannerOpen(true)}
+              className="rounded bg-amber-600 px-3 py-2 text-white"
+            >
+              Scan QR
+            </button>
+          </div>
         </div>
 
         {/* Direction */}
-        <div className="mb-4 flex gap-2">
+        <div className="mb-4 flex flex-wrap gap-2">
           {(["OUT", "IN"] as MovementDirection[]).map((d) => (
             <button
               key={d}
@@ -1003,7 +1205,7 @@ export default function MoveClient(): JSX.Element {
           ))}
         </div>
 
-        {/* Project (DEPLOY only) — searchable, includes PNC */}
+        {/* Project (DEPLOY only) */}
         {direction === "OUT" && (
           <div className="mb-4">
             <label className="mb-1 block text-sm font-semibold text-gray-700">
@@ -1084,9 +1286,7 @@ export default function MoveClient(): JSX.Element {
           </label>
           {!useNow && (
             <div>
-              <label className="block text-sm font-medium">
-                Specify date/time
-              </label>
+              <label className="block text-sm font-medium">Specify date/time</label>
               <input
                 type="datetime-local"
                 value={manualIso}
@@ -1097,12 +1297,12 @@ export default function MoveClient(): JSX.Element {
           )}
         </div>
 
-        {/* Batch Items (QR adds here) */}
-        <div className="mb-4 rounded bg-white p-4 shadow">
+        {/* Batch Items */}
+        <div className="mb-6 rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
           <h2 className="mb-2 font-semibold">Batch Items</h2>
           <p className="mb-3 text-xs text-gray-500">
-            Tip: <b>QR Quick Mode</b> lets you scan multiple items first
-            (they’ll appear here), then save once.
+            Tip: <b>QR Quick Mode</b> lets you scan multiple items first (they’ll
+            appear here), then save once.
           </p>
           <div className="space-y-3">
             {rows.map((row, i) => (
@@ -1126,9 +1326,7 @@ export default function MoveClient(): JSX.Element {
                     inputMode="numeric"
                     pattern="[0-9]*"
                     value={row.assetNumber}
-                    onChange={(e) =>
-                      updateRow(i, { assetNumber: e.target.value })
-                    }
+                    onChange={(e) => updateRow(i, { assetNumber: e.target.value })}
                     placeholder="e.g. 33"
                   />
                 </div>
@@ -1153,44 +1351,12 @@ export default function MoveClient(): JSX.Element {
             <button onClick={clearBatch} className="rounded border px-3 py-2">
               Clear Batch
             </button>
-            <button
-              onClick={() => setScannerOpen(true)}
-              className="rounded bg-amber-600 px-3 py-2 text-white"
-            >
-              Next Scan
-            </button>
           </div>
         </div>
 
-        {/* Notes */}
-        <div className="mb-4">
-          <label className="mb-1 block text-sm font-semibold text-gray-700">
-            Notes{" "}
-            {direction === "OUT" && projectCode === "POSSIBLE NEW CLAIM" ? (
-              <span className="text-red-600">*</span>
-            ) : null}
-          </label>
-          <textarea
-            className="min-h-32 w-full rounded border p-3"
-            placeholder="Optional context... (who, where onsite, reason for delayed entry, etc.)"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-          />
-        </div>
-
-        {/* Save All */}
-        <div className="mb-8 flex flex-wrap gap-2">
-          <button
-            onClick={submitAll}
-            className="rounded bg-blue-600 px-4 py-2 font-medium text-white"
-          >
-            Save All
-          </button>
-        </div>
-
-        {/* Recent Movements */}
-        <div className="rounded bg-white p-4 shadow">
-          <div className="mb-3 grid grid-cols-2 gap-2 md:grid-cols-8 md:items-end">
+        {/* Recent Movements — improved UI */}
+        <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+          <div className="mb-3 grid grid-cols-1 gap-2 md:grid-cols-8 md:items-end">
             <h2 className="col-span-2 text-base font-semibold md:col-span-2">
               Recent Movements
             </h2>
@@ -1252,17 +1418,31 @@ export default function MoveClient(): JSX.Element {
               <option value="desc">Desc</option>
               <option value="asc">Asc</option>
             </select>
-            <label className="flex items-center gap-2 rounded border p-2 text-xs text-gray-700">
-              <input
-                type="checkbox"
-                checked={showNotes}
-                onChange={(e) => setShowNotes(e.target.checked)}
-              />
-              Show notes
-            </label>
+            <div className="flex items-center justify-between gap-2 rounded border p-2 text-xs text-gray-700">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={showNotes}
+                  onChange={(e) => setShowNotes(e.target.checked)}
+                />
+                Show notes
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={showArchived}
+                  onChange={(e) => {
+                    setShowArchived(e.target.checked);
+                    setRecPage(1);
+                  }}
+                />
+                Archived (&gt; 30d)
+              </label>
+            </div>
           </div>
 
-          <div className="mb-2 grid grid-cols-1 gap-2 md:grid-cols-5">
+          {/* date / page size row */}
+          <div className="mb-3 grid grid-cols-1 gap-2 md:grid-cols-5">
             <input
               type="date"
               className="rounded border p-2 text-sm"
@@ -1293,19 +1473,10 @@ export default function MoveClient(): JSX.Element {
               <option value={20}>20</option>
               <option value={50}>50</option>
             </select>
-            <label className="flex items-center gap-2 rounded border p-2 text-xs text-gray-700">
-              <input
-                type="checkbox"
-                checked={showArchived}
-                onChange={(e) => {
-                  setShowArchived(e.target.checked);
-                  setRecPage(1);
-                }}
-              />
-              Show archived (&gt; 30 days)
-            </label>
+            <div className="md:col-span-2" />
           </div>
 
+          {/* ITEMS */}
           <div className="space-y-2">
             {pageItems.length === 0 ? (
               <div className="text-sm text-gray-600">No entries</div>
@@ -1313,84 +1484,121 @@ export default function MoveClient(): JSX.Element {
               pageItems.map((m) => {
                 const isArchived = new Date(m.at).getTime() < cutoffMs;
                 const dur = durationById.get(m.id);
+                const dirBadge =
+                  m.direction === "OUT"
+                    ? "bg-blue-50 text-blue-700 ring-1 ring-blue-200"
+                    : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200";
+
                 return (
                   <div
                     key={m.id}
-                    className="flex flex-col gap-1 rounded border p-3 sm:flex-row sm:items-center sm:justify-between"
+                    className="rounded-lg border border-gray-100 bg-white p-3 shadow-sm transition hover:shadow md:p-4"
                   >
-                    <div className="text-sm">
-                      <span className="font-semibold">
-                        {getType(m)} #{getAsset(m)}
-                      </span>{" "}
-                      <span className="uppercase">
-                        {m.direction === "OUT" ? "DEPLOY" : "PULL OUT"}
-                      </span>{" "}
-                      <span>— {new Date(m.at).toLocaleString()}</span>{" "}
-                      {m.projectCode ? (
-                        <span>
-                          {" "}
-                          | Project:{" "}
-                          <span className="font-medium">{m.projectCode}</span>
-                        </span>
-                      ) : null}
-                      {dur?.label ? (
-                        <span> | Duration: {dur.label}</span>
-                      ) : null}
-                      {showNotes && m.note ? (
-                        <span> | Note: {m.note}</span>
-                      ) : null}
-                      {isArchived ? (
-                        <span className="ml-2 rounded bg-gray-200 px-2 py-0.5 text-xs text-gray-700">
-                          Archived
-                        </span>
-                      ) : null}
-                    </div>
-                    <div className="mt-2 flex gap-2 sm:mt-0">
-                      {isAdmin ? (
-                        confirmDeleteId === m.id ? (
-                          <>
-                            <button
-                              onClick={() => deleteMovement(m.id)}
-                              className="rounded bg-red-600 px-3 py-2 text-white"
-                            >
-                              Confirm Delete
-                            </button>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      {/* Left cluster */}
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="inline-flex items-center rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-800">
+                            {getType(m)} #{getAsset(m)}
+                          </span>
+                          <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold uppercase ${dirBadge}`}>
+                            {m.direction === "OUT" ? "DEPLOYED" : "PULLED-OUT"}
+                          </span>
+                          {m.projectCode ? (
+                            <span className="inline-flex items-center rounded-md bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700 ring-1 ring-violet-200">
+                              Project: {m.projectCode}
+                            </span>
+                          ) : null}
+                          {isArchived ? (
+                            <span className="inline-flex items-center rounded-md bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-600 ring-1 ring-gray-200">
+                              Archived
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <div className="mt-1 text-xs text-gray-600">
+                          {new Date(m.at).toLocaleString()}
+                          {dur?.label ? <span className="ml-2">· Duration: {dur.label}</span> : null}
+                        </div>
+                      </div>
+
+                      {/* Right cluster: actions */}
+                      <div className="flex shrink-0 items-center gap-2">
+                        <button
+                          onClick={() => toggleDetails(m.id)}
+                          className="rounded border px-3 py-1 text-xs"
+                        >
+                          {detailsOpen[m.id] ? "Hide Details" : "Show Details"}
+                        </button>
+                        {isAdmin ? (
+                          confirmDeleteId === m.id ? (
+                            <>
+                              <button
+                                onClick={() => deleteMovement(m.id)}
+                                className="rounded bg-red-600 px-3 py-1.5 text-xs font-medium text-white"
+                              >
+                                Confirm
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setConfirmDeleteId(null);
+                                  toast("Delete cancelled");
+                                }}
+                                className="rounded border px-3 py-1.5 text-xs"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
                             <button
                               onClick={() => {
-                                setConfirmDeleteId(null);
-                                toast("Delete cancelled");
+                                setConfirmDeleteId(m.id);
+                                toast("Click again to confirm delete", {
+                                  icon: "⚠️",
+                                });
                               }}
-                              className="rounded bg-gray-300 px-3 py-2"
+                              className="rounded bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 ring-1 ring-red-200"
                             >
-                              Cancel
+                              Delete
                             </button>
-                          </>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              setConfirmDeleteId(m.id);
-                              toast("Click again to confirm delete", {
-                                icon: "⚠️",
-                              });
-                            }}
-                            className="rounded bg-red-600 px-3 py-2 text-white"
-                          >
-                            Delete
-                          </button>
-                        )
-                      ) : null}
+                          )
+                        ) : null}
+                      </div>
                     </div>
+
+                    {/* Collapsible details: mover + notes */}
+                    {detailsOpen[m.id] && (
+                      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <div className="rounded-lg bg-gray-50 p-3 text-sm ring-1 ring-gray-100">
+                          <div className="text-xs font-semibold text-gray-600">
+                            Moved By
+                          </div>
+                          <div className="mt-0.5 text-gray-800">
+                            {nameFor(m.byId) ?? "Unknown"}
+                          </div>
+                        </div>
+                        {showNotes && m.note ? (
+                          <div className="rounded-lg bg-gray-50 p-3 text-sm ring-1 ring-gray-100">
+                            <div className="text-xs font-semibold text-gray-600">
+                              Notes
+                            </div>
+                            <div className="mt-0.5 whitespace-pre-wrap text-gray-800">
+                              {m.note}
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
                 );
               })
             )}
           </div>
 
-          {/* pagination controls */}
-          <div className="mt-3 flex items-center justify-between">
+          {/* pagination */}
+          <div className="mt-3 flex flex-col items-center justify-between gap-2 md:flex-row">
             <div className="text-xs text-gray-500">
-              Page {recPage} / {totalPages} · {recentFilteredSorted.length}{" "}
-              items
+              Page {recPage} / {totalPages} · {recentFilteredSorted.length} items
             </div>
             <div className="flex gap-2">
               <button
@@ -1413,10 +1621,7 @@ export default function MoveClient(): JSX.Element {
       </div>
 
       {/* Camera scanner overlay */}
-      <ScannerOverlay
-        open={scannerOpen}
-        onClose={() => setScannerOpen(false)}
-      />
+      <ScannerOverlay open={scannerOpen} onClose={() => setScannerOpen(false)} />
 
       {/* WhatsApp Report */}
       <WhatsAppReportModal
