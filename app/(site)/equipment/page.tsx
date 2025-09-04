@@ -61,6 +61,22 @@ function cmpNum(a?: number | null, b?: number | null) {
   return aa === bb ? 0 : aa < bb ? -1 : 1;
 }
 
+/* ---------- Movements (slim) for last-OUT notes ---------- */
+
+type MovementSlim = {
+  id: string;
+  direction: "IN" | "OUT";
+  at: string;
+  note?: string | null;
+  projectCode?: string | null;
+  equipment?: Pick<EquipmentDTO, "type" | "assetNumber">;
+  // legacy fallback fields (if API still returns flat fields)
+  type?: string;
+  assetNumber?: number;
+};
+
+const eqKeyFromParts = (type: string, asset: number) => `${type}#${asset}`;
+
 /* ---------- Shared UI ---------- */
 
 function Pagination({
@@ -99,6 +115,7 @@ function Pagination({
           disabled={page <= 1}
           title="First page"
           aria-label="First page"
+          type="button"
         >
           «
         </button>
@@ -108,6 +125,7 @@ function Pagination({
           disabled={page <= 1}
           title="Previous page"
           aria-label="Previous page"
+          type="button"
         >
           ‹
         </button>
@@ -120,6 +138,7 @@ function Pagination({
           disabled={page >= totalPages}
           title="Next page"
           aria-label="Next page"
+          type="button"
         >
           ›
         </button>
@@ -129,6 +148,7 @@ function Pagination({
           disabled={page >= totalPages}
           title="Last page"
           aria-label="Last page"
+          type="button"
         >
           »
         </button>
@@ -203,6 +223,47 @@ export default function EquipmentTrackingPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [typeF, statusF]);
+
+  /* ---------- Fetch slim movements to compute latest DEPLOY (OUT) notes per equipment ---------- */
+
+  const [lastOutNoteByEquip, setLastOutNoteByEquip] = useState<
+    Record<string, { note: string; at: string }>
+  >({});
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await axios.get<{ status: number; items: MovementSlim[] }>(
+          "/api/equipment/movements",
+          { params: { limit: 2000 } },
+        );
+        if (data?.status !== 200 || !Array.isArray(data.items)) return;
+
+        const sorted = data.items
+          .slice()
+          .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+
+        const map: Record<string, { note: string; at: string }> = {};
+
+        for (const mv of sorted) {
+          const type = mv.equipment?.type ?? mv.type ?? "";
+          const asset = mv.equipment?.assetNumber ?? mv.assetNumber ?? 0;
+          if (!type || !Number.isInteger(asset)) continue;
+
+          if (mv.direction === "OUT" && (mv.note ?? "").trim()) {
+            map[eqKeyFromParts(type, asset)] = {
+              note: (mv.note || "").trim(),
+              at: mv.at,
+            };
+          }
+        }
+
+        setLastOutNoteByEquip(map);
+      } catch {
+        // non-fatal
+      }
+    })();
+  }, []);
 
   /* ---------- Filter + sort (main table) ---------- */
 
@@ -358,7 +419,14 @@ export default function EquipmentTrackingPage() {
 
   const [projQuery, setProjQuery] = useState("");
   const [minProjTotal, setMinProjTotal] = useState<number>(0);
-  const [typeMulti, setTypeMulti] = useState<string[]>([]);
+
+  // DEFAULTS: Air Scrubber, Blower, Dehumidifier ON
+  const [typeMulti, setTypeMulti] = useState<string[]>([
+    "Air Scrubber",
+    "Blower",
+    "Dehumidifier",
+  ]);
+
   const [projBand, setProjBand] = useState<"" | "POTENTIAL" | "URGENT">("");
   const [projSort, setProjSort] = useState<
     "TOTAL_DESC" | "NAME_ASC" | "OLDEST_DESC"
@@ -454,6 +522,19 @@ export default function EquipmentTrackingPage() {
     ) : (
       <span className="ml-1 text-xs text-gray-300">↕</span>
     );
+
+  /* -------------------- Per-project notes helpers -------------------- */
+
+  const [projNotesOpen, setProjNotesOpen] = useState<Record<string, boolean>>(
+    {},
+  );
+  const toggleProjNote = (id: string) =>
+    setProjNotesOpen((m) => ({ ...m, [id]: !m[id] }));
+
+  const latestOutNoteFor = (e: EquipRow) => {
+    const k = eqKeyFromParts(e.type, e.assetNumber);
+    return lastOutNoteByEquip[k]?.note ?? "";
+  };
 
   /* -------------------- Render -------------------- */
 
@@ -562,7 +643,7 @@ export default function EquipmentTrackingPage() {
           </span>
         </div>
 
-        {/* ======= NEW: Deployed — Breakdown by Project with Controls ======= */}
+        {/* ======= Deployed — Breakdown by Project with Controls ======= */}
         <div className="mb-6 rounded bg-white p-4 shadow">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-semibold">
@@ -573,6 +654,7 @@ export default function EquipmentTrackingPage() {
                 onClick={expandAll}
                 className="rounded border px-2 py-1 hover:bg-gray-50"
                 title="Expand all projects"
+                type="button"
               >
                 Expand all
               </button>
@@ -580,6 +662,7 @@ export default function EquipmentTrackingPage() {
                 onClick={collapseAll}
                 className="rounded border px-2 py-1 hover:bg-gray-50"
                 title="Collapse all projects"
+                type="button"
               >
                 Collapse all
               </button>
@@ -612,6 +695,7 @@ export default function EquipmentTrackingPage() {
                           ? "bg-gray-800 text-white"
                           : "bg-white hover:bg-gray-50"
                       }`}
+                      type="button"
                     >
                       {t}
                     </button>
@@ -621,10 +705,14 @@ export default function EquipmentTrackingPage() {
                   <button
                     onClick={() => setTypeMulti([])}
                     className="rounded border px-2 py-1 text-xs hover:bg-gray-50"
+                    type="button"
                   >
                     Clear
                   </button>
                 )}
+              </div>
+              <div className="text-[10px] text-gray-500">
+                Default active: Air Scrubber, Blower, Dehumidifier
               </div>
             </div>
             <div className="flex flex-col gap-1 md:col-span-2">
@@ -658,7 +746,10 @@ export default function EquipmentTrackingPage() {
                 value={projSort}
                 onChange={(e) =>
                   setProjSort(
-                    e.target.value as "TOTAL_DESC" | "NAME_ASC" | "OLDEST_DESC",
+                    e.target.value as
+                      | "TOTAL_DESC"
+                      | "NAME_ASC"
+                      | "OLDEST_DESC",
                   )
                 }
               >
@@ -693,6 +784,7 @@ export default function EquipmentTrackingPage() {
                       onClick={() => toggleExpand(proj)}
                       aria-expanded={isOpen}
                       aria-controls={`proj-${proj}`}
+                      type="button"
                     >
                       <div className="flex min-w-0 items-center gap-3">
                         <span
@@ -758,6 +850,7 @@ export default function EquipmentTrackingPage() {
                               <th className="p-2 text-left">Last moved at</th>
                               <th className="p-2 text-left">Elapsed</th>
                               <th className="p-2 text-left">Flag</th>
+                              <th className="p-2 text-left">Notes</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -767,26 +860,62 @@ export default function EquipmentTrackingPage() {
                                   (daysSince(b.lastMovedAt) ?? 0) -
                                   (daysSince(a.lastMovedAt) ?? 0),
                               )
-                              .map((e) => (
-                                <tr key={e.id} className="border-t">
-                                  <td className="p-2">{e.type}</td>
-                                  <td className="p-2 font-semibold">
-                                    {e.assetNumber}
-                                  </td>
-                                  <td className="p-2">
-                                    {e.lastMovedBy ?? "—"}
-                                  </td>
-                                  <td className="p-2">
-                                    {e.lastMovedAt
-                                      ? new Date(
-                                          e.lastMovedAt as any,
-                                        ).toLocaleString()
-                                      : "—"}
-                                  </td>
-                                  <td className="p-2">{fmtElapsedFor(e)}</td>
-                                  <td className="p-2">{bandBadge(e)}</td>
-                                </tr>
-                              ))}
+                              .map((e) => {
+                                const note = latestOutNoteFor(e);
+                                const open = !!projNotesOpen[e.id];
+                                return (
+                                  <tr key={e.id} className="border-t align-top">
+                                    <td className="p-2">{e.type}</td>
+                                    <td className="p-2 font-semibold">
+                                      {e.assetNumber}
+                                    </td>
+                                    <td className="p-2">
+                                      {e.lastMovedBy ?? "—"}
+                                    </td>
+                                    <td className="p-2">
+                                      {e.lastMovedAt
+                                        ? new Date(
+                                            e.lastMovedAt as any,
+                                          ).toLocaleString()
+                                        : "—"}
+                                    </td>
+                                    <td className="p-2">
+                                      {fmtElapsedFor(e)}
+                                    </td>
+                                    <td className="p-2">{bandBadge(e)}</td>
+                                    <td className="p-2">
+                                      {note ? (
+                                        <div className="space-y-1">
+                                          <button
+                                            type="button"
+                                            onClick={() => toggleProjNote(e.id)}
+                                            className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs hover:bg-gray-50"
+                                            title={
+                                              open ? "Hide notes" : "Show notes"
+                                            }
+                                          >
+                                            {open ? "Hide notes" : "Show notes"}
+                                          </button>
+                                          {open && (
+                                            <div className="mt-2 rounded-lg bg-amber-50 p-2 text-xs ring-1 ring-amber-200">
+                                              <div className="mb-0.5 font-semibold text-amber-800">
+                                                Note (latest deploy)
+                                              </div>
+                                              <div className="whitespace-pre-wrap text-amber-900">
+                                                {note}
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <span className="text-xs text-gray-400">
+                                          —
+                                        </span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
                           </tbody>
                         </table>
                       </div>
@@ -835,6 +964,7 @@ export default function EquipmentTrackingPage() {
               className={`rounded px-3 py-2 text-sm ${
                 onlyBand === "" ? "bg-gray-800 text-white" : "border bg-white"
               }`}
+              type="button"
             >
               All
             </button>
@@ -845,6 +975,7 @@ export default function EquipmentTrackingPage() {
                   ? "bg-amber-600 text-white"
                   : "border bg-white"
               }`}
+              type="button"
             >
               Potential ≥7
             </button>
@@ -855,6 +986,7 @@ export default function EquipmentTrackingPage() {
                   ? "bg-red-600 text-white"
                   : "border bg-white"
               }`}
+              type="button"
             >
               Urgent ≥14
             </button>
