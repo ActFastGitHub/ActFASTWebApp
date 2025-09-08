@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import Navbar from "@/app/components/navBar";
 import { useSession } from "next-auth/react";
@@ -74,6 +74,7 @@ export default function EquipmentManagePage() {
   const [typeF, setTypeF] = useState("");
   const [statusF, setStatusF] = useState("");
   const [includeArchived, setIncludeArchived] = useState(false);
+  const [showArchivedOnly, setShowArchivedOnly] = useState(false); // NEW
   const [q, setQ] = useState("");
 
   /* show/hide less-used columns */
@@ -115,7 +116,7 @@ export default function EquipmentManagePage() {
   /* reset page when filters or search change */
   useEffect(() => {
     setPage(1);
-  }, [q, typeF, statusF, includeArchived]);
+  }, [q, typeF, statusF, includeArchived, showArchivedOnly]); // include new toggle
 
   /* clamp page when filtered list changes */
   function clampPage(nextTotal: number) {
@@ -124,6 +125,8 @@ export default function EquipmentManagePage() {
   }
 
   /* ───── load list + projects ───── */
+  const isArchivingRef = useRef(false); // prevent recursion loops
+
   async function load() {
     setLoading(true);
     try {
@@ -133,12 +136,14 @@ export default function EquipmentManagePage() {
           params: {
             type: typeF || undefined,
             status: statusF || undefined,
-            includeArchived: includeArchived ? "1" : undefined,
+            // if we want to show archived only, we must fetch archived too
+            includeArchived:
+              includeArchived || showArchivedOnly ? "1" : undefined,
           },
         },
       );
-      const list = data.items ?? [];
-      setItems(list);
+
+      const list = (data.items ?? []).slice();
 
       // keep type list in sync (for Add + edit datalist)
       const next = Array.from(new Set(list.map((i) => i.type)))
@@ -146,7 +151,19 @@ export default function EquipmentManagePage() {
         .map((code) => ({ code }));
       setTypes(next);
 
+      setItems(list);
       clampPage(list.length);
+
+      // Auto-archive pass (non-blocking UI-wise)
+      // Only run if not currently archiving to avoid loops
+      if (!isArchivingRef.current) {
+        const archivedNow = await autoArchiveStale(list);
+        if (archivedNow > 0) {
+          // Refresh to reflect new archived statuses
+          await load();
+          return; // stop this run; the reload handles the rest
+        }
+      }
     } catch (e: any) {
       toast.error(e?.response?.data?.error ?? "Failed to load equipment");
     } finally {
@@ -157,7 +174,7 @@ export default function EquipmentManagePage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [typeF, statusF, includeArchived]);
+  }, [typeF, statusF, includeArchived, showArchivedOnly]);
 
   useEffect(() => {
     (async () => {
@@ -190,6 +207,66 @@ export default function EquipmentManagePage() {
     })();
   }, []);
 
+  /* ───── Auto-archive helpers ───── */
+  function addMonths(d: Date, months: number) {
+    const dt = new Date(d.getTime());
+    const oldDay = dt.getDate();
+    dt.setMonth(dt.getMonth() + months);
+
+    // Handle “end of month” rollover (e.g., Jan 31 + 1 month → Mar 2 in JS)
+    // Snap back to last day of the target month if we rolled over.
+    if (dt.getDate() < oldDay) {
+      dt.setDate(0); // go to the last day of previous month (effectively last day of target month)
+    }
+    return dt;
+  }
+
+  function shouldAutoArchive(e: EquipmentDTO) {
+    const now = new Date();
+    if (e.archived) return false;
+    const refStr = (e.lastMovedAt as any) || (e.createdAt as any);
+    if (!refStr) return false;
+    const ref = new Date(refStr);
+    if (Number.isNaN(ref.getTime())) return false;
+
+    const deadline = addMonths(ref, 3);
+    return now >= deadline;
+  }
+
+  async function autoArchiveStale(list: EquipmentDTO[]) {
+    const toArchive = list.filter((e) => shouldAutoArchive(e));
+    if (toArchive.length === 0) return 0;
+
+    isArchivingRef.current = true;
+    try {
+      const results = await Promise.allSettled(
+        toArchive.map((e) =>
+          axios.patch<{ status: number; error?: string }>(
+            `/api/equipment/${e.id}`,
+            { archived: true },
+          ),
+        ),
+      );
+      const success = results.filter(
+        (r) => r.status === "fulfilled" && r.value.data?.status === 200,
+      ).length;
+
+      if (success > 0) {
+        toast.success(`Auto-archived ${success} stale equipment`);
+      }
+      const failed = results.length - success;
+      if (failed > 0) {
+        toast.error(`Auto-archive failed for ${failed} item(s)`);
+      }
+      return success;
+    } catch {
+      toast.error("Auto-archive failed");
+      return 0;
+    } finally {
+      isArchivingRef.current = false;
+    }
+  }
+
   /* ───── edit helpers ───── */
   function beginEdit(row: EquipmentDTO) {
     setEditingId(row.id);
@@ -202,7 +279,9 @@ export default function EquipmentManagePage() {
       model: row.model ?? "",
       serial: row.serial ?? "",
       // prefill lastMovedAt for datetime-local control (ISO without seconds Z)
-      lastMovedAt: row.lastMovedAt ? toDatetimeLocal(row.lastMovedAt as any) : "",
+      lastMovedAt: row.lastMovedAt
+        ? toDatetimeLocal(row.lastMovedAt as any)
+        : "",
     });
   }
   function cancelEdit() {
@@ -374,6 +453,17 @@ export default function EquipmentManagePage() {
 
     let list: EquipmentDTO[] = items;
 
+    // Apply archived visibility rules client-side too,
+    // in case the API returned mixed data when includeArchived=1.
+    if (showArchivedOnly) {
+      list = list.filter((e) => e.archived);
+    } else if (!includeArchived) {
+      list = list.filter((e) => !e.archived);
+    }
+    // type/status filters (unchanged)
+    if (typeF) list = list.filter((e) => e.type === typeF);
+    if (statusF) list = list.filter((e) => e.status === statusF);
+
     if (s) {
       // If purely numeric (leading zeros allowed), treat as exact assetNumber
       if (/^\d+$/.test(s)) {
@@ -410,7 +500,16 @@ export default function EquipmentManagePage() {
     });
 
     return list;
-  }, [items, q, sortKey, sortDir]);
+  }, [
+    items,
+    q,
+    sortKey,
+    sortDir,
+    includeArchived,
+    showArchivedOnly,
+    typeF,
+    statusF,
+  ]);
 
   // Slice for current page
   const total = filtered.length;
@@ -505,15 +604,18 @@ export default function EquipmentManagePage() {
           bucket.lost.push(n);
           break;
         default:
-          // Treat unknown as neither active nor repair; they won’t show in active/repair
           break;
       }
     }
 
     const fmtNums = (arr: number[]) =>
-      arr.length ? arr.sort((a, b) => a - b).map((n) => `#${n}`).join(", ") : "";
+      arr.length
+        ? arr
+            .sort((a, b) => a - b)
+            .map((n) => `#${n}`)
+            .join(", ")
+        : "";
 
-    // For each type, compute Active, Missing (gaps), For Repair, plus Warehouse/Deployed
     const typesSorted = Array.from(byType.keys()).sort((a, b) =>
       a.localeCompare(b),
     );
@@ -539,7 +641,7 @@ export default function EquipmentManagePage() {
       lines.push(t);
       lines.push("");
 
-      // Active summary (as requested: Active = Warehouse + Deployed)
+      // Active summary (Warehouse + Deployed)
       lines.push(`Active Count: ${activeNums.length}`);
       lines.push(`Active Numbers: ${fmtNums(activeNums)}`);
 
@@ -557,7 +659,6 @@ export default function EquipmentManagePage() {
       lines.push(`For Repair Count: ${repairNums.length}`);
       lines.push(`For Repair Numbers: ${fmtNums(repairNums)}`);
 
-      // Optional extra insights if available
       if (b.lost.length) {
         lines.push(`Lost Count: ${b.lost.length}`);
         lines.push(`Lost Numbers: ${fmtNums(b.lost)}`);
@@ -610,19 +711,18 @@ export default function EquipmentManagePage() {
     );
   }
 
-  function PaginationControls({
-    location,
-  }: {
-    location: "top" | "bottom";
-  }) {
+  function PaginationControls({ location }: { location: "top" | "bottom" }) {
     return (
       <div
-        className={`mt-2 w-full flex flex-wrap items-center gap-2 ${location === "bottom" ? "py-3" : "pb-3"} md:gap-3`}
+        className={`mt-2 flex w-full flex-wrap items-center gap-2 ${location === "bottom" ? "py-3" : "pb-3"} md:gap-3`}
       >
         {/* Left-aligned on md+ (mr-auto pushes the rest to the right) */}
-        <div className="min-w-0 shrink text-xs text-gray-700 md:text-sm md:mr-auto">
-          Showing <span className="font-semibold">{total === 0 ? 0 : startIndex + 1}</span>-
-          <span className="font-semibold">{endIndex}</span> of{" "}
+        <div className="min-w-0 shrink text-xs text-gray-700 md:mr-auto md:text-sm">
+          Showing{" "}
+          <span className="font-semibold">
+            {total === 0 ? 0 : startIndex + 1}
+          </span>
+          -<span className="font-semibold">{endIndex}</span> of{" "}
           <span className="font-semibold">{total}</span>
         </div>
 
@@ -691,7 +791,7 @@ export default function EquipmentManagePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 pt-24 md:pt-28 lg:pt-32 overflow-x-hidden">
+    <div className="min-h-screen overflow-x-hidden bg-gray-100 pt-24 md:pt-28 lg:pt-32">
       <Navbar />
       <div className="mx-auto max-w-7xl p-4">
         <div className="mb-4 flex items-center justify-between gap-2">
@@ -756,7 +856,9 @@ export default function EquipmentManagePage() {
                           value={t.code}
                           className={({ active }) =>
                             `relative cursor-pointer select-none py-2 pl-3 pr-9 ${
-                              active ? "bg-blue-600 text-white" : "text-gray-900"
+                              active
+                                ? "bg-blue-600 text-white"
+                                : "text-gray-900"
                             }`
                           }
                         >
@@ -827,14 +929,15 @@ export default function EquipmentManagePage() {
                 Download PNG
               </a>
               <div className="text-sm text-gray-600">
-                QR opens Move page in <b>Quick Mode</b>. Scan multiple, then save once.
+                QR opens Move page in <b>Quick Mode</b>. Scan multiple, then
+                save once.
               </div>
             </div>
           )}
         </div>
 
         {/* Filters / Controls */}
-        <div className="mb-3 grid grid-cols-1 gap-2 md:grid-cols-7">
+        <div className="mb-3 grid grid-cols-1 gap-2 md:grid-cols-8">
           {/* longer search bar */}
           <input
             placeholder="Search (type, #, status, project, model, serial…)"
@@ -858,6 +961,12 @@ export default function EquipmentManagePage() {
             className="rounded border p-2"
             value={statusF}
             onChange={(e) => setStatusF(e.target.value)}
+            disabled={showArchivedOnly} // archived-only ignores active statuses
+            title={
+              showArchivedOnly
+                ? "Disabled while showing archived only"
+                : "Filter by status"
+            }
           >
             <option value="">All Status</option>
             {STATUSES.map((s) => (
@@ -871,8 +980,31 @@ export default function EquipmentManagePage() {
               type="checkbox"
               checked={includeArchived}
               onChange={(e) => setIncludeArchived(e.target.checked)}
+              disabled={showArchivedOnly}
+              title={
+                showArchivedOnly
+                  ? "Already showing archived only"
+                  : "Include archived alongside active"
+              }
             />
             <span className="whitespace-nowrap text-sm">Include Archived</span>
+          </label>
+          <label className="flex items-center gap-2 rounded border p-2">
+            <input
+              type="checkbox"
+              checked={showArchivedOnly}
+              onChange={(e) => {
+                const v = e.target.checked;
+                setShowArchivedOnly(v);
+                // convenience: if enabling "archived only", ensure includeArchived is visually irrelevant
+                if (v && !includeArchived) {
+                  // not required to flip includeArchived; we fetch archived because showArchivedOnly triggers includeArchived param
+                }
+              }}
+            />
+            <span className="whitespace-nowrap text-sm">
+              Show Archived only
+            </span>
           </label>
           <label className="flex items-center gap-2 rounded border p-2 md:col-span-2">
             <input
@@ -909,10 +1041,18 @@ export default function EquipmentManagePage() {
 
                 {/* optional columns */}
                 <th className="p-3 text-left">
-                  <SortHeader label="Model" col="model" hidden={!showModelSerial} />
+                  <SortHeader
+                    label="Model"
+                    col="model"
+                    hidden={!showModelSerial}
+                  />
                 </th>
                 <th className="p-3 text-left">
-                  <SortHeader label="Serial" col="serial" hidden={!showModelSerial} />
+                  <SortHeader
+                    label="Serial"
+                    col="serial"
+                    hidden={!showModelSerial}
+                  />
                 </th>
 
                 <th className="p-3 text-left">
@@ -953,7 +1093,9 @@ export default function EquipmentManagePage() {
                           value={editing ? draft?.type ?? row.type : row.type}
                           onChange={(ev) =>
                             editing &&
-                            setDraft((d) => (d ? { ...d, type: ev.target.value } : d))
+                            setDraft((d) =>
+                              d ? { ...d, type: ev.target.value } : d,
+                            )
                           }
                           readOnly={!editing}
                         />
@@ -978,7 +1120,9 @@ export default function EquipmentManagePage() {
                           }
                           onChange={(ev) =>
                             editing &&
-                            setDraft((d) => (d ? { ...d, assetNumber: ev.target.value } : d))
+                            setDraft((d) =>
+                              d ? { ...d, assetNumber: ev.target.value } : d,
+                            )
                           }
                           readOnly={!editing}
                         />
@@ -988,7 +1132,9 @@ export default function EquipmentManagePage() {
                       <td className="p-3">
                         <select
                           className={`rounded border p-1 ${!editing ? "bg-gray-50" : ""}`}
-                          value={editing ? draft?.status ?? row.status : row.status}
+                          value={
+                            editing ? draft?.status ?? row.status : row.status
+                          }
                           onChange={(ev) =>
                             editing &&
                             setDraft((d) =>
@@ -1016,19 +1162,25 @@ export default function EquipmentManagePage() {
                           as="div"
                           value={
                             editing
-                              ? draft?.currentProjectCode ?? row.currentProjectCode ?? ""
+                              ? draft?.currentProjectCode ??
+                                row.currentProjectCode ??
+                                ""
                               : row.currentProjectCode ?? ""
                           }
                           onChange={(v: string) =>
                             editing &&
-                            setDraft((d) => (d ? { ...d, currentProjectCode: v ?? "" } : d))
+                            setDraft((d) =>
+                              d ? { ...d, currentProjectCode: v ?? "" } : d,
+                            )
                           }
                         >
                           <div className="relative">
                             <Combobox.Input
                               className={`w-40 rounded border p-1 ${!editing ? "bg-gray-50" : ""}`}
                               displayValue={(v: string) => v}
-                              onChange={(e) => editing && setProjQueryEdit(e.target.value)}
+                              onChange={(e) =>
+                                editing && setProjQueryEdit(e.target.value)
+                              }
                               readOnly={!editing}
                               placeholder="ACTF-2025-001"
                             />
@@ -1043,7 +1195,9 @@ export default function EquipmentManagePage() {
                                     value={p.code}
                                     className={({ active }) =>
                                       `relative cursor-pointer select-none py-1.5 pl-3 pr-6 ${
-                                        active ? "bg-blue-600 text-white" : "text-gray-900"
+                                        active
+                                          ? "bg-blue-600 text-white"
+                                          : "text-gray-900"
                                       }`
                                     }
                                   >
@@ -1057,7 +1211,9 @@ export default function EquipmentManagePage() {
                                         {selected && (
                                           <span
                                             className={`absolute inset-y-0 right-0 flex items-center pr-3 ${
-                                              active ? "text-white" : "text-blue-600"
+                                              active
+                                                ? "text-white"
+                                                : "text-blue-600"
                                             }`}
                                           >
                                             <CheckIcon className="h-4 w-4" />
@@ -1078,9 +1234,16 @@ export default function EquipmentManagePage() {
                         {showModelSerial ? (
                           <input
                             className={`w-36 rounded border p-1 ${!editing ? "bg-gray-50" : ""}`}
-                            value={editing ? draft?.model ?? row.model ?? "" : row.model ?? ""}
+                            value={
+                              editing
+                                ? draft?.model ?? row.model ?? ""
+                                : row.model ?? ""
+                            }
                             onChange={(ev) =>
-                              editing && setDraft((d) => (d ? { ...d, model: ev.target.value } : d))
+                              editing &&
+                              setDraft((d) =>
+                                d ? { ...d, model: ev.target.value } : d,
+                              )
                             }
                             readOnly={!editing}
                           />
@@ -1092,9 +1255,16 @@ export default function EquipmentManagePage() {
                         {showModelSerial ? (
                           <input
                             className={`w-36 rounded border p-1 ${!editing ? "bg-gray-50" : ""}`}
-                            value={editing ? draft?.serial ?? row.serial ?? "" : row.serial ?? ""}
+                            value={
+                              editing
+                                ? draft?.serial ?? row.serial ?? ""
+                                : row.serial ?? ""
+                            }
                             onChange={(ev) =>
-                              editing && setDraft((d) => (d ? { ...d, serial: ev.target.value } : d))
+                              editing &&
+                              setDraft((d) =>
+                                d ? { ...d, serial: ev.target.value } : d,
+                              )
                             }
                             readOnly={!editing}
                           />
@@ -1109,19 +1279,27 @@ export default function EquipmentManagePage() {
                             className="w-56 rounded border p-1"
                             value={draft?.lastMovedAt ?? ""}
                             onChange={(e) =>
-                              setDraft((d) => (d ? { ...d, lastMovedAt: e.target.value } : d))
+                              setDraft((d) =>
+                                d ? { ...d, lastMovedAt: e.target.value } : d,
+                              )
                             }
                           />
                         ) : (
                           <span>
-                            {row.lastMovedAt ? new Date(row.lastMovedAt as any).toLocaleString() : "—"}
+                            {row.lastMovedAt
+                              ? new Date(
+                                  row.lastMovedAt as any,
+                                ).toLocaleString()
+                              : "—"}
                           </span>
                         )}
                       </td>
 
                       {/* Created (read-only) */}
                       <td className="p-3">
-                        {row.createdAt ? new Date(row.createdAt as any).toLocaleString() : "—"}
+                        {row.createdAt
+                          ? new Date(row.createdAt as any).toLocaleString()
+                          : "—"}
                       </td>
 
                       {/* Actions (icons) */}
@@ -1129,10 +1307,18 @@ export default function EquipmentManagePage() {
                         <div className="flex flex-wrap items-center gap-2">
                           {editing ? (
                             <>
-                              <IconButton title="Save" onClick={saveEdit} className="bg-emerald-600 text-white">
+                              <IconButton
+                                title="Save"
+                                onClick={saveEdit}
+                                className="bg-emerald-600 text-white"
+                              >
                                 <CheckCircleIcon className="h-5 w-5" />
                               </IconButton>
-                              <IconButton title="Cancel" onClick={cancelEdit} className="bg-gray-300">
+                              <IconButton
+                                title="Cancel"
+                                onClick={cancelEdit}
+                                className="bg-gray-300"
+                              >
                                 <XMarkIcon className="h-5 w-5" />
                               </IconButton>
                             </>
@@ -1186,7 +1372,9 @@ export default function EquipmentManagePage() {
                                   title="Delete"
                                   onClick={() => {
                                     setConfirmDeleteId(row.id);
-                                    toast("Click again to confirm delete", { icon: "⚠️" });
+                                    toast("Click again to confirm delete", {
+                                      icon: "⚠️",
+                                    });
                                   }}
                                   className="bg-red-600 text-white"
                                 >
@@ -1215,7 +1403,9 @@ export default function EquipmentManagePage() {
           {loading ? (
             <div className="rounded bg-white p-4 text-sm shadow">Loading…</div>
           ) : pageItems.length === 0 ? (
-            <div className="rounded bg-white p-4 text-sm shadow">No results</div>
+            <div className="rounded bg-white p-4 text-sm shadow">
+              No results
+            </div>
           ) : (
             <>
               {/* Pagination on top for mobile (single instance) */}
@@ -1256,14 +1446,17 @@ export default function EquipmentManagePage() {
                           <div className="text-xs text-gray-500">Status</div>
                           <select
                             className={`mt-1 w-full rounded border p-2 ${!editing ? "bg-gray-50" : ""}`}
-                            value={editing ? draft?.status ?? row.status : row.status}
+                            value={
+                              editing ? draft?.status ?? row.status : row.status
+                            }
                             onChange={(ev) =>
                               editing &&
                               setDraft((d) =>
                                 d
                                   ? {
                                       ...d,
-                                      status: ev.target.value as EquipmentStatus,
+                                      status: ev.target
+                                        .value as EquipmentStatus,
                                     }
                                   : d,
                               )
@@ -1286,7 +1479,10 @@ export default function EquipmentManagePage() {
                             className={`mt-1 w-full rounded border p-2 ${!editing ? "bg-gray-50" : ""}`}
                             value={editing ? draft?.type ?? row.type : row.type}
                             onChange={(ev) =>
-                              editing && setDraft((d) => (d ? { ...d, type: ev.target.value } : d))
+                              editing &&
+                              setDraft((d) =>
+                                d ? { ...d, type: ev.target.value } : d,
+                              )
                             }
                             readOnly={!editing}
                           />
@@ -1307,7 +1503,9 @@ export default function EquipmentManagePage() {
                             }
                             onChange={(ev) =>
                               editing &&
-                              setDraft((d) => (d ? { ...d, assetNumber: ev.target.value } : d))
+                              setDraft((d) =>
+                                d ? { ...d, assetNumber: ev.target.value } : d,
+                              )
                             }
                             readOnly={!editing}
                           />
@@ -1320,19 +1518,25 @@ export default function EquipmentManagePage() {
                             as="div"
                             value={
                               editing
-                                ? draft?.currentProjectCode ?? row.currentProjectCode ?? ""
+                                ? draft?.currentProjectCode ??
+                                  row.currentProjectCode ??
+                                  ""
                                 : row.currentProjectCode ?? ""
                             }
                             onChange={(v: string) =>
                               editing &&
-                              setDraft((d) => (d ? { ...d, currentProjectCode: v ?? "" } : d))
+                              setDraft((d) =>
+                                d ? { ...d, currentProjectCode: v ?? "" } : d,
+                              )
                             }
                           >
                             <div className="relative">
                               <Combobox.Input
                                 className={`mt-1 w-full rounded border p-2 ${!editing ? "bg-gray-50" : ""}`}
                                 displayValue={(v: string) => v}
-                                onChange={(e) => editing && setProjQueryEdit(e.target.value)}
+                                onChange={(e) =>
+                                  editing && setProjQueryEdit(e.target.value)
+                                }
                                 readOnly={!editing}
                                 placeholder="ACTF-2025-001"
                               />
@@ -1347,7 +1551,9 @@ export default function EquipmentManagePage() {
                                       value={p.code}
                                       className={({ active }) =>
                                         `relative cursor-pointer select-none py-2 pl-3 pr-9 ${
-                                          active ? "bg-blue-600 text-white" : "text-gray-900"
+                                          active
+                                            ? "bg-blue-600 text-white"
+                                            : "text-gray-900"
                                         }`
                                       }
                                     >
@@ -1361,7 +1567,9 @@ export default function EquipmentManagePage() {
                                           {selected && (
                                             <span
                                               className={`absolute inset-y-0 right-0 flex items-center pr-4 ${
-                                                active ? "text-white" : "text-blue-600"
+                                                active
+                                                  ? "text-white"
+                                                  : "text-blue-600"
                                               }`}
                                             >
                                               <CheckIcon className="h-5 w-5" />
@@ -1384,22 +1592,36 @@ export default function EquipmentManagePage() {
                               <div className="text-xs text-gray-500">Model</div>
                               <input
                                 className={`mt-1 w-full rounded border p-2 ${!editing ? "bg-gray-50" : ""}`}
-                                value={editing ? draft?.model ?? row.model ?? "" : row.model ?? ""}
+                                value={
+                                  editing
+                                    ? draft?.model ?? row.model ?? ""
+                                    : row.model ?? ""
+                                }
                                 onChange={(ev) =>
                                   editing &&
-                                  setDraft((d) => (d ? { ...d, model: ev.target.value } : d))
+                                  setDraft((d) =>
+                                    d ? { ...d, model: ev.target.value } : d,
+                                  )
                                 }
                                 readOnly={!editing}
                               />
                             </div>
                             <div>
-                              <div className="text-xs text-gray-500">Serial</div>
+                              <div className="text-xs text-gray-500">
+                                Serial
+                              </div>
                               <input
                                 className={`mt-1 w-full rounded border p-2 ${!editing ? "bg-gray-50" : ""}`}
-                                value={editing ? draft?.serial ?? row.serial ?? "" : row.serial ?? ""}
+                                value={
+                                  editing
+                                    ? draft?.serial ?? row.serial ?? ""
+                                    : row.serial ?? ""
+                                }
                                 onChange={(ev) =>
                                   editing &&
-                                  setDraft((d) => (d ? { ...d, serial: ev.target.value } : d))
+                                  setDraft((d) =>
+                                    d ? { ...d, serial: ev.target.value } : d,
+                                  )
                                 }
                                 readOnly={!editing}
                               />
@@ -1410,20 +1632,28 @@ export default function EquipmentManagePage() {
                         {/* Last Moved (editable) & Created (read-only) */}
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                           <div>
-                            <div className="text-xs text-gray-500">Last Moved</div>
+                            <div className="text-xs text-gray-500">
+                              Last Moved
+                            </div>
                             {editing ? (
                               <input
                                 type="datetime-local"
                                 className="mt-1 w-full rounded border p-2"
                                 value={draft?.lastMovedAt ?? ""}
                                 onChange={(e) =>
-                                  setDraft((d) => (d ? { ...d, lastMovedAt: e.target.value } : d))
+                                  setDraft((d) =>
+                                    d
+                                      ? { ...d, lastMovedAt: e.target.value }
+                                      : d,
+                                  )
                                 }
                               />
                             ) : (
                               <div className="mt-1">
                                 {row.lastMovedAt
-                                  ? new Date(row.lastMovedAt as any).toLocaleString()
+                                  ? new Date(
+                                      row.lastMovedAt as any,
+                                    ).toLocaleString()
                                   : "—"}
                               </div>
                             )}
@@ -1431,7 +1661,11 @@ export default function EquipmentManagePage() {
                           <div>
                             <div className="text-xs text-gray-500">Created</div>
                             <div className="mt-1">
-                              {row.createdAt ? new Date(row.createdAt as any).toLocaleString() : "—"}
+                              {row.createdAt
+                                ? new Date(
+                                    row.createdAt as any,
+                                  ).toLocaleString()
+                                : "—"}
                             </div>
                           </div>
                         </div>
@@ -1441,16 +1675,28 @@ export default function EquipmentManagePage() {
                       <div className="mt-3 flex flex-wrap gap-2">
                         {editing ? (
                           <>
-                            <IconButton title="Save" onClick={saveEdit} className="bg-emerald-600 text-white">
+                            <IconButton
+                              title="Save"
+                              onClick={saveEdit}
+                              className="bg-emerald-600 text-white"
+                            >
                               <CheckCircleIcon className="h-5 w-5" />
                             </IconButton>
-                            <IconButton title="Cancel" onClick={cancelEdit} className="bg-gray-300">
+                            <IconButton
+                              title="Cancel"
+                              onClick={cancelEdit}
+                              className="bg-gray-300"
+                            >
                               <XMarkIcon className="h-5 w-5" />
                             </IconButton>
                           </>
                         ) : (
                           <>
-                            <IconButton title="Edit" onClick={() => beginEdit(row)} className="bg-blue-600 text-white">
+                            <IconButton
+                              title="Edit"
+                              onClick={() => beginEdit(row)}
+                              className="bg-blue-600 text-white"
+                            >
                               <PencilSquareIcon className="h-5 w-5" />
                             </IconButton>
                             <IconButton
@@ -1489,7 +1735,9 @@ export default function EquipmentManagePage() {
                                 title="Delete"
                                 onClick={() => {
                                   setConfirmDeleteId(row.id);
-                                  toast("Click again to confirm delete", { icon: "⚠️" });
+                                  toast("Click again to confirm delete", {
+                                    icon: "⚠️",
+                                  });
                                 }}
                                 className="bg-red-600 text-white"
                               >
