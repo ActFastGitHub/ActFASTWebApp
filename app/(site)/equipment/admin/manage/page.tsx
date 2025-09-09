@@ -156,12 +156,15 @@ export default function EquipmentManagePage() {
 
       // Auto-archive pass (non-blocking UI-wise)
       // Only run if not currently archiving to avoid loops
+      // Auto-reconcile & auto-archive pass
       if (!isArchivingRef.current) {
-        const archivedNow = await autoArchiveStale(list);
-        if (archivedNow > 0) {
-          // Refresh to reflect new archived statuses
-          await load();
-          return; // stop this run; the reload handles the rest
+        isArchivingRef.current = true;
+        const changes = await autoReconcileAndArchive(list);
+        isArchivingRef.current = false;
+
+        if (changes > 0) {
+          await load(); // refresh to reflect updates, then bail
+          return;
         }
       }
     } catch (e: any) {
@@ -223,23 +226,63 @@ export default function EquipmentManagePage() {
 
   function shouldAutoArchive(e: EquipmentDTO) {
     const now = new Date();
+
+    // already archived → skip
     if (e.archived) return false;
+
+    // never auto-archive deployed items
+    if (e.status === "DEPLOYED") return false;
+
+    // only auto-archive these statuses
+    if (!["WAREHOUSE", "LOST", "MAINTENANCE"].includes(e.status)) return false;
+
     const refStr = (e.lastMovedAt as any) || (e.createdAt as any);
     if (!refStr) return false;
+
     const ref = new Date(refStr);
     if (Number.isNaN(ref.getTime())) return false;
 
+    // 3 calendar months since ref
     const deadline = addMonths(ref, 3);
     return now >= deadline;
   }
 
-  async function autoArchiveStale(list: EquipmentDTO[]) {
-    const toArchive = list.filter((e) => shouldAutoArchive(e));
-    if (toArchive.length === 0) return 0;
+  function shouldUnarchiveMistake(e: EquipmentDTO) {
+    // If it’s deployed, it must not be archived.
+    return e.archived === true && e.status === "DEPLOYED";
+  }
 
-    isArchivingRef.current = true;
-    try {
-      const results = await Promise.allSettled(
+  async function autoReconcileAndArchive(list: EquipmentDTO[]) {
+    const toUnarchive = list.filter((e) => shouldUnarchiveMistake(e));
+    const toArchive = list.filter((e) => shouldAutoArchive(e));
+
+    let fixed = 0;
+    let archived = 0;
+
+    // First: unarchive any deployed items that were archived by mistake
+    if (toUnarchive.length > 0) {
+      const res = await Promise.allSettled(
+        toUnarchive.map((e) =>
+          axios.patch<{ status: number; error?: string }>(
+            `/api/equipment/${e.id}`,
+            { archived: false },
+          ),
+        ),
+      );
+      fixed = res.filter(
+        (r) => r.status === "fulfilled" && r.value.data?.status === 200,
+      ).length;
+      const failed = res.length - fixed;
+      if (fixed > 0)
+        toast.success(
+          `Reinstated ${fixed} deployed item(s) that were archived by mistake`,
+        );
+      if (failed > 0) toast.error(`Failed to reinstate ${failed} item(s)`);
+    }
+
+    // Second: archive stale items in allowed statuses
+    if (toArchive.length > 0) {
+      const res = await Promise.allSettled(
         toArchive.map((e) =>
           axios.patch<{ status: number; error?: string }>(
             `/api/equipment/${e.id}`,
@@ -247,24 +290,16 @@ export default function EquipmentManagePage() {
           ),
         ),
       );
-      const success = results.filter(
+      archived = res.filter(
         (r) => r.status === "fulfilled" && r.value.data?.status === 200,
       ).length;
-
-      if (success > 0) {
-        toast.success(`Auto-archived ${success} stale equipment`);
-      }
-      const failed = results.length - success;
-      if (failed > 0) {
-        toast.error(`Auto-archive failed for ${failed} item(s)`);
-      }
-      return success;
-    } catch {
-      toast.error("Auto-archive failed");
-      return 0;
-    } finally {
-      isArchivingRef.current = false;
+      const failed = res.length - archived;
+      if (archived > 0)
+        toast.success(`Auto-archived ${archived} stale equipment`);
+      if (failed > 0) toast.error(`Auto-archive failed for ${failed} item(s)`);
     }
+
+    return fixed + archived; // number of changes
   }
 
   /* ───── edit helpers ───── */
