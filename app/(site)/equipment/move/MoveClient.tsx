@@ -477,7 +477,8 @@ function WhatsAppReportModal({
       }
     });
 
-    lines.push(`Date: ${titleDate(`${y}-${m}-${d}`)}`);
+    const titleDateStr = `${y}-${m}-${d}`;
+    lines.push(`Date: ${titleDate(titleDateStr)}`);
     lines.push("");
 
     // OUT — by project
@@ -985,6 +986,30 @@ export default function MoveClient(): JSX.Element {
     return Array.from(set).sort();
   }, [recent]);
 
+  /* ---------- NEW: Compute origin project for each IN row ---------- */
+  const originProjectById = useMemo(() => {
+    // Sort all recent by time ascending so "last OUT" is correct as we walk
+    const sorted = recent
+      .slice()
+      .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+
+    const lastOut: Record<string, string | undefined> = {}; // key -> project
+    const map = new Map<string, string | undefined>();
+
+    sorted.forEach((r) => {
+      const key = `${getType(r)}#${getAsset(r)}`;
+      if (r.direction === "OUT") {
+        // remember which project it was deployed to
+        lastOut[key] = (r.projectCode || undefined) as string | undefined;
+      } else {
+        // this is a PULL OUT (IN) — origin is whatever the last OUT said
+        map.set(r.id, lastOut[key]);
+      }
+    });
+
+    return map;
+  }, [recent]);
+
   const recentFilteredSorted = useMemo(() => {
     let arr = [...recent];
 
@@ -1010,13 +1035,14 @@ export default function MoveClient(): JSX.Element {
 
     const s = recQuery.toLowerCase().trim();
     if (s) {
-      arr = arr.filter((r) =>
-        `${getType(r)} ${getAsset(r)} ${r.direction} ${r.projectCode ?? ""} ${
+      arr = arr.filter((r) => {
+        const origin = originProjectById.get(r.id) ?? "";
+        return `${getType(r)} ${getAsset(r)} ${r.direction} ${r.projectCode ?? ""} ${
           r.byId ?? ""
-        } ${r.note ?? ""}`
+        } ${r.note ?? ""} ${origin}`
           .toLowerCase()
-          .includes(s),
-      );
+          .includes(s);
+      });
     }
 
     arr.sort((a, b) => {
@@ -1042,6 +1068,7 @@ export default function MoveClient(): JSX.Element {
     cutoffMs,
     filterProject,
     filterType,
+    originProjectById,
   ]);
 
   const totalPages = Math.max(
@@ -1503,6 +1530,11 @@ export default function MoveClient(): JSX.Element {
                 const isArchived = new Date(m.at).getTime() < cutoffMs;
                 const dur = durationById.get(m.id);
                 const moverShown = !!showMoverMap[m.id];
+                const originProj =
+                  m.direction === "IN"
+                    ? originProjectById.get(m.id)
+                    : undefined;
+
                 return (
                   <div
                     key={m.id}
@@ -1524,12 +1556,23 @@ export default function MoveClient(): JSX.Element {
                           <span className="inline-flex items-center rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-800">
                             {getType(m)} #{getAsset(m)}
                           </span>
-                          {m.projectCode ? (
+
+                          {/* Project tag logic:
+                              - OUT: show destination project (existing behavior)
+                              - IN: show origin project (NEW requirement) */}
+                          {m.direction === "OUT" && m.projectCode ? (
                             <span className="inline-flex items-center rounded-md bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700 ring-1 ring-violet-200">
                               Project: {m.projectCode}
                             </span>
                           ) : null}
-                          {new Date(m.at).getTime() < cutoffMs ? (
+
+                          {m.direction === "IN" ? (
+                            <span className="inline-flex items-center rounded-md bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700 ring-1 ring-sky-200">
+                              From: {originProj || "Unknown Project"}
+                            </span>
+                          ) : null}
+
+                          {isArchived ? (
                             <span className="inline-flex items-center rounded-md bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-600 ring-1 ring-gray-200">
                               Archived
                             </span>
@@ -1538,15 +1581,13 @@ export default function MoveClient(): JSX.Element {
 
                         <div className="mt-1 text-xs text-gray-600">
                           {new Date(m.at).toLocaleString()}
-                          {durationById.get(m.id)?.label ? (
-                            <span className="ml-2">
-                              · Duration: {durationById.get(m.id)!.label}
-                            </span>
+                          {dur?.label ? (
+                            <span className="ml-2">· Duration: {dur.label}</span>
                           ) : null}
                         </div>
 
                         {/* Mover (per-entry toggle) */}
-                        {showMoverMap[m.id] && (
+                        {moverShown && (
                           <div className="mt-2 inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-1 text-xs text-gray-800 ring-1 ring-gray-200">
                             <UserIcon className="h-4 w-4" />
                             <span>
@@ -1572,7 +1613,7 @@ export default function MoveClient(): JSX.Element {
                       <div className="flex shrink-0 flex-wrap items-center gap-2">
                         {/* Toggle mover */}
                         <button
-                          onClick={() => toggleMover(m.id)}
+                          onClick={() => setShowMoverMap((s) => ({ ...s, [m.id]: !s[m.id] }))}
                           className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs"
                           title={showMoverMap[m.id] ? "Hide name" : "Show name"}
                         >
@@ -1592,11 +1633,11 @@ export default function MoveClient(): JSX.Element {
                         {/* Toggle notes (only if notes feature enabled and there is a note) */}
                         {showNotes && m.note ? (
                           <button
-                            onClick={() => toggleNotes(m.id)}
-                            className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs"
-                            title={
-                              notesOpen[m.id] ? "Hide notes" : "Show notes"
+                            onClick={() =>
+                              setNotesOpen((o) => ({ ...o, [m.id]: !o[m.id] }))
                             }
+                            className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs"
+                            title={notesOpen[m.id] ? "Hide notes" : "Show notes"}
                           >
                             {notesOpen[m.id] ? (
                               <>
@@ -1657,8 +1698,7 @@ export default function MoveClient(): JSX.Element {
           {/* pagination controls */}
           <div className="mt-3 flex items-center justify-between">
             <div className="text-xs text-gray-500">
-              Page {recPage} / {totalPages} · {recentFilteredSorted.length}{" "}
-              items
+              Page {recPage} / {totalPages} · {recentFilteredSorted.length} items
             </div>
             <div className="flex gap-2">
               <button
