@@ -103,6 +103,45 @@ const prettyDate = (isoDate: string) =>
     day: "numeric",
   });
 
+/* ---------- Inline Edit: helpers & types ---------- */
+type MovementUpdate = {
+  at?: string;
+  note?: string | null;
+  projectCode?: string | null;
+  equipment?: {
+    typeCode?: string; // aligns to PATCH API
+    assetNumber?: number;
+  };
+  byId?: string | null;
+};
+
+type EditState = {
+  atLocal: string; // yyyy-MM-ddTHH:mm
+  note: string;
+  projectCode: string;
+  type: string; // UI shows friendly name; backend maps to typeCode
+  assetNumber: string; // keep as string for input; validate to number on save
+  byId: string;
+};
+
+const isoToLocalInput = (iso: string) => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => `${n}`.padStart(2, "0");
+  const yyyy = d.getFullYear();
+  const mm = pad(d.getMonth() + 1);
+  const dd = pad(d.getDate());
+  const hh = pad(d.getHours());
+  const mi = pad(d.getMinutes());
+  return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+};
+
+const localInputToISO = (local: string) => {
+  if (!local) return undefined;
+  const d = new Date(local);
+  return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
+};
+
 /* ──────────────────────────────────────────────────────────── */
 /*  Scanner Overlay (in-browser camera QR scan)                 */
 /* ──────────────────────────────────────────────────────────── */
@@ -134,7 +173,7 @@ function ScannerOverlay({
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          await videoRef.current.play();
+          await (videoRef.current as HTMLVideoElement).play();
         }
 
         const tick = () => {
@@ -283,7 +322,7 @@ function WhatsAppReportModal({
       if (r.direction === "OUT") {
         lastOut[key] = (r.projectCode || undefined) as string | undefined;
       } else {
-        // keep the last OUT as-is; don't clear here so later INs still know origin
+        // keep last OUT
       }
     });
     return lastOut;
@@ -304,7 +343,6 @@ function WhatsAppReportModal({
 
     const lines: string[] = [];
 
-    /** SPECIAL: Specific Project mode — scan ALL entries for selected project */
     if (mode === "project") {
       const projCode = project.trim();
       if (!projCode) {
@@ -312,19 +350,14 @@ function WhatsAppReportModal({
         return;
       }
 
-      // sort all movements by time ascending
       const sorted = movements
         .slice()
         .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
 
-      // Track current on-site set for this project
-      const onSite = new Map<string, Set<number>>(); // type -> asset set
-      const dateDeploy: Record<string, Map<string, number[]>> = {}; // date -> type -> assets
-      const datePull: Record<string, Map<string, number[]>> = {}; // date -> type -> assets
-
-      // Map equipment -> last OUT project
+      const onSite = new Map<string, Set<number>>();
+      const dateDeploy: Record<string, Map<string, number[]>> = {};
+      const datePull: Record<string, Map<string, number[]>> = {};
       const lastOutByEquip = new Map<string, string | undefined>();
-
       const eqKey = (r: MovementForReport) => `${r.type}#${r.assetNumber}`;
 
       sorted.forEach((r) => {
@@ -341,7 +374,6 @@ function WhatsAppReportModal({
             const tmap = dateDeploy[dk];
             tmap.set(r.type, [...(tmap.get(r.type) || []), r.assetNumber]);
 
-            // mark on site
             if (!onSite.has(r.type)) onSite.set(r.type, new Set());
             onSite.get(r.type)!.add(r.assetNumber);
           }
@@ -349,11 +381,10 @@ function WhatsAppReportModal({
           const origin = lastOutByEquip.get(key);
           if (origin === projCode) {
             const dk = toDateKey(r.at);
-            datePull[dk] = datePull[dk] || new Map<string, number[]>();
+            datePull[dk] = datePull[dk] ?? (new Map() as Map<string, number[]>);
             const tmap = datePull[dk];
             tmap.set(r.type, [...(tmap.get(r.type) || []), r.assetNumber]);
 
-            // remove from on site
             if (!onSite.has(r.type)) onSite.set(r.type, new Set());
             onSite.get(r.type)!.delete(r.assetNumber);
           }
@@ -363,7 +394,6 @@ function WhatsAppReportModal({
       lines.push(`${projCode}`);
       lines.push("");
 
-      // collect all dates that had deploy or pull
       const allDates = new Set<string>([
         ...Object.keys(dateDeploy),
         ...Object.keys(datePull),
@@ -374,7 +404,6 @@ function WhatsAppReportModal({
 
       sortedDates.forEach((dk) => {
         lines.push(`${prettyDate(dk)}`);
-        // DEPLOYED
         const dep = dateDeploy[dk];
         if (dep && dep.size) {
           lines.push("DEPLOYED");
@@ -385,10 +414,9 @@ function WhatsAppReportModal({
               lines.push(`${type}: ${nums.join(", ")}`);
             });
         }
-        // PULLED-OUT
         const pull = datePull[dk];
         if (pull && pull.size) {
-          if (dep && dep.size) lines.push(""); // blank line between sections on same day
+          if (dep && dep.size) lines.push("");
           lines.push("PULLED-OUT");
           Array.from(pull.entries())
             .sort(([a], [b]) => a.localeCompare(b))
@@ -397,10 +425,9 @@ function WhatsAppReportModal({
               lines.push(`${type}: ${nums.join(", ")}`);
             });
         }
-        lines.push(""); // blank line after date block
+        lines.push("");
       });
 
-      // Equipments left on-site (optional)
       const remaining: Array<[string, number[]]> = Array.from(onSite.entries())
         .map(
           ([type, set]) =>
@@ -429,8 +456,6 @@ function WhatsAppReportModal({
       return;
     }
 
-    // For Today / Warehouse / Custom Date we keep day filtering
-    // but improve "Custom" mode to include origins for IN (warehouse returns)
     const rowsForDay = movements.filter((r) => {
       const t = new Date(r.at).getTime();
       return t >= start.getTime() && t <= end.getTime();
@@ -438,14 +463,11 @@ function WhatsAppReportModal({
 
     const warehouseOnly = mode === "warehouse";
 
-    // Build last out map over ALL movements to determine origin of INs
     const lastOutRef = buildLastOutMap(movements);
 
-    // per-project (for OUT)
     const byProject = new Map<string, Map<string, number[]>>();
     const notesByProject = new Map<string, string[]>();
 
-    // warehouse returns grouped by origin project (for IN)
     const inByOriginProject = new Map<string, Map<string, number[]>>();
     const notesWarehouse = new Map<string, Set<string>>();
 
@@ -461,7 +483,6 @@ function WhatsAppReportModal({
         mapTypes.get(r.type)!.push(r.assetNumber);
         if (note) notesByProject.get(proj)!.push(note);
       } else if (r.direction === "IN") {
-        // determine origin project from last OUT
         const key = `${r.type}#${r.assetNumber}`;
         const origin = lastOutRef[key] || "Unknown Project";
         if (!inByOriginProject.has(origin))
@@ -481,7 +502,6 @@ function WhatsAppReportModal({
     lines.push(`Date: ${titleDate(titleDateStr)}`);
     lines.push("");
 
-    // OUT — by project
     byProject.forEach((mapTypes, proj) => {
       lines.push(`Project: ${proj}`);
       mapTypes.forEach((nums, type) => {
@@ -496,7 +516,6 @@ function WhatsAppReportModal({
       lines.push("");
     });
 
-    // IN — by origin project
     if (inByOriginProject.size) {
       inByOriginProject.forEach((typesMap, originProj) => {
         lines.push(`Returned to Warehouse (from ${originProj}):`);
@@ -540,28 +559,36 @@ function WhatsAppReportModal({
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setMode("today")}
-              className={`rounded px-3 py-1 ${mode === "today" ? "bg-blue-600 text-white" : "bg-gray-100"}`}
+              className={`rounded px-3 py-1 ${
+                mode === "today" ? "bg-blue-600 text-white" : "bg-gray-100"
+              }`}
               aria-pressed={mode === "today"}
             >
               Today
             </button>
             <button
               onClick={() => setMode("custom")}
-              className={`rounded px-3 py-1 ${mode === "custom" ? "bg-blue-600 text-white" : "bg-gray-100"}`}
+              className={`rounded px-3 py-1 ${
+                mode === "custom" ? "bg-blue-600 text-white" : "bg-gray-100"
+              }`}
               aria-pressed={mode === "custom"}
             >
               Custom Date
             </button>
             <button
               onClick={() => setMode("project")}
-              className={`rounded px-3 py-1 ${mode === "project" ? "bg-blue-600 text-white" : "bg-gray-100"}`}
+              className={`rounded px-3 py-1 ${
+                mode === "project" ? "bg-blue-600 text-white" : "bg-gray-100"
+              }`}
               aria-pressed={mode === "project"}
             >
               Specific Project
             </button>
             <button
               onClick={() => setMode("warehouse")}
-              className={`rounded px-3 py-1 ${mode === "warehouse" ? "bg-blue-600 text-white" : "bg-gray-100"}`}
+              className={`rounded px-3 py-1 ${
+                mode === "warehouse" ? "bg-blue-600 text-white" : "bg-gray-100"
+              }`}
               aria-pressed={mode === "warehouse"}
             >
               Warehouse Returns
@@ -619,7 +646,9 @@ function WhatsAppReportModal({
                           {({ active, selected }) => (
                             <>
                               <span
-                                className={`block truncate ${selected ? "font-semibold" : ""}`}
+                                className={`block truncate ${
+                                  selected ? "font-semibold" : ""
+                                }`}
                               >
                                 {p.code}
                               </span>
@@ -723,7 +752,6 @@ export default function MoveClient(): JSX.Element {
             .map((p: any) => ({ id: p.id, code: p.code }))
             .sort((a: Project, b: Project) => b.code.localeCompare(a.code));
 
-          // always include POSSIBLE NEW CLAIM at the top
           const hasPNC = sorted.some((p) => p.code === "POSSIBLE NEW CLAIM");
           const withPNC = hasPNC
             ? sorted
@@ -732,7 +760,6 @@ export default function MoveClient(): JSX.Element {
           setProjects(withPNC);
         }
       } catch {
-        // still ensure PNC exists even if request fails
         setProjects([{ id: "PNC", code: "POSSIBLE NEW CLAIM" }]);
       }
     })();
@@ -842,7 +869,6 @@ export default function MoveClient(): JSX.Element {
     if (!payload.items.length) return "Please add at least one valid item.";
     if (payload.direction === "OUT" && !payload.projectCode)
       return "Project code is required when deploying.";
-    // Require notes only when project is POSSIBLE NEW CLAIM
     if (
       payload.direction === "OUT" &&
       payload.projectCode === "POSSIBLE NEW CLAIM" &&
@@ -988,21 +1014,18 @@ export default function MoveClient(): JSX.Element {
 
   /* ---------- NEW: Compute origin project for each IN row ---------- */
   const originProjectById = useMemo(() => {
-    // Sort all recent by time ascending so "last OUT" is correct as we walk
     const sorted = recent
       .slice()
       .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
 
-    const lastOut: Record<string, string | undefined> = {}; // key -> project
+    const lastOut: Record<string, string | undefined> = {};
     const map = new Map<string, string | undefined>();
 
     sorted.forEach((r) => {
       const key = `${getType(r)}#${getAsset(r)}`;
       if (r.direction === "OUT") {
-        // remember which project it was deployed to
         lastOut[key] = (r.projectCode || undefined) as string | undefined;
       } else {
-        // this is a PULL OUT (IN) — origin is whatever the last OUT said
         map.set(r.id, lastOut[key]);
       }
     });
@@ -1099,6 +1122,98 @@ export default function MoveClient(): JSX.Element {
       if (resp && isDeleteError(resp))
         toast.error(resp.error || "Delete failed");
       else toast.error("Delete failed");
+    }
+  }
+
+  /* ---------- NEW: Inline edit state & actions ---------- */
+  const [editMap, setEditMap] = useState<Record<string, EditState>>({});
+  const isEditing = (id: string) => !!editMap[id];
+
+  function startEdit(m: Recent) {
+    const state: EditState = {
+      atLocal: isoToLocalInput(m.at),
+      note: m.note ?? "",
+      projectCode: m.projectCode ?? "",
+      type: getType(m),
+      assetNumber: String(getAsset(m) || ""),
+      byId: m.byId ?? "",
+    };
+    setEditMap((s) => ({ ...s, [m.id]: state }));
+  }
+  function cancelEdit(id: string) {
+    setEditMap((s) => {
+      const { [id]: _, ...rest } = s;
+      return rest;
+    });
+  }
+
+  async function saveEdit(id: string) {
+    const draft = editMap[id];
+    if (!draft) return;
+
+    const current = recent.find((r) => r.id === id);
+    if (!current) {
+      toast.error("Movement not found");
+      return;
+    }
+
+    const update: MovementUpdate = {
+      at: localInputToISO(draft.atLocal),
+      note: draft.note.trim() || null,
+      byId: draft.byId.trim() || null,
+    };
+
+    if (!update.at) {
+      toast.error("Please provide a valid date/time.");
+      return;
+    }
+
+    if (current.direction === "OUT") {
+      update.projectCode = draft.projectCode.trim() || null;
+      if (!update.projectCode) {
+        toast.error("Project code is required for DEPLOY (OUT).");
+        return;
+      }
+    }
+
+    const assetNum =
+      draft.assetNumber.trim().length > 0
+        ? Number(draft.assetNumber.trim())
+        : undefined;
+
+    if (draft.type.trim() || assetNum) {
+      if (
+        assetNum !== undefined &&
+        (!Number.isInteger(assetNum) || assetNum <= 0)
+      ) {
+        toast.error("Asset # must be a positive integer.");
+        return;
+      }
+      update.equipment = {
+        typeCode: draft.type.trim() || undefined, // <-- align with PATCH route
+        assetNumber: assetNum,
+      };
+    }
+
+    try {
+      const { data } = await axios.patch<{
+        status: number;
+        updated?: unknown;
+        error?: string;
+      }>(`/api/equipment/movements/${id}`, {
+        data: update,
+        touchEquipment: true,
+      });
+
+      if (data?.status === 200) {
+        toast.success("Movement updated");
+        cancelEdit(id);
+        await refreshRecent();
+      } else {
+        toast.error(data?.error || "Update failed");
+      }
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || "Update failed");
     }
   }
 
@@ -1203,7 +1318,7 @@ export default function MoveClient(): JSX.Element {
         </div>
 
         {/* Direction */}
-        <div className="mb-4 flex gap-2">
+        <div className="mb-4 flex flex-wrap gap-2">
           {(["OUT", "IN"] as MovementDirection[]).map((d) => (
             <button
               key={d}
@@ -1257,7 +1372,9 @@ export default function MoveClient(): JSX.Element {
                         {({ active, selected }) => (
                           <>
                             <span
-                              className={`block truncate ${selected ? "font-semibold" : ""}`}
+                              className={`block truncate ${
+                                selected ? "font-semibold" : ""
+                              }`}
                             >
                               {p.code}
                             </span>
@@ -1377,7 +1494,7 @@ export default function MoveClient(): JSX.Element {
           </div>
         </div>
 
-        {/* Notes — RESTORED */}
+        {/* Notes */}
         <div className="mb-4">
           <label className="mb-1 block text-sm font-semibold text-gray-700">
             Notes{" "}
@@ -1393,7 +1510,7 @@ export default function MoveClient(): JSX.Element {
           />
         </div>
 
-        {/* Save All — RESTORED */}
+        {/* Save All */}
         <div className="mb-8 flex flex-wrap gap-2">
           <button
             onClick={submitAll}
@@ -1405,8 +1522,9 @@ export default function MoveClient(): JSX.Element {
 
         {/* Recent Movements */}
         <div className="rounded bg-white p-4 shadow">
-          <div className="mb-3 grid grid-cols-2 gap-2 md:grid-cols-8 md:items-end">
-            <h2 className="col-span-2 text-base font-semibold md:col-span-2">
+          {/* Top filter row – fully responsive */}
+          <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-8 md:items-end">
+            <h2 className="text-base font-semibold md:col-span-2">
               Recent Movements
             </h2>
 
@@ -1477,7 +1595,8 @@ export default function MoveClient(): JSX.Element {
             </label>
           </div>
 
-          <div className="mb-2 grid grid-cols-1 gap-2 md:grid-cols-5">
+          {/* Secondary filter row */}
+          <div className="mb-2 grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-5">
             <input
               type="date"
               className="rounded border p-2 text-sm"
@@ -1540,7 +1659,8 @@ export default function MoveClient(): JSX.Element {
                     key={m.id}
                     className="rounded-lg border border-gray-100 bg-white p-3 shadow-sm transition hover:shadow md:p-4"
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-3">
+                    {/* Make the header responsive: vertical on mobile, horizontal on md+ */}
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                       {/* Left cluster */}
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
@@ -1553,22 +1673,26 @@ export default function MoveClient(): JSX.Element {
                           >
                             {friendlyDir(m.direction)}
                           </span>
-                          <span className="inline-flex items-center rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-800">
-                            {getType(m)} #{getAsset(m)}
+                          <span className="inline-flex max-w-full items-center rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-800">
+                            <span className="truncate">
+                              {getType(m)} #{getAsset(m)}
+                            </span>
                           </span>
 
-                          {/* Project tag logic:
-                              - OUT: show destination project (existing behavior)
-                              - IN: show origin project (NEW requirement) */}
+                          {/* Project tag logic */}
                           {m.direction === "OUT" && m.projectCode ? (
-                            <span className="inline-flex items-center rounded-md bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700 ring-1 ring-violet-200">
-                              Project: {m.projectCode}
+                            <span className="inline-flex max-w-full items-center rounded-md bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700 ring-1 ring-violet-200">
+                              <span className="truncate">
+                                Project: {m.projectCode}
+                              </span>
                             </span>
                           ) : null}
 
                           {m.direction === "IN" ? (
-                            <span className="inline-flex items-center rounded-md bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700 ring-1 ring-sky-200">
-                              From: {originProj || "Unknown Project"}
+                            <span className="inline-flex max-w-full items-center rounded-md bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700 ring-1 ring-sky-200">
+                              <span className="truncate">
+                                From: {originProj || "Unknown Project"}
+                              </span>
                             </span>
                           ) : null}
 
@@ -1580,9 +1704,13 @@ export default function MoveClient(): JSX.Element {
                         </div>
 
                         <div className="mt-1 text-xs text-gray-600">
-                          {new Date(m.at).toLocaleString()}
+                          <span className="block sm:inline">
+                            {new Date(m.at).toLocaleString()}
+                          </span>
                           {dur?.label ? (
-                            <span className="ml-2">· Duration: {dur.label}</span>
+                            <span className="ml-0 block sm:ml-2 sm:inline">
+                              · Duration: {dur.label}
+                            </span>
                           ) : null}
                         </div>
 
@@ -1602,91 +1730,320 @@ export default function MoveClient(): JSX.Element {
                             <div className="text-xs font-semibold text-amber-800">
                               Notes
                             </div>
-                            <div className="mt-0.5 whitespace-pre-wrap text-amber-900">
+                            <div className="mt-0.5 whitespace-pre-wrap break-words text-amber-900">
                               {m.note}
                             </div>
                           </div>
                         ) : null}
+
+                        {/* Inline edit form (1-col on mobile, 6-col on md) */}
+                        {isAdmin && isEditing(m.id) && (
+                          <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-6">
+                            <div className="md:col-span-3">
+                              <label className="block text-xs text-gray-600">
+                                Date/Time
+                              </label>
+                              <input
+                                type="datetime-local"
+                                className="mt-1 w-full rounded border p-2 text-sm"
+                                value={editMap[m.id].atLocal}
+                                onChange={(e) =>
+                                  setEditMap((s) => ({
+                                    ...s,
+                                    [m.id]: {
+                                      ...s[m.id],
+                                      atLocal: e.target.value,
+                                    },
+                                  }))
+                                }
+                              />
+                            </div>
+                            <div className="md:col-span-3">
+                              <label className="block text-xs text-gray-600">
+                                By (Nickname/User)
+                              </label>
+                              <input
+                                className="mt-1 w-full rounded border p-2 text-sm"
+                                value={editMap[m.id].byId}
+                                onChange={(e) =>
+                                  setEditMap((s) => ({
+                                    ...s,
+                                    [m.id]: {
+                                      ...s[m.id],
+                                      byId: e.target.value,
+                                    },
+                                  }))
+                                }
+                                placeholder="e.g. ANGELO"
+                              />
+                            </div>
+
+                            <div className="md:col-span-3">
+                              <label className="block text-xs text-gray-600">
+                                Project (OUT only)
+                              </label>
+                              <Combobox
+                                value={editMap[m.id].projectCode}
+                                onChange={(v: string) =>
+                                  setEditMap((s) => ({
+                                    ...s,
+                                    [m.id]: {
+                                      ...s[m.id],
+                                      projectCode: v ?? "",
+                                    },
+                                  }))
+                                }
+                                as="div"
+                              >
+                                <div className="relative">
+                                  <Combobox.Input
+                                    disabled={m.direction !== "OUT"}
+                                    className="w-full rounded border p-2 text-sm disabled:opacity-60"
+                                    displayValue={(v: string) => v}
+                                    onChange={(e) =>
+                                      setEditMap((s) => ({
+                                        ...s,
+                                        [m.id]: {
+                                          ...s[m.id],
+                                          projectCode: e.target.value,
+                                        },
+                                      }))
+                                    }
+                                    placeholder={
+                                      m.direction === "OUT"
+                                        ? "Search/select project"
+                                        : "N/A for PULL OUT"
+                                    }
+                                  />
+                                  <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2">
+                                    <ChevronUpDownIcon className="h-5 w-5 text-gray-400" />
+                                  </Combobox.Button>
+                                  {m.direction === "OUT" &&
+                                    filteredProjects.length > 0 && (
+                                      <Combobox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                                        {filteredProjects.map((p) => (
+                                          <Combobox.Option
+                                            key={p.id}
+                                            value={p.code}
+                                            className={({ active }) =>
+                                              `relative cursor-pointer select-none py-2 pl-3 pr-9 ${
+                                                active
+                                                  ? "bg-blue-600 text-white"
+                                                  : "text-gray-900"
+                                              }`
+                                            }
+                                          >
+                                            {({ selected, active }) => (
+                                              <>
+                                                <span
+                                                  className={`block truncate ${selected ? "font-semibold" : ""}`}
+                                                >
+                                                  {p.code}
+                                                </span>
+                                                {selected && (
+                                                  <span
+                                                    className={`absolute inset-y-0 right-0 flex items-center pr-4 ${
+                                                      active
+                                                        ? "text-white"
+                                                        : "text-blue-600"
+                                                    }`}
+                                                  >
+                                                    <CheckIcon className="h-5 w-5" />
+                                                  </span>
+                                                )}
+                                              </>
+                                            )}
+                                          </Combobox.Option>
+                                        ))}
+                                      </Combobox.Options>
+                                    )}
+                                </div>
+                              </Combobox>
+                            </div>
+
+                            <div>
+                              <label className="block text-xs text-gray-600">
+                                Type
+                              </label>
+                              <input
+                                className="mt-1 w-full rounded border p-2 text-sm"
+                                value={editMap[m.id].type}
+                                onChange={(e) =>
+                                  setEditMap((s) => ({
+                                    ...s,
+                                    [m.id]: {
+                                      ...s[m.id],
+                                      type: e.target.value,
+                                    },
+                                  }))
+                                }
+                                placeholder="Dehumidifier / Blower / ..."
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-600">
+                                Asset #
+                              </label>
+                              <input
+                                className="mt-1 w-full rounded border p-2 text-sm"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                value={editMap[m.id].assetNumber}
+                                onChange={(e) =>
+                                  setEditMap((s) => ({
+                                    ...s,
+                                    [m.id]: {
+                                      ...s[m.id],
+                                      assetNumber: e.target.value,
+                                    },
+                                  }))
+                                }
+                                placeholder="e.g. 33"
+                              />
+                            </div>
+
+                            <div className="md:col-span-6">
+                              <label className="block text-xs text-gray-600">
+                                Notes
+                              </label>
+                              <textarea
+                                className="mt-1 w-full rounded border p-2 text-sm"
+                                rows={2}
+                                value={editMap[m.id].note}
+                                onChange={(e) =>
+                                  setEditMap((s) => ({
+                                    ...s,
+                                    [m.id]: {
+                                      ...s[m.id],
+                                      note: e.target.value,
+                                    },
+                                  }))
+                                }
+                                placeholder="Context / corrections…"
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
 
-                      {/* Right cluster: actions */}
-                      <div className="flex shrink-0 flex-wrap items-center gap-2">
+                      {/* Right cluster: actions (column on mobile, row on md+) */}
+                      <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:flex-wrap md:items-center">
                         {/* Toggle mover */}
-                        <button
-                          onClick={() => setShowMoverMap((s) => ({ ...s, [m.id]: !s[m.id] }))}
-                          className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs"
-                          title={showMoverMap[m.id] ? "Hide name" : "Show name"}
-                        >
-                          {showMoverMap[m.id] ? (
-                            <>
-                              <EyeSlashIcon className="h-4 w-4" />
-                              Hide name
-                            </>
-                          ) : (
-                            <>
-                              <EyeIcon className="h-4 w-4" />
-                              Show name
-                            </>
-                          )}
-                        </button>
-
-                        {/* Toggle notes (only if notes feature enabled and there is a note) */}
-                        {showNotes && m.note ? (
+                        <div className="flex flex-row flex-wrap gap-2">
                           <button
                             onClick={() =>
-                              setNotesOpen((o) => ({ ...o, [m.id]: !o[m.id] }))
+                              setShowMoverMap((s) => ({
+                                ...s,
+                                [m.id]: !s[m.id],
+                              }))
                             }
                             className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs"
-                            title={notesOpen[m.id] ? "Hide notes" : "Show notes"}
+                            title={
+                              showMoverMap[m.id] ? "Hide name" : "Show name"
+                            }
                           >
-                            {notesOpen[m.id] ? (
+                            {showMoverMap[m.id] ? (
                               <>
                                 <EyeSlashIcon className="h-4 w-4" />
-                                Hide notes
+                                Hide name
                               </>
                             ) : (
                               <>
                                 <EyeIcon className="h-4 w-4" />
-                                Show notes
+                                Show name
                               </>
                             )}
                           </button>
-                        ) : null}
 
-                        {/* Delete (admin) */}
-                        {isAdmin ? (
-                          confirmDeleteId === m.id ? (
+                          {/* Toggle notes */}
+                          {showNotes && m.note ? (
+                            <button
+                              onClick={() =>
+                                setNotesOpen((o) => ({
+                                  ...o,
+                                  [m.id]: !o[m.id],
+                                }))
+                              }
+                              className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs"
+                              title={
+                                notesOpen[m.id] ? "Hide notes" : "Show notes"
+                              }
+                            >
+                              {notesOpen[m.id] ? (
+                                <>
+                                  <EyeSlashIcon className="h-4 w-4" />
+                                  Hide notes
+                                </>
+                              ) : (
+                                <>
+                                  <EyeIcon className="h-4 w-4" />
+                                  Show notes
+                                </>
+                              )}
+                            </button>
+                          ) : null}
+
+                          {/* Edit / Save / Cancel (admin only) */}
+                          {isAdmin && !isEditing(m.id) && (
+                            <button
+                              onClick={() => startEdit(m)}
+                              className="rounded bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 ring-1 ring-indigo-200"
+                            >
+                              Edit
+                            </button>
+                          )}
+                          {isAdmin && isEditing(m.id) && (
                             <>
                               <button
-                                onClick={() => deleteMovement(m.id)}
-                                className="rounded bg-red-600 px-3 py-1.5 text-xs font-medium text-white"
+                                onClick={() => saveEdit(m.id)}
+                                className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white"
                               >
-                                Confirm
+                                Save
                               </button>
                               <button
-                                onClick={() => {
-                                  setConfirmDeleteId(null);
-                                  toast("Delete cancelled");
-                                }}
+                                onClick={() => cancelEdit(m.id)}
                                 className="rounded border px-3 py-1.5 text-xs"
                               >
                                 Cancel
                               </button>
                             </>
-                          ) : (
-                            <button
-                              onClick={() => {
-                                setConfirmDeleteId(m.id);
-                                toast("Click again to confirm delete", {
-                                  icon: "⚠️",
-                                });
-                              }}
-                              className="rounded bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 ring-1 ring-red-200"
-                            >
-                              Delete
-                            </button>
-                          )
-                        ) : null}
+                          )}
+
+                          {/* Delete (admin) */}
+                          {isAdmin ? (
+                            confirmDeleteId === m.id ? (
+                              <>
+                                <button
+                                  onClick={() => deleteMovement(m.id)}
+                                  className="rounded bg-red-600 px-3 py-1.5 text-xs font-medium text-white"
+                                >
+                                  Confirm
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setConfirmDeleteId(null);
+                                    toast("Delete cancelled");
+                                  }}
+                                  className="rounded border px-3 py-1.5 text-xs"
+                                >
+                                  Cancel
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setConfirmDeleteId(m.id);
+                                  toast("Click again to confirm delete", {
+                                    icon: "⚠️",
+                                  });
+                                }}
+                                className="rounded bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 ring-1 ring-red-200"
+                              >
+                                Delete
+                              </button>
+                            )
+                          ) : null}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1696,9 +2053,10 @@ export default function MoveClient(): JSX.Element {
           </div>
 
           {/* pagination controls */}
-          <div className="mt-3 flex items-center justify-between">
+          <div className="mt-3 flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center">
             <div className="text-xs text-gray-500">
-              Page {recPage} / {totalPages} · {recentFilteredSorted.length} items
+              Page {recPage} / {totalPages} · {recentFilteredSorted.length}{" "}
+              items
             </div>
             <div className="flex gap-2">
               <button

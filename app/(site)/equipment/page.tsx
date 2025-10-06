@@ -624,6 +624,11 @@ export default function EquipmentTrackingPage() {
   const toggleAgingNote = (id: string) =>
     setAgingNoteOpen((m) => ({ ...m, [id]: !m[id] }));
 
+  /* ---------- NEW: Project table note toggles ---------- */
+  const [projNoteOpen, setProjNoteOpen] = useState<Record<string, boolean>>({});
+  const toggleProjNote = (id: string) =>
+    setProjNoteOpen((m) => ({ ...m, [id]: !m[id] }));
+
   /* ---------- Ready-to-Pull controls (filters + pagination) ---------- */
   const [pullTab, setPullTab] = useState<"URGENT" | "POTENTIAL">("URGENT");
   const [rpTypeF, setRpTypeF] = useState<string>(""); // filter by type
@@ -688,7 +693,7 @@ export default function EquipmentTrackingPage() {
             <TypePills entries={stats.byType.totalNonArchived} />
           </div>
 
-        {/* Deployed (non-archived) */}
+          {/* Deployed (non-archived) */}
           <div className="rounded bg-blue-50 p-3 text-sm shadow">
             <div className="text-blue-700">Deployed</div>
             <div className="text-xl font-semibold text-blue-900">
@@ -1148,22 +1153,33 @@ export default function EquipmentTrackingPage() {
                     {/* Peek row (oldest 3) */}
                     {!isOpen && peek.length > 0 && (
                       <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-3">
-                        {peek.map((e) => (
-                          <div
-                            key={e.id}
-                            className="flex items-center justify-between rounded bg-gray-50 px-2 py-1"
-                          >
-                            <span className="truncate">
-                              {e.type} #{e.assetNumber}
-                            </span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-gray-600">
-                                {fmtElapsedFor(e)}
+                        {peek.map((e) => {
+                          const hasNote = !!latestOutNoteFor(e);
+                          return (
+                            <div
+                              key={e.id}
+                              className="flex items-center justify-between rounded bg-gray-50 px-2 py-1"
+                            >
+                              <span className="truncate">
+                                {e.type} #{e.assetNumber}
                               </span>
-                              {bandBadge(e)}
+                              <div className="flex items-center gap-2">
+                                {hasNote && (
+                                  <span
+                                    className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800"
+                                    title="Has note"
+                                  >
+                                    note
+                                  </span>
+                                )}
+                                <span className="text-xs text-gray-600">
+                                  {fmtElapsedFor(e)}
+                                </span>
+                                {bandBadge(e)}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
 
@@ -1179,6 +1195,8 @@ export default function EquipmentTrackingPage() {
                               <th className="p-2 text-left">Last moved at</th>
                               <th className="p-2 text-left">Elapsed</th>
                               <th className="p-2 text-left">Flag</th>
+                              {/* NEW: Note column */}
+                              <th className="p-2 text-left">Note</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1188,26 +1206,61 @@ export default function EquipmentTrackingPage() {
                                   (daysSince(b.lastMovedAt) ?? 0) -
                                   (daysSince(a.lastMovedAt) ?? 0),
                               )
-                              .map((e) => (
-                                <tr key={e.id} className="border-t align-top">
-                                  <td className="p-2">{e.type}</td>
-                                  <td className="p-2 font-semibold">
-                                    {e.assetNumber}
-                                  </td>
-                                  <td className="p-2">
-                                    {e.lastMovedBy ?? "—"}
-                                  </td>
-                                  <td className="p-2">
-                                    {e.lastMovedAt
-                                      ? new Date(
-                                          e.lastMovedAt as any,
-                                        ).toLocaleString()
-                                      : "—"}
-                                  </td>
-                                  <td className="p-2">{fmtElapsedFor(e)}</td>
-                                  <td className="p-2">{bandBadge(e)}</td>
-                                </tr>
-                              ))}
+                              .map((e) => {
+                                const note = latestOutNoteFor(e);
+                                const open = !!projNoteOpen[e.id];
+                                return (
+                                  <tr key={e.id} className="border-t align-top">
+                                    <td className="p-2">{e.type}</td>
+                                    <td className="p-2 font-semibold">
+                                      {e.assetNumber}
+                                    </td>
+                                    <td className="p-2">
+                                      {e.lastMovedBy ?? "—"}
+                                    </td>
+                                    <td className="p-2">
+                                      {e.lastMovedAt
+                                        ? new Date(
+                                            e.lastMovedAt as any,
+                                          ).toLocaleString()
+                                        : "—"}
+                                    </td>
+                                    <td className="p-2">{fmtElapsedFor(e)}</td>
+                                    <td className="p-2">{bandBadge(e)}</td>
+                                    {/* NEW: Note cell */}
+                                    <td className="p-2">
+                                      {note ? (
+                                        <div className="space-y-1">
+                                          <button
+                                            type="button"
+                                            onClick={() => toggleProjNote(e.id)}
+                                            className="rounded border px-2 py-0.5 text-[11px] hover:bg-gray-50"
+                                            title={
+                                              open ? "Hide note" : "Show note"
+                                            }
+                                          >
+                                            {open ? "Hide" : "Show"} note
+                                          </button>
+                                          {open && (
+                                            <div className="rounded bg-amber-50 p-2 text-[11px] ring-1 ring-amber-200 max-w-xs md:max-w-md lg:max-w-lg">
+                                              <div className="mb-1 font-semibold text-amber-800">
+                                                Note (latest deploy)
+                                              </div>
+                                              <div className="whitespace-pre-wrap break-words text-amber-900">
+                                                {note}
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <span className="text-[11px] text-gray-400">
+                                          —
+                                        </span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
                           </tbody>
                         </table>
                       </div>
@@ -1219,7 +1272,8 @@ export default function EquipmentTrackingPage() {
           )}
         </div>
 
-        {/* ---------- Filters (main table) ---------- */}
+        {/* ---------- Filters (main table) ---------- */
+        }
         <div className="mb-3 grid grid-cols-1 gap-2 md:grid-cols-6">
           <input
             placeholder="Search (type, #, project, last moved by…) — tip: type 01 for #1"
