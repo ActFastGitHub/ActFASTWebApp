@@ -604,18 +604,18 @@ export default function EquipmentTrackingPage() {
     );
 
   /* ---------- Top Aging visibility (remember per session) ---------- */
-  const STORAGE_KEY = "equipment_show_top_aging";
+  const STORAGE_KEY_AGING = "equipment_show_top_aging";
   const [showTopAging, setShowTopAging] = useState(false);
   useEffect(() => {
     try {
-      const v = localStorage.getItem(STORAGE_KEY);
+      const v = localStorage.getItem(STORAGE_KEY_AGING);
       if (v === "1") setShowTopAging(true);
     } catch {}
   }, []);
   useEffect(() => {
     try {
-      if (showTopAging) localStorage.setItem(STORAGE_KEY, "1");
-      else localStorage.removeItem(STORAGE_KEY);
+      if (showTopAging) localStorage.setItem(STORAGE_KEY_AGING, "1");
+      else localStorage.removeItem(STORAGE_KEY_AGING);
     } catch {}
   }, [showTopAging]);
 
@@ -673,6 +673,23 @@ export default function EquipmentTrackingPage() {
     (rpPage - 1) * rpPageSize,
     rpPage * rpPageSize,
   );
+
+  /* ---------- NEW: Ready-to-Pull visibility (hidden by default + persisted) ---------- */
+  const STORAGE_KEY_READY = "equipment_show_ready_to_pull";
+  const [showReadyToPull, setShowReadyToPull] = useState(false);
+
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem(STORAGE_KEY_READY);
+      if (v === "1") setShowReadyToPull(true);
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try {
+      if (showReadyToPull) localStorage.setItem(STORAGE_KEY_READY, "1");
+      else localStorage.removeItem(STORAGE_KEY_READY);
+    } catch {}
+  }, [showReadyToPull]);
 
   /* -------------------- Render -------------------- */
 
@@ -771,212 +788,6 @@ export default function EquipmentTrackingPage() {
               </ul>
             )}
           </div>
-        </div>
-
-        {/* ======= Ready-to-Pull (action list) — now filterable + paginated ======= */}
-        <div className="mb-6 rounded bg-white p-4 shadow md:p-5">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-base font-semibold md:text-lg">Ready to Pull</h3>
-            <div className="flex gap-2 text-xs">
-              <button
-                type="button"
-                onClick={() => setPullTab("URGENT")}
-                className={`rounded border px-3 py-1 ${
-                  pullTab === "URGENT" ? "bg-red-600 text-white" : "bg-white"
-                }`}
-              >
-                Urgent ≥14 ({stats.urgent})
-              </button>
-              <button
-                type="button"
-                onClick={() => setPullTab("POTENTIAL")}
-                className={`rounded border px-3 py-1 ${
-                  pullTab === "POTENTIAL" ? "bg-amber-500 text-white" : "bg-white"
-                }`}
-              >
-                Potential ≥7 ({stats.potential})
-              </button>
-            </div>
-          </div>
-
-          {/* Filters */}
-          <div className="mb-3 grid grid-cols-1 gap-2 md:grid-cols-5">
-            <select
-              className="rounded border p-2"
-              value={rpTypeF}
-              onChange={(e) => setRpTypeF(e.target.value)}
-            >
-              <option value="">All Types</option>
-              {types.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-            <input
-              className="rounded border p-2 md:col-span-2"
-              placeholder="Search by project / type / #"
-              value={rpQuery}
-              onChange={(e) => setRpQuery(e.target.value)}
-            />
-            <div className="md:col-span-2">
-              <Pagination
-                page={rpPage}
-                setPage={setRpPage}
-                pageSize={rpPageSize}
-                total={rpTotal}
-                compact
-              />
-            </div>
-          </div>
-
-          {/* Table */}
-          {rpTotal === 0 ? (
-            <div className="text-sm text-gray-500">
-              {pullTab === "URGENT"
-                ? "No items at or beyond 14 days."
-                : "No items between 7–13 days."}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-xs md:text-sm">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="p-2 text-left">Type • #</th>
-                    <th className="p-2 text-left">Project</th>
-                    <th className="p-2 text-left">Last moved by</th>
-                    <th className="p-2 text-left">Last moved at</th>
-                    <th className="p-2 text-left">Days</th>
-                    <th className="p-2 text-left">Flag</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rpPageItems.map((e) => {
-                    const d = daysSince(e.lastMovedAt) ?? 0;
-                    return (
-                      <tr key={e.id} className="border-t">
-                        <td className="p-2 font-medium">
-                          {e.type}{" "}
-                          <span className="text-gray-500">#{e.assetNumber}</span>
-                        </td>
-                        <td className="p-2">{e.currentProjectCode ?? "—"}</td>
-                        <td className="p-2">{e.lastMovedBy ?? "—"}</td>
-                        <td className="p-2">
-                          {e.lastMovedAt
-                            ? new Date(e.lastMovedAt as any).toLocaleString()
-                            : "—"}
-                        </td>
-                        <td className="p-2">{d}d</td>
-                        <td className="p-2">{bandBadge(e)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Bottom pagination */}
-          {rpTotal > 0 && (
-            <Pagination
-              page={rpPage}
-              setPage={setRpPage}
-              pageSize={rpPageSize}
-              total={rpTotal}
-              className="mt-3"
-              compact
-            />
-          )}
-        </div>
-
-        {/* ======= Top Aging (Global) — collapsed by default + fixed hooks ======= */}
-        <div className="mb-6 rounded bg-white p-4 shadow md:p-5">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-base font-semibold md:text-lg">Top Aging (Global)</h3>
-            <button
-              type="button"
-              onClick={() => setShowTopAging((v) => !v)}
-              className="rounded border px-3 py-1 text-xs hover:bg-gray-50"
-            >
-              {showTopAging ? "Hide Top Aging" : "Show Top Aging"}
-            </button>
-          </div>
-
-          {!showTopAging ? (
-            <div className="text-sm text-gray-500">
-              Hidden. Click “Show Top Aging” to view the oldest deployed items.
-            </div>
-          ) : stats.oldest.length === 0 ? (
-            <div className="text-sm text-gray-500">No deployed equipment.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-xs md:text-sm">
-                <thead className="bg-gray-50 text-gray-700">
-                  <tr>
-                    <th className="p-2 text-left">Type • #</th>
-                    <th className="p-2 text-left">Project</th>
-                    <th className="p-2 text-left">Last moved by</th>
-                    <th className="p-2 text-left">Last moved at</th>
-                    <th className="p-2 text-left">Elapsed</th>
-                    <th className="p-2 text-left">Days</th>
-                    <th className="p-2 text-left">Flag</th>
-                    <th className="p-2 text-left">Note</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stats.oldest.map((e) => {
-                    const d = daysSince(e.lastMovedAt) ?? 0;
-                    const note = latestOutNoteFor(e);
-                    const open = !!agingNoteOpen[e.id];
-                    return (
-                      <tr key={e.id} className="border-t">
-                        <td className="p-2 font-medium">
-                          {e.type}{" "}
-                          <span className="text-gray-500">#{e.assetNumber}</span>
-                        </td>
-                        <td className="p-2">{e.currentProjectCode ?? "—"}</td>
-                        <td className="p-2">{e.lastMovedBy ?? "—"}</td>
-                        <td className="p-2">
-                          {e.lastMovedAt
-                            ? new Date(e.lastMovedAt as any).toLocaleString()
-                            : "—"}
-                        </td>
-                        <td className="p-2">{fmtElapsedFor(e)}</td>
-                        <td className="p-2">{d}d</td>
-                        <td className="p-2">{bandBadge(e)}</td>
-                        <td className="p-2">
-                          {note ? (
-                            <div className="space-y-1">
-                              <button
-                                type="button"
-                                onClick={() => toggleAgingNote(e.id)}
-                                className="rounded border px-2 py-0.5 text-[11px] hover:bg-gray-50"
-                                title={open ? "Hide note" : "Show note"}
-                              >
-                                {open ? "Hide" : "Show"} note
-                              </button>
-                              {open && (
-                                <div className="rounded bg-amber-50 p-2 text-[11px] ring-1 ring-amber-200">
-                                  <div className="mb-1 font-semibold text-amber-800">
-                                    Note (latest deploy)
-                                  </div>
-                                  <div className="whitespace-pre-wrap text-amber-900">
-                                    {note}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-[11px] text-gray-400">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
         </div>
 
         {/* ======= Deployed — Breakdown by Project (non-archived only) ======= */}
@@ -1242,7 +1053,7 @@ export default function EquipmentTrackingPage() {
                                             {open ? "Hide" : "Show"} note
                                           </button>
                                           {open && (
-                                            <div className="rounded bg-amber-50 p-2 text-[11px] ring-1 ring-amber-200 max-w-xs md:max-w-md lg:max-w-lg">
+                                            <div className="max-w-xs rounded bg-amber-50 p-2 text-[11px] ring-1 ring-amber-200 md:max-w-md lg:max-w-lg">
                                               <div className="mb-1 font-semibold text-amber-800">
                                                 Note (latest deploy)
                                               </div>
@@ -1272,8 +1083,234 @@ export default function EquipmentTrackingPage() {
           )}
         </div>
 
-        {/* ---------- Filters (main table) ---------- */
-        }
+        {/* ======= Ready-to-Pull (action list) — now collapsible & hidden by default ======= */}
+        <div className="mb-6 rounded bg-white p-4 shadow md:p-5">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-base font-semibold md:text-lg">Ready to Pull</h3>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowReadyToPull((v) => !v)}
+                className="rounded border px-3 py-1 text-xs hover:bg-gray-50"
+              >
+                {showReadyToPull ? "Hide" : "Show"} Ready to Pull
+              </button>
+            </div>
+          </div>
+
+          {!showReadyToPull ? (
+            <div className="text-sm text-gray-500">
+              Hidden. Click “Show Ready to Pull” to view suggested pickups.
+            </div>
+          ) : (
+            <>
+              {/* Tabs */}
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex gap-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setPullTab("URGENT")}
+                    className={`rounded border px-3 py-1 ${
+                      pullTab === "URGENT" ? "bg-red-600 text-white" : "bg-white"
+                    }`}
+                  >
+                    Urgent ≥14 ({stats.urgent})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPullTab("POTENTIAL")}
+                    className={`rounded border px-3 py-1 ${
+                      pullTab === "POTENTIAL" ? "bg-amber-500 text-white" : "bg-white"
+                    }`}
+                  >
+                    Potential ≥7 ({stats.potential})
+                  </button>
+                </div>
+              </div>
+
+              {/* Filters */}
+              <div className="mb-3 grid grid-cols-1 gap-2 md:grid-cols-5">
+                <select
+                  className="rounded border p-2"
+                  value={rpTypeF}
+                  onChange={(e) => setRpTypeF(e.target.value)}
+                >
+                  <option value="">All Types</option>
+                  {types.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  className="rounded border p-2 md:col-span-2"
+                  placeholder="Search by project / type / #"
+                  value={rpQuery}
+                  onChange={(e) => setRpQuery(e.target.value)}
+                />
+                <div className="md:col-span-2">
+                  <Pagination
+                    page={rpPage}
+                    setPage={setRpPage}
+                    pageSize={rpPageSize}
+                    total={rpTotal}
+                    compact
+                  />
+                </div>
+              </div>
+
+              {/* Table */}
+              {rpTotal === 0 ? (
+                <div className="text-sm text-gray-500">
+                  {pullTab === "URGENT"
+                    ? "No items at or beyond 14 days."
+                    : "No items between 7–13 days."}
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-xs md:text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="p-2 text-left">Type • #</th>
+                        <th className="p-2 text-left">Project</th>
+                        <th className="p-2 text-left">Last moved by</th>
+                        <th className="p-2 text-left">Last moved at</th>
+                        <th className="p-2 text-left">Days</th>
+                        <th className="p-2 text-left">Flag</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rpPageItems.map((e) => {
+                        const d = daysSince(e.lastMovedAt) ?? 0;
+                        return (
+                          <tr key={e.id} className="border-t">
+                            <td className="p-2 font-medium">
+                              {e.type}{" "}
+                              <span className="text-gray-500">#{e.assetNumber}</span>
+                            </td>
+                            <td className="p-2">{e.currentProjectCode ?? "—"}</td>
+                            <td className="p-2">{e.lastMovedBy ?? "—"}</td>
+                            <td className="p-2">
+                              {e.lastMovedAt
+                                ? new Date(e.lastMovedAt as any).toLocaleString()
+                                : "—"}
+                            </td>
+                            <td className="p-2">{d}d</td>
+                            <td className="p-2">{bandBadge(e)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Bottom pagination */}
+              {rpTotal > 0 && (
+                <Pagination
+                  page={rpPage}
+                  setPage={setRpPage}
+                  pageSize={rpPageSize}
+                  total={rpTotal}
+                  className="mt-3"
+                  compact
+                />
+              )}
+            </>
+          )}
+        </div>
+
+        {/* ======= Top Aging (Global) — collapsed by default + fixed hooks ======= */}
+        <div className="mb-6 rounded bg-white p-4 shadow md:p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-base font-semibold md:text-lg">Top Aging (Global)</h3>
+            <button
+              type="button"
+              onClick={() => setShowTopAging((v) => !v)}
+              className="rounded border px-3 py-1 text-xs hover:bg-gray-50"
+            >
+              {showTopAging ? "Hide Top Aging" : "Show Top Aging"}
+            </button>
+          </div>
+
+          {!showTopAging ? (
+            <div className="text-sm text-gray-500">
+              Hidden. Click “Show Top Aging” to view the oldest deployed items.
+            </div>
+          ) : stats.oldest.length === 0 ? (
+            <div className="text-sm text-gray-500">No deployed equipment.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-xs md:text-sm">
+                <thead className="bg-gray-50 text-gray-700">
+                  <tr>
+                    <th className="p-2 text-left">Type • #</th>
+                    <th className="p-2 text-left">Project</th>
+                    <th className="p-2 text-left">Last moved by</th>
+                    <th className="p-2 text-left">Last moved at</th>
+                    <th className="p-2 text-left">Elapsed</th>
+                    <th className="p-2 text-left">Days</th>
+                    <th className="p-2 text-left">Flag</th>
+                    <th className="p-2 text-left">Note</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.oldest.map((e) => {
+                    const d = daysSince(e.lastMovedAt) ?? 0;
+                    const note = latestOutNoteFor(e);
+                    const open = !!agingNoteOpen[e.id];
+                    return (
+                      <tr key={e.id} className="border-t">
+                        <td className="p-2 font-medium">
+                          {e.type}{" "}
+                          <span className="text-gray-500">#{e.assetNumber}</span>
+                        </td>
+                        <td className="p-2">{e.currentProjectCode ?? "—"}</td>
+                        <td className="p-2">{e.lastMovedBy ?? "—"}</td>
+                        <td className="p-2">
+                          {e.lastMovedAt
+                            ? new Date(e.lastMovedAt as any).toLocaleString()
+                            : "—"}
+                        </td>
+                        <td className="p-2">{fmtElapsedFor(e)}</td>
+                        <td className="p-2">{d}d</td>
+                        <td className="p-2">{bandBadge(e)}</td>
+                        <td className="p-2">
+                          {note ? (
+                            <div className="space-y-1">
+                              <button
+                                type="button"
+                                onClick={() => toggleAgingNote(e.id)}
+                                className="rounded border px-2 py-0.5 text-[11px] hover:bg-gray-50"
+                                title={open ? "Hide note" : "Show note"}
+                              >
+                                {open ? "Hide" : "Show"} note
+                              </button>
+                              {open && (
+                                <div className="rounded bg-amber-50 p-2 text-[11px] ring-1 ring-amber-200">
+                                  <div className="mb-1 font-semibold text-amber-800">
+                                    Note (latest deploy)
+                                  </div>
+                                  <div className="whitespace-pre-wrap text-amber-900">
+                                    {note}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-gray-400">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* ---------- Filters (main table) ---------- */}
         <div className="mb-3 grid grid-cols-1 gap-2 md:grid-cols-6">
           <input
             placeholder="Search (type, #, project, last moved by…) — tip: type 01 for #1"
