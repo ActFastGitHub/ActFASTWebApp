@@ -39,7 +39,7 @@ const Navbar: React.FC<NavbarProps> = ({ onPortalClick }) => {
   };
 
   return (
-    <nav className="fixed left-0 right-0 top-0 z-10 bg-black">
+    <nav className="fixed left-0 right-0 top-0 z-50 bg-black">
       <div className="mx-auto max-w-7xl px-2 sm:px-4 lg:px-6">
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center space-x-4">
