@@ -978,19 +978,47 @@ export default function MoveClient(): JSX.Element {
 
   // auto-archive (>30 days old)
   const [showArchived, setShowArchived] = useState(false);
+
+  // NOTE: keep behavior as-is, but compute cutoff once per mount (same as your original)
   const cutoffMs = useMemo(() => Date.now() - 30 * 24 * 60 * 60 * 1000, []);
 
+  // ✅ FIX: fetch ALL movements by paging the API (200 at a time)
   async function refreshRecent() {
+    const PAGE_SIZE = 200; // matches API cap
+    const MAX_TOTAL = 20000; // safety guard
+
     try {
-      const { data } = await axios.get<{ status: number; items: Recent[] }>(
-        "/api/equipment/movements",
-        { params: { limit: 1000 } },
-      );
-      if (data.status === 200) setRecent(data.items);
+      const all = new Map<string, Recent>();
+      let skip = 0;
+
+      for (;;) {
+        const { data } = await axios.get<{
+          status: number;
+          items: Recent[];
+          total?: number;
+          limit?: number;
+          skip?: number;
+        }>("/api/equipment/movements", {
+          params: { limit: PAGE_SIZE, skip },
+        });
+
+        if (data?.status !== 200 || !Array.isArray(data.items)) break;
+
+        data.items.forEach((r) => all.set(r.id, r));
+
+        // stop if less than a full page
+        if (data.items.length < PAGE_SIZE) break;
+
+        skip += PAGE_SIZE;
+        if (all.size >= MAX_TOTAL) break;
+      }
+
+      setRecent(Array.from(all.values()));
     } catch {
       /* noop */
     }
   }
+
   useEffect(() => {
     refreshRecent();
   }, []);
