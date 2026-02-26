@@ -20,6 +20,7 @@ type RoleKey =
   | "Project Coordinator"
   | "Purchasing Officer"
   | "Controller"
+  | "Bookkeeper"
   | "Technical Support Analyst";
 
 // --- Section Colors ---
@@ -47,7 +48,7 @@ const sectionColors: Record<
     glow: "rgba(232,121,249,0.13)",
     inner: "hover:bg-pink-200/90",
   },
-  "Automotive": {
+  Automotive: {
     gradient: "from-yellow-300/60 via-orange-400/40 to-amber-400/30",
     glow: "rgba(251,191,36,0.13)",
     inner: "hover:bg-yellow-200/90",
@@ -89,6 +90,12 @@ const roleColors: Record<
     glow: "rgba(99,102,241,0.16)",
     gradient: "from-indigo-400/70 via-indigo-200/40 to-white/10",
   },
+  Bookkeeper: {
+    border: "border-pink-500",
+    ring: "ring-pink-400",
+    glow: "rgba(99,102,241,0.16)",
+    gradient: "from-pink-400/70 via-pink-200/40 to-white/10",
+  },
   // You = green!
   "Technical Support Analyst": {
     border: "border-lime-600",
@@ -106,62 +113,177 @@ type TeamSection = {
 };
 
 const upperManagement: TeamMember[] = [
-  { name: "Carlo Bernabe", role: "Project Manager", description: "Seasoned professional with over 20 years of experience, overseeing key aspects of restoration and repair projects." },
-  { name: "Jun Adasa", role: "Project Manager", description: "Leads multiple projects with a focus on strategic coordination, ensuring budgets, schedules, and client expectations are met." },
-  { name: "Albert Siscar", role: "Project Manager", description: "Senior manager who drives project timelines, fosters strong client relationships, and guarantees high-quality outcomes." },
-  { name: "DJ Lopez", role: "Construction Manager", description: "Directs all final repair operations, managing budgets and collaborating with subcontractors to meet project scopes." },
-  { name: "Ervin Ong", role: "Project Coordinator", description: "Facilitates communication between teams, assisting in scheduling, client interaction, and on-site coordination." },
+  {
+    name: "Carlo Bernabe",
+    role: "Project Manager",
+    description:
+      "Seasoned professional with over 20 years of experience, overseeing key aspects of restoration and repair projects.",
+  },
+  {
+    name: "Jun Adasa",
+    role: "Project Manager",
+    description:
+      "Leads multiple projects with a focus on strategic coordination, ensuring budgets, schedules, and client expectations are met.",
+  },
+  {
+    name: "Albert Siscar",
+    role: "Project Manager",
+    description:
+      "Senior manager who drives project timelines, fosters strong client relationships, and guarantees high-quality outcomes.",
+  },
+  {
+    name: "DJ Lopez",
+    role: "Construction Manager",
+    description:
+      "Directs all final repair operations, managing budgets and collaborating with subcontractors to meet project scopes.",
+  },
+  {
+    name: "Ervin Ong",
+    role: "Project Coordinator",
+    description:
+      "Facilitates communication between teams, assisting in scheduling, client interaction, and on-site coordination.",
+  },
   // { name: "Mac De Guzman", role: "Project Coordinator", description: "Focuses on large-scale projects, managing employee schedules and ensuring timely progress on key deliverables." },
-  { name: "April Adasa", role: "Purchasing Officer", description: "Oversees procurement and supply management, supporting both final repairs and contents operations." },
-  { name: "Girlie Atienza", role: "Controller", description: "Manages financial tasks including bookkeeping, payroll, and time sheet administration." },
-  { name: "Angelo Guerra", role: "Technical Support Analyst", description: "Provides IT solutions, web development, and process optimization to streamline company operations." },
+  {
+    name: "April Adasa",
+    role: "Purchasing Officer",
+    description:
+      "Oversees procurement and supply management, supporting both final repairs and contents operations.",
+  },
+  {
+    name: "Girlie Atienza",
+    role: "Controller",
+    description:
+      "Oversees the company’s overall financial strategy, reporting, compliance, and internal controls. Supervises bookkeeping, payroll, and financial administration functions.",
+  },
+  {
+    name: "Trixie Gamilla",
+    role: "Bookkeeper",
+    description:
+      "Handles day-to-day financial transactions including bookkeeping entries, payroll processing, and time sheet administration, reporting directly to the Controller.",
+  },
+  {
+    name: "Angelo Guerra",
+    role: "Technical Support Analyst",
+    description:
+      "Provides IT solutions, web development, and process optimization to streamline company operations.",
+  },
 ];
 
 const teamSections: TeamSection[] = [
   {
     role: "Contents Team",
-    description: "The Contents Team collaboratively manages sorting, packing, proper labeling, and recording of items. They also handle initial cleanup and ensure everything is accounted for before and after transport.",
+    description:
+      "The Contents Team collaboratively manages sorting, packing, proper labeling, and recording of items. They also handle initial cleanup and ensure everything is accounted for before and after transport.",
     members: [
-      { name: "Julia", description: "Lead member ensuring smooth coordination of sorting, packing, labeling, and record-keeping." },
-      { name: "Beth", description: "Senior member focused on efficient team collaboration and thorough preparation for transport." },
-      { name: "Lisa", description: "Lead member ensuring all items are accurately tracked, labeled, and ready for pack-out and pack-back." },
-      { name: "Lorena", description: "Contributes to every stage of content handling, maintaining accurate records of item locations." },
-      { name: "Vivian", description: "Supports all aspects of sorting, labeling, and cleanup to keep operations running smoothly." },
+      {
+        name: "Julia",
+        description:
+          "Lead member ensuring smooth coordination of sorting, packing, labeling, and record-keeping.",
+      },
+      {
+        name: "Beth",
+        description:
+          "Senior member focused on efficient team collaboration and thorough preparation for transport.",
+      },
+      {
+        name: "Lisa",
+        description:
+          "Lead member ensuring all items are accurately tracked, labeled, and ready for pack-out and pack-back.",
+      },
+      {
+        name: "Lorena",
+        description:
+          "Contributes to every stage of content handling, maintaining accurate records of item locations.",
+      },
+      {
+        name: "Vivian",
+        description:
+          "Supports all aspects of sorting, labeling, and cleanup to keep operations running smoothly.",
+      },
     ],
   },
   {
     role: "Emergency Team",
-    description: "The Emergency Team is the frontline crew for urgent restoration situations—whether water, fire, smoke, or mold. They respond swiftly, bring specialized equipment, and stabilize conditions alongside Project Managers on-site.",
+    description:
+      "The Emergency Team is the frontline crew for urgent restoration situations—whether water, fire, smoke, or mold. They respond swiftly, bring specialized equipment, and stabilize conditions alongside Project Managers on-site.",
     members: [
-      { name: "Ricco", description: "Most tenured responder specializing in plumbing, ready for any urgent restoration needs." },
-      { name: "Theo", description: "Expert in demolition and asbestos abatement, ensuring quick, safe resolutions." },
-      { name: "Chriskie", description: "Skilled in demolition and asbestos abatement, delivering prompt support for water, fire, smoke, and mold incidents." },
-      { name: "Julius", description: "Newest team member capable of handling a broad range of emergency tasks." },
+      {
+        name: "Ricco",
+        description:
+          "Most tenured responder specializing in plumbing, ready for any urgent restoration needs.",
+      },
+      {
+        name: "Theo",
+        description:
+          "Expert in demolition and asbestos abatement, ensuring quick, safe resolutions.",
+      },
+      {
+        name: "Chriskie",
+        description:
+          "Skilled in demolition and asbestos abatement, delivering prompt support for water, fire, smoke, and mold incidents.",
+      },
+      {
+        name: "Julius",
+        description:
+          "Newest team member capable of handling a broad range of emergency tasks.",
+      },
     ],
   },
   {
     role: "Logistics Team",
-    description: "The Logistics Team manages transportation and delivery, from retrieving packed items at client sites to placing them in secure warehouse pods, as well as delivering ordered materials to project locations.",
+    description:
+      "The Logistics Team manages transportation and delivery, from retrieving packed items at client sites to placing them in secure warehouse pods, as well as delivering ordered materials to project locations.",
     members: [
-      { name: "George", description: "Coordinates pack-outs and pack-backs with precision, ensuring items move safely from client sites to storage." },
-      { name: "Lito", description: "Oversees pickups, deliveries, and organizes stored items in designated pods for clients." },
+      {
+        name: "George",
+        description:
+          "Coordinates pack-outs and pack-backs with precision, ensuring items move safely from client sites to storage.",
+      },
+      {
+        name: "Lito",
+        description:
+          "Oversees pickups, deliveries, and organizes stored items in designated pods for clients.",
+      },
     ],
   },
   {
     role: "Final Repairs Team",
-    description: "The Final Repairs Team handles the end-stage fixes, from essential touch-ups to warranty repairs. They step in for in-house repairs if subcontractors aren’t utilized.",
+    description:
+      "The Final Repairs Team handles the end-stage fixes, from essential touch-ups to warranty repairs. They step in for in-house repairs if subcontractors aren’t utilized.",
     members: [
-      { name: "Fred", description: "Specialist in final repairs, touch-ups, and warranty work to ensure top-quality results." },
-      { name: "Bobby", description: "Highly adept at final repairs with a strong specialty in drywalling; also flexible in handling various tasks." },
-      { name: "Christopher", description: "Newest member of the final repairs team with strong expertise in HVAC systems." },
-      { name: "Dann", description: "Adaptable in various tasks, focused on developing specialty in floor covering installation to ensure quality and pleasing finishes." },
+      {
+        name: "Fred",
+        description:
+          "Specialist in final repairs, touch-ups, and warranty work to ensure top-quality results.",
+      },
+      {
+        name: "Bobby",
+        description:
+          "Highly adept at final repairs with a strong specialty in drywalling; also flexible in handling various tasks.",
+      },
+      {
+        name: "Christopher",
+        description:
+          "Newest member of the final repairs team with strong expertise in HVAC systems.",
+      },
+      {
+        name: "Dann",
+        description:
+          "Adaptable in various tasks, focused on developing specialty in floor covering installation to ensure quality and pleasing finishes.",
+      },
     ],
   },
   {
     role: "Automotive",
-    description: "Our Automotive Specialist ensures company vehicles are in prime condition and assists other teams whenever necessary.",
+    description:
+      "Our Automotive Specialist ensures company vehicles are in prime condition and assists other teams whenever necessary.",
     members: [
-      { name: "Jun C", description: "Handles all vehicle maintenance and repairs, providing support to other departments as needed." },
+      {
+        name: "Jun C",
+        description:
+          "Handles all vehicle maintenance and repairs, providing support to other departments as needed.",
+      },
     ],
   },
 ];
@@ -169,10 +291,13 @@ const teamSections: TeamSection[] = [
 const getImagePath = (name: string) =>
   `/images/team/${name.toLowerCase().replace(/ /g, "_")}.jpg`;
 
-function SectionDivider({ colors = "from-cyan-400 via-white to-cyan-400", className = "" }) {
+function SectionDivider({
+  colors = "from-cyan-400 via-white to-cyan-400",
+  className = "",
+}) {
   return (
     <div
-      className={`mx-auto h-1 w-2/3 rounded-full bg-gradient-to-r ${colors} blur-[1px] opacity-60 ${className}`}
+      className={`mx-auto h-1 w-2/3 rounded-full bg-gradient-to-r ${colors} opacity-60 blur-[1px] ${className}`}
     />
   );
 }
@@ -219,23 +344,20 @@ function TeamPageInner() {
 
       {/* ==== MAIN PAGE CONTENT, gets blur+scroll lock when modal active ==== */}
       <div
-        className={`
-          bg-gradient-to-b from-gray-950 via-gray-900 to-gray-800
-          min-h-screen transition-all duration-150
-          ${showModal ? "overflow-hidden filter blur-3xl" : ""}
-        `}
+        className={`min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-800 transition-all duration-150 ${showModal ? "overflow-hidden blur-3xl filter" : ""} `}
       >
         <Navbar onPortalClick={() => setShowModal(true)} />
 
         {/* -- SECTION MENU: jump-to-section -- */}
-        <div className="w-full flex justify-center items-center pt-6 pb-2">
+        <div className="flex w-full items-center justify-center pb-2 pt-6">
           <motion.h1
-            className="mt-16 text-center text-5xl lg:text-7xl font-extrabold tracking-tight text-white drop-shadow-xl transition-all"
+            className="mt-16 text-center text-5xl font-extrabold tracking-tight text-white drop-shadow-xl transition-all lg:text-7xl"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.8 }}
             style={{
-              textShadow: "0 2px 16px rgba(0,255,255,0.10), 0 4px 32px rgba(0,0,0,0.14)",
+              textShadow:
+                "0 2px 16px rgba(0,255,255,0.10), 0 4px 32px rgba(0,0,0,0.14)",
               letterSpacing: "0.04em",
               cursor: "pointer",
               zIndex: 10,
@@ -248,16 +370,15 @@ function TeamPageInner() {
 
         {/* Dropdown menu */}
         {showMenu && (
-          <div className="fixed left-0 top-0 w-full h-full bg-black/50 z-50 flex flex-col items-center pt-24">
+          <div className="fixed left-0 top-0 z-50 flex h-full w-full flex-col items-center bg-black/50 pt-24">
             <motion.div
               initial={{ opacity: 0, y: -30, scale: 0.97 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ duration: 0.23, ease: "easeOut" }}
-              className="relative bg-gradient-to-br from-slate-800/90 via-gray-900/95 to-gray-800/90
-                 backdrop-blur-lg border border-white/10 shadow-2xl w-full max-w-sm mx-auto rounded-2xl px-8 py-8"
+              className="relative mx-auto w-full max-w-sm rounded-2xl border border-white/10 bg-gradient-to-br from-slate-800/90 via-gray-900/95 to-gray-800/90 px-8 py-8 shadow-2xl backdrop-blur-lg"
             >
               <button
-                className="absolute right-6 top-4 text-3xl text-white/80 hover:text-white transition"
+                className="absolute right-6 top-4 text-3xl text-white/80 transition hover:text-white"
                 onClick={toggleMenu}
                 aria-label="Close menu"
               >
@@ -265,7 +386,7 @@ function TeamPageInner() {
               </button>
               <ul className="flex flex-col items-center space-y-4">
                 <li
-                  className="cursor-pointer text-white text-xl font-extrabold tracking-wide hover:text-cyan-300 transition border-b-2 border-transparent hover:border-cyan-400 px-3 py-1"
+                  className="cursor-pointer border-b-2 border-transparent px-3 py-1 text-xl font-extrabold tracking-wide text-white transition hover:border-cyan-400 hover:text-cyan-300"
                   onClick={() => scrollTo("office-team")}
                   tabIndex={0}
                 >
@@ -274,7 +395,7 @@ function TeamPageInner() {
                 {teamSections.map((s) => (
                   <li
                     key={s.role}
-                    className="cursor-pointer text-white text-xl font-extrabold tracking-wide hover:text-cyan-300 transition border-b-2 border-transparent hover:border-cyan-400 px-3 py-1"
+                    className="cursor-pointer border-b-2 border-transparent px-3 py-1 text-xl font-extrabold tracking-wide text-white transition hover:border-cyan-400 hover:text-cyan-300"
                     onClick={() => scrollTo(s.role)}
                     tabIndex={0}
                   >
@@ -289,7 +410,7 @@ function TeamPageInner() {
         {/* --- OFFICE TEAM --- */}
         <section id="office-team" className="space-y-10">
           <motion.h2
-            className="text-center text-3xl font-bold text-white mb-2 mt-4 tracking-wider"
+            className="mb-2 mt-4 text-center text-3xl font-bold tracking-wider text-white"
             initial={{ opacity: 0, y: 50 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
@@ -297,14 +418,9 @@ function TeamPageInner() {
           >
             Office Team
           </motion.h2>
-          <div className="w-full flex justify-center">
+          <div className="flex w-full justify-center">
             <div
-              className={`
-                flex flex-wrap justify-center items-stretch
-                gap-8 xl:gap-10
-                w-full max-w-screen-xl
-                px-4
-              `}
+              className={`flex w-full max-w-screen-xl flex-wrap items-stretch justify-center gap-8 px-4 xl:gap-10`}
               style={{
                 minHeight: "340px",
               }}
@@ -316,7 +432,9 @@ function TeamPageInner() {
                 useEffect(() => {
                   if (inView) controls.start("visible");
                 }, [inView, controls]);
-                const accent = roleColors[m.role as RoleKey] || roleColors["Technical Support Analyst"];
+                const accent =
+                  roleColors[m.role as RoleKey] ||
+                  roleColors["Technical Support Analyst"];
                 return (
                   <motion.div
                     key={m.name}
@@ -331,20 +449,7 @@ function TeamPageInner() {
                     viewport={{ once: true }}
                     transition={{ duration: 0.5, delay: i * 0.09 }}
                     onClick={() => open(officeImgs, i)}
-                    className={`
-                      cursor-pointer relative flex flex-col items-center
-                      rounded-2xl
-                      bg-gradient-to-br ${accent.gradient}
-                      bg-white/30 backdrop-blur-lg
-                      border border-white/30 border-l-8 ${accent.border}
-                      pt-16 pb-7 px-6
-                      group
-                      transition-all duration-200
-                      shadow-2xl
-                      min-w-[270px] max-w-[340px] w-full
-                      flex-1
-                      sm:flex-initial
-                    `}
+                    className={`relative flex cursor-pointer flex-col items-center rounded-2xl bg-gradient-to-br ${accent.gradient} border border-l-8 border-white/30 bg-white/30 backdrop-blur-lg ${accent.border} group w-full min-w-[270px] max-w-[340px] flex-1 px-6 pb-7 pt-16 shadow-2xl transition-all duration-200 sm:flex-initial`}
                     style={{
                       marginTop: "52px",
                       overflow: "visible",
@@ -358,15 +463,7 @@ function TeamPageInner() {
                     }}
                   >
                     <div
-                      className={`
-                        absolute -top-14 left-1/2 -translate-x-1/2
-                        h-24 w-24 rounded-full
-                        bg-gray-200
-                        ring-4 ${accent.ring} ring-offset-2 ring-offset-white
-                        shadow-2xl flex items-center justify-center z-10
-                        group-hover:scale-105
-                        transition-transform
-                      `}
+                      className={`absolute -top-14 left-1/2 h-24 w-24 -translate-x-1/2 rounded-full bg-gray-200 ring-4 ${accent.ring} z-10 flex items-center justify-center shadow-2xl ring-offset-2 ring-offset-white transition-transform group-hover:scale-105`}
                       style={{
                         boxShadow: `0 0 0 6px ${accent.glow}`,
                       }}
@@ -374,17 +471,17 @@ function TeamPageInner() {
                       <img
                         src={getImagePath(m.name)}
                         alt={m.name}
-                        className="h-full w-full object-cover rounded-full"
+                        className="h-full w-full rounded-full object-cover"
                       />
                       <span
-                        className="absolute inset-0 rounded-full pointer-events-none"
+                        className="pointer-events-none absolute inset-0 rounded-full"
                         style={{
                           boxShadow: `0 0 24px 3px ${accent.glow}`,
                           opacity: 0.45,
                         }}
                       />
                     </div>
-                    <h3 className="text-2xl font-extrabold text-white tracking-wide text-center drop-shadow">
+                    <h3 className="text-center text-2xl font-extrabold tracking-wide text-white drop-shadow">
                       {m.name}
                     </h3>
                     <div
@@ -398,7 +495,7 @@ function TeamPageInner() {
                       {m.role}
                     </div>
                     <p
-                      className="rounded-xl bg-white/40 px-4 py-3 text-sm text-gray-800 shadow-md font-medium mt-2 text-center"
+                      className="mt-2 rounded-xl bg-white/40 px-4 py-3 text-center text-sm font-medium text-gray-800 shadow-md"
                       style={{
                         border: "1px solid rgba(255,255,255,0.13)",
                         backdropFilter: "blur(2px)",
@@ -413,19 +510,24 @@ function TeamPageInner() {
           </div>
         </section>
 
-        <SectionDivider colors="from-cyan-400 via-fuchsia-400 to-lime-300" className="my-12" />
+        <SectionDivider
+          colors="from-cyan-400 via-fuchsia-400 to-lime-300"
+          className="my-12"
+        />
 
         {/* --- OTHER TEAMS --- */}
         {teamSections.map((sec, sidx) => {
           const imgs = sec.members.map((mem) => getImagePath(mem.name));
-          const accent = sectionColors[sec.role as SectionKey] || sectionColors["Contents Team"];
+          const accent =
+            sectionColors[sec.role as SectionKey] ||
+            sectionColors["Contents Team"];
           const isSingle = sec.members.length === 1;
           const isLast = sidx === teamSections.length - 1;
           return (
             <React.Fragment key={sec.role}>
               <section id={sec.role} className="space-y-0">
                 <motion.h2
-                  className="text-center text-3xl font-bold text-white mb-8 mt-10 tracking-wider"
+                  className="mb-8 mt-10 text-center text-3xl font-bold tracking-wider text-white"
                   initial={{ opacity: 0, y: 50 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
@@ -433,16 +535,9 @@ function TeamPageInner() {
                 >
                   {sec.role}
                 </motion.h2>
-                <div className="w-full flex justify-center">
+                <div className="flex w-full justify-center">
                   <motion.div
-                    className={`
-                      w-full max-w-4xl
-                      bg-gradient-to-br ${accent.gradient} rounded-2xl border border-white/20
-                      shadow-2xl backdrop-blur-lg p-6 sm:p-10 transition-all duration-200
-                      flex flex-col items-center
-                      mx-2 sm:mx-0
-                      ${isLast ? "mb-16" : ""}
-                    `}
+                    className={`w-full max-w-4xl bg-gradient-to-br ${accent.gradient} mx-2 flex flex-col items-center rounded-2xl border border-white/20 p-6 shadow-2xl backdrop-blur-lg transition-all duration-200 sm:mx-0 sm:p-10 ${isLast ? "mb-16" : ""} `}
                     style={{
                       boxShadow: `0 4px 28px 0 ${accent.glow}, 0 2px 16px 0 rgba(30,41,59,0.09)`,
                     }}
@@ -455,20 +550,17 @@ function TeamPageInner() {
                     viewport={{ once: true }}
                     transition={{ duration: 0.6, delay: 0.07 * sidx }}
                   >
-                    <p className="mb-8 text-center text-base text-white/90 font-medium drop-shadow-sm max-w-2xl mx-auto">
+                    <p className="mx-auto mb-8 max-w-2xl text-center text-base font-medium text-white/90 drop-shadow-sm">
                       {sec.description}
                     </p>
                     <div
-                      className={`
-                        grid gap-8
-                        ${isSingle
+                      className={`grid gap-8 ${
+                        isSingle
                           ? "grid-cols-1 justify-center"
                           : sec.members.length < 4
-                          ? "grid-cols-1 sm:grid-cols-2 justify-center"
-                          : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 justify-center"}
-                        w-full
-                        ${isSingle ? "max-w-xs mx-auto" : ""}
-                      `}
+                            ? "grid-cols-1 justify-center sm:grid-cols-2"
+                            : "grid-cols-1 justify-center sm:grid-cols-2 lg:grid-cols-3"
+                      } w-full ${isSingle ? "mx-auto max-w-xs" : ""} `}
                     >
                       {sec.members.map((mem, idx) => {
                         const ref = useRef<HTMLDivElement>(null);
@@ -491,15 +583,7 @@ function TeamPageInner() {
                             viewport={{ once: true }}
                             transition={{ duration: 0.55, delay: idx * 0.09 }}
                             onClick={() => open(imgs, idx)}
-                            className={`
-                              relative flex flex-col items-center rounded-xl
-                              bg-white/70 backdrop-blur-md border border-white/20
-                              pt-14 pb-6 px-5 shadow
-                              transition-all duration-200
-                              cursor-pointer
-                              ${isSingle ? "mx-auto" : ""}
-                              ${accent.inner}
-                            `}
+                            className={`relative flex cursor-pointer flex-col items-center rounded-xl border border-white/20 bg-white/70 px-5 pb-6 pt-14 shadow backdrop-blur-md transition-all duration-200 ${isSingle ? "mx-auto" : ""} ${accent.inner} `}
                             style={{
                               marginTop: "14px",
                               overflow: "visible",
@@ -512,27 +596,19 @@ function TeamPageInner() {
                             }}
                           >
                             <div
-                              className={`
-                                absolute -top-10 left-1/2 -translate-x-1/2
-                                h-20 w-20 rounded-full
-                                bg-gray-200 ring-4 ring-white/90
-                                shadow-lg
-                                flex items-center justify-center z-10
-                                group-hover:scale-105
-                                transition-transform
-                              `}
+                              className={`absolute -top-10 left-1/2 z-10 flex h-20 w-20 -translate-x-1/2 items-center justify-center rounded-full bg-gray-200 shadow-lg ring-4 ring-white/90 transition-transform group-hover:scale-105`}
                             >
                               <img
                                 src={getImagePath(mem.name)}
                                 alt={mem.name}
-                                className="h-full w-full object-cover rounded-full"
+                                className="h-full w-full rounded-full object-cover"
                               />
                             </div>
-                            <p className="text-lg font-bold text-gray-900 tracking-wide text-center">
+                            <p className="text-center text-lg font-bold tracking-wide text-gray-900">
                               {mem.name}
                             </p>
                             <div
-                              className="mt-2 rounded-lg bg-white/90 px-3 py-2 text-sm text-gray-800 shadow-sm font-medium text-center"
+                              className="mt-2 rounded-lg bg-white/90 px-3 py-2 text-center text-sm font-medium text-gray-800 shadow-sm"
                               style={{
                                 backdropFilter: "blur(2px)",
                                 border: "1px solid rgba(255,255,255,0.13)",
@@ -550,7 +626,7 @@ function TeamPageInner() {
               {sidx < teamSections.length - 1 && (
                 <SectionDivider
                   colors="from-orange-300 via-fuchsia-300 to-cyan-300"
-                  className="mt-12 mb-12"
+                  className="mb-12 mt-12"
                 />
               )}
             </React.Fragment>
