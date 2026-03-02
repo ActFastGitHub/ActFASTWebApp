@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Navbar from "@/app/components/navBar";
 import toast from "react-hot-toast";
 import axios from "axios";
+import { sortProjects } from "@/app/utils/projectSorted";
 
 // Material Types
 import * as Types from "@/app/types/materialsPageTypes";
@@ -116,11 +117,14 @@ const ProjectCostManagement = () => {
    *  =========================*/
   const fetchProjects = async () => {
     try {
-      const response = await axios.get("/api/projects");
+      const response = await axios.get<{ projects: Types.Project[] }>(
+        "/api/projects",
+      );
       if (response.data && response.data.projects) {
-        const sortedProjects = response.data.projects.sort(
-          (a: Types.Project, b: Types.Project) => b.code.localeCompare(a.code),
-        );
+        const sortedProjects = sortProjects(response.data.projects, {
+          order: "desc",
+          pinCode: "POSSIBLE NEW CLAIM",
+        });
         setProjects(sortedProjects);
 
         // If there is a selected projectFilter, reset `selectedProject`

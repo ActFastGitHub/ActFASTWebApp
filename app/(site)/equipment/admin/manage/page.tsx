@@ -24,6 +24,7 @@ import QRCode from "qrcode";
 import toast from "react-hot-toast";
 import type { EquipmentDTO, EquipmentStatus } from "@/app/types/equipment";
 import { STATUSES } from "@/app/types/equipment";
+import { sortProjects } from "@/app/utils/projectSorted";
 
 type TypeItem = { code: string };
 type Project = { id: string; code: string };
@@ -182,11 +183,12 @@ export default function EquipmentManagePage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await axios.get("/api/projects");
+        const res = await axios.get<{ projects: Project[] }>("/api/projects");
         if (res.data?.projects) {
-          const sorted = res.data.projects
-            .map((p: any) => ({ id: p.id, code: p.code }))
-            .sort((a: Project, b: Project) => b.code.localeCompare(a.code));
+          const sorted = sortProjects(res.data.projects, {
+            order: "desc",
+            pinCode: "POSSIBLE NEW CLAIM",
+          });
           setProjects(sorted);
         }
       } catch {

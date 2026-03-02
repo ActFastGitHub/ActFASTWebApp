@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Navbar from "@/app/components/navBar";
 import toast from "react-hot-toast";
 import axios from "axios";
+import { sortProjects } from "@/app/utils/projectSorted";
 import { FaEdit, FaTrashAlt, FaEye, FaEyeSlash } from "react-icons/fa";
 
 type Item = {
@@ -113,15 +114,15 @@ const ItemsManagement = () => {
 
   const fetchProjects = async () => {
     try {
-      const response = await axios.get("/api/projects");
-      const sortedProjects = response.data.projects.sort(
-        (a: Partial<Project>, b: Partial<Project>) => {
-          if (a.code && b.code) {
-            return b.code.localeCompare(a.code);
-          }
-          return 0;
-        },
+      const response = await axios.get<{ projects: Project[] }>(
+        "/api/projects",
       );
+
+      const sortedProjects = sortProjects(response.data.projects, {
+        order: "desc", // matches your old b.code.localeCompare(a.code)
+        pinCode: "POSSIBLE NEW CLAIM",
+      });
+
       setProjects(sortedProjects);
     } catch (error) {
       console.error("Error fetching projects:", error);

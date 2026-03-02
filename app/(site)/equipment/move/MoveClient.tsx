@@ -28,6 +28,7 @@ import {
   isDeleteOK,
   isDeleteError,
 } from "@/app/types/equipment";
+import { sortProjects } from "@/app/utils/projectSorted";
 
 /* ──────────────────────────────────────────────────────────── */
 /*  LocalStorage keys                                           */
@@ -281,11 +282,10 @@ function WhatsAppReportModal({
 
   // ensure PNC exists as an option
   const projectOptions = useMemo(() => {
-    const hasPNC = projects.some((p) => p.code === "POSSIBLE NEW CLAIM");
-    const list = hasPNC
-      ? projects
-      : [{ id: "PNC", code: "POSSIBLE NEW CLAIM" }, ...projects];
-    return list;
+    return sortProjects(projects, {
+      order: "desc",
+      pinCode: "POSSIBLE NEW CLAIM",
+    });
   }, [projects]);
 
   const filteredProjects = useMemo(() => {
@@ -748,16 +748,17 @@ export default function MoveClient(): JSX.Element {
       try {
         const res = await axios.get("/api/projects");
         if (res.data?.projects) {
-          const sorted: Project[] = res.data.projects
-            .map((p: any) => ({ id: p.id, code: p.code }))
-            .sort((a: Project, b: Project) => b.code.localeCompare(a.code));
+          const rawProjects: Project[] = res.data.projects.map((p: any) => ({
+            id: p.id,
+            code: p.code,
+          }));
 
-          const hasPNC = sorted.some((p) => p.code === "POSSIBLE NEW CLAIM");
-          const withPNC = hasPNC
-            ? sorted
-            : [{ id: "PNC", code: "POSSIBLE NEW CLAIM" }, ...sorted];
+          const sorted = sortProjects(rawProjects, {
+            order: "desc",
+            pinCode: "POSSIBLE NEW CLAIM",
+          });
 
-          setProjects(withPNC);
+          setProjects(sorted);
         }
       } catch {
         setProjects([{ id: "PNC", code: "POSSIBLE NEW CLAIM" }]);
