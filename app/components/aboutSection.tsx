@@ -53,7 +53,7 @@ const certifications = [
 ];
 
 const LOCATION_URL = "https://maps.app.goo.gl/cEr3uFjKEuKyhNdm9";
-const LOCATION_TEXT = "Unit 108 - 11539 136 Street, Surrey, BC";
+const LOCATION_TEXT = "Unit 108 - 11539 136 Street, Surrey, BC V3R 0G3";
 
 /* ---------------------------------------------
    Years Counter (medallion)
