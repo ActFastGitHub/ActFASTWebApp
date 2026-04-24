@@ -10,22 +10,21 @@ import Navbar from "@/app/components/navBar";
 import Modal from "@/app/components/modal";
 import { UserProps } from "@/app/libs/interfaces";
 
-/* ───────────── ACL MAP (for client-side visibility only) ───────────── */
 const ACL: Record<string, string[]> = {
   "pods-mapping": [],
-  "memberpage": [],
-  "projectspage": [],
-  "contentspage": [],
-  "projectcosting": ["admin", "owner"],
-  "projectmanagement": ["admin", "owner"],
-  "inventorymanagementpage": ["admin", "owner"],
+  memberpage: [],
+  projectspage: [],
+  contentspage: [],
+  "field-photos": [],
+  projectcosting: ["admin", "owner"],
+  projectmanagement: ["admin", "owner"],
+  inventorymanagementpage: ["admin", "owner"],
 };
 
 const norm = (s?: string) => s?.toLowerCase().trim() ?? "";
 const canAccess = (slug: string, role: string) =>
-  !(ACL[slug]?.length) || ACL[slug].includes(role);
+  !ACL[slug]?.length || ACL[slug].includes(role);
 
-/* Small card (Tailwind: safelist these colors if using JIT purge) */
 const Card = ({
   color,
   title,
@@ -51,23 +50,22 @@ export default function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const toastShownRef = useRef(false);
 
-  /* Toast after provider login */
   useEffect(() => {
     if (typeof window === "undefined" || status !== "authenticated") return;
-    const provider = new URLSearchParams(window.location.search).get("provider");
+    const provider = new URLSearchParams(window.location.search).get(
+      "provider",
+    );
     if (provider && !toastShownRef.current) {
       toast.success(`${provider} successful login`);
       toastShownRef.current = true;
     }
   }, [status]);
 
-  /* Redirects */
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
     if (session?.user?.isNewUser) router.push("/create-profile");
   }, [status, session?.user?.isNewUser, router]);
 
-  /* Fetch profile */
   useEffect(() => {
     if (status !== "authenticated" || !session?.user?.email) return;
     (async () => {
@@ -79,7 +77,7 @@ export default function Dashboard() {
         setUser({ role: session?.user?.role } as UserProps);
       }
     })();
-  }, [status, session?.user?.email]);
+  }, [status, session?.user?.email, session?.user?.role]);
 
   if (status === "loading" || user === null) {
     return (
@@ -98,7 +96,6 @@ export default function Dashboard() {
       <Navbar />
 
       <div className="flex">
-        {/* Sidebar */}
         <aside
           className={`fixed inset-y-0 left-0 w-32 transform bg-gray-800 text-white sm:w-48 ${
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
@@ -114,7 +111,6 @@ export default function Dashboard() {
           </div>
         </aside>
 
-        {/* Main */}
         <main
           className={`flex-1 transition-all duration-300 md:mt-4 ${
             sidebarOpen ? "ml-32 sm:ml-48" : "ml-0"
@@ -174,7 +170,16 @@ export default function Dashboard() {
                 </Link>
               )}
 
-              {/* Admin / owner only */}
+              {canAccess("field-photos", role) && (
+                <Link href="/field-photos">
+                  <Card
+                    color="gray"
+                    title="Field Photos"
+                    desc="Capture project photos and upload directly to Dropbox folders."
+                  />
+                </Link>
+              )}
+
               {canAccess("projectcosting", role) && (
                 <Link href="/projectcosting">
                   <Card
@@ -205,8 +210,6 @@ export default function Dashboard() {
                 </Link>
               )}
 
-              {/* ---------------- EQUIPMENT (NEW) ---------------- */}
-              {/* Everyone: Tracking board */}
               <Link href="/equipment">
                 <Card
                   color="blue"
@@ -215,7 +218,6 @@ export default function Dashboard() {
                 />
               </Link>
 
-              {/* Everyone: Quick Move form */}
               <Link href="/equipment/move">
                 <Card
                   color="purple"
@@ -224,7 +226,6 @@ export default function Dashboard() {
                 />
               </Link>
 
-              {/* Admin/Owner only: Equipment Management */}
               {(role === "admin" || role === "owner") && (
                 <Link href="/equipment/admin/manage">
                   <Card
@@ -235,7 +236,6 @@ export default function Dashboard() {
                 </Link>
               )}
 
-              {/* Admin/Owner only: Bulk QR labels */}
               {(role === "admin" || role === "owner") && (
                 <Link href="/equipment/qr-labels">
                   <Card
