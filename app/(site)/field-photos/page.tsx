@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
@@ -16,6 +16,8 @@ const MAX_QUEUE_ITEMS = 100;
 const QUEUE_WARNING_THRESHOLD = 75;
 const CAPTURE_COOLDOWN_MS = 1000;
 const DEFAULT_IMAGE_QUALITY = 0.75;
+const PROJECT_TEMPLATE_PATH = "/FOLDER STRUCTURE";
+const PROJECT_FOLDER_REGEX = /^\d{4}-\d{3,4}-\d{2}-[A-Za-z0-9-]+$/;
 
 /* ─────────────────────────────
    IndexedDB settings
@@ -24,6 +26,66 @@ const DEFAULT_IMAGE_QUALITY = 0.75;
 const DB_NAME = "actfast-field-photos-db";
 const STORE_NAME = "photo-upload-queue";
 const DB_VERSION = 1;
+
+/* ─────────────────────────────
+   File naming helpers
+───────────────────────────── */
+
+const cleanFileNamePart = (value: string) => {
+  const cleaned = value
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-_]/g, "");
+
+  return cleaned || "unknown";
+};
+
+const getCurrentYearAndMonth = () => {
+  const now = new Date();
+
+  return {
+    year: now.getFullYear(),
+    month: String(now.getMonth() + 1).padStart(2, "0"),
+  };
+};
+
+const cleanProjectNamePart = (value: string) => {
+  const cleaned = value
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^A-Z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  return cleaned;
+};
+
+const isProjectFolderName = (folderName: string) =>
+  PROJECT_FOLDER_REGEX.test(folderName);
+
+const getProjectNumberFromFolderName = (folderName: string) => {
+  if (!isProjectFolderName(folderName)) return null;
+
+  const parts = folderName.split("-");
+  const projectNumber = Number(parts[1]);
+
+  return Number.isFinite(projectNumber) ? projectNumber : null;
+};
+
+const getLocalTimestampForFile = () => {
+  const now = new Date();
+
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  const hh = String(now.getHours()).padStart(2, "0");
+  const min = String(now.getMinutes()).padStart(2, "0");
+  const sec = String(now.getSeconds()).padStart(2, "0");
+
+  return `${yyyy}-${mm}-${dd}_${hh}-${min}-${sec}`;
+};
 
 /* ─────────────────────────────
    Types
@@ -184,6 +246,14 @@ export default function FieldPhotosPage() {
 
   const [queue, setQueue] = useState<PhotoQueueItem[]>([]);
   const [imageQuality, setImageQuality] = useState(DEFAULT_IMAGE_QUALITY);
+  const [photoTakerName, setPhotoTakerName] = useState("unknown");
+
+  // Admin/template project folder states.
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [showOnlyProjectFolders, setShowOnlyProjectFolders] = useState(true);
+  const [templateProjectName, setTemplateProjectName] = useState("");
+  const [isCreatingTemplateProject, setIsCreatingTemplateProject] =
+    useState(false);
 
   /* ─────────────────────────────
      Queue counters
@@ -198,6 +268,38 @@ export default function FieldPhotosPage() {
   const activeQueueCount = queue.filter((i) => i.status !== "uploaded").length;
   const isQueueFull = activeQueueCount >= MAX_QUEUE_ITEMS;
   const isQueueNearLimit = activeQueueCount >= QUEUE_WARNING_THRESHOLD;
+
+  /* ─────────────────────────────
+     Project folder helpers
+  ───────────────────────────── */
+
+  const visibleProjectFolders = useMemo(() => {
+    const folders = [...projectFolders].sort((a, b) =>
+      b.name.localeCompare(a.name, undefined, { numeric: true }),
+    );
+
+    if (!showOnlyProjectFolders) return folders;
+
+    return folders.filter((folder) => isProjectFolderName(folder.name));
+  }, [projectFolders, showOnlyProjectFolders]);
+
+  const nextProjectNumber = useMemo(() => {
+    const highestProjectNumber = projectFolders.reduce((highest, folder) => {
+      const projectNumber = getProjectNumberFromFolderName(folder.name);
+      return projectNumber && projectNumber > highest ? projectNumber : highest;
+    }, 0);
+
+    return highestProjectNumber > 0 ? highestProjectNumber + 1 : 1001;
+  }, [projectFolders]);
+
+  const nextProjectFolderName = useMemo(() => {
+    const { year, month } = getCurrentYearAndMonth();
+    const cleanedProjectName = cleanProjectNamePart(templateProjectName);
+
+    if (!cleanedProjectName) return "";
+
+    return `${year}-${nextProjectNumber}-${month}-${cleanedProjectName}`;
+  }, [templateProjectName, nextProjectNumber]);
 
   /* ─────────────────────────────
      Queue state helpers
@@ -231,6 +333,38 @@ export default function FieldPhotosPage() {
       router.push("/login");
     }
   }, [session, status, router]);
+
+  /* ─────────────────────────────
+     Load photo taker name
+  ───────────────────────────── */
+
+  useEffect(() => {
+    if (!session?.user?.email) return;
+
+    const fetchPhotoTakerName = async () => {
+      try {
+        const res = await fetch(`/api/user/profile/${session.user.email}`);
+        const data = await res.json();
+
+        const name =
+          data?.nickname ||
+          data?.firstName ||
+          session.user?.name ||
+          session.user?.email ||
+          "unknown";
+
+        const role = String(data?.role || "").toLowerCase();
+        setIsAdmin(role === "admin");
+        setPhotoTakerName(cleanFileNamePart(name));
+      } catch {
+        const fallback = session.user?.name || session.user?.email || "unknown";
+
+        setPhotoTakerName(cleanFileNamePart(fallback));
+      }
+    };
+
+    fetchPhotoTakerName();
+  }, [session?.user?.email, session?.user?.name]);
 
   /* ─────────────────────────────
      Online / offline detection
@@ -329,7 +463,9 @@ export default function FieldPhotosPage() {
       const data = await readApiResponse(res);
 
       if (!res.ok) {
-        throw new Error(data.detail || data.message || "Failed to load projects");
+        throw new Error(
+          data.detail || data.message || "Failed to load projects",
+        );
       }
 
       setProjectFolders(data.folders || []);
@@ -353,7 +489,9 @@ export default function FieldPhotosPage() {
       const data = await readApiResponse(res);
 
       if (!res.ok) {
-        throw new Error(data.detail || data.message || "Failed to load folders");
+        throw new Error(
+          data.detail || data.message || "Failed to load folders",
+        );
       }
 
       setChildFolders(data.folders || []);
@@ -382,7 +520,9 @@ export default function FieldPhotosPage() {
       const data = await readApiResponse(res);
 
       if (!res.ok) {
-        throw new Error(data.detail || data.message || "Failed to create project");
+        throw new Error(
+          data.detail || data.message || "Failed to create project",
+        );
       }
 
       setNewProjectName("");
@@ -395,6 +535,66 @@ export default function FieldPhotosPage() {
       toast.success("Project folder created");
     } catch (error) {
       handleError(error, "Failed to create project folder");
+    }
+  };
+
+  const createProjectFolderFromTemplate = async () => {
+    if (!isAdmin) {
+      toast.error("Only admin users can create project folders from template");
+      return;
+    }
+
+    const cleanedProjectName = cleanProjectNamePart(templateProjectName);
+
+    if (!cleanedProjectName) {
+      toast.error("Enter a valid project name");
+      return;
+    }
+
+    if (
+      projectFolders.some((folder) => folder.name === nextProjectFolderName)
+    ) {
+      toast.error("That project folder already exists. Nothing was copied.");
+      return;
+    }
+
+    setIsCreatingTemplateProject(true);
+
+    try {
+      setDebugError("");
+
+      const res = await fetch("/api/dropbox/copy-folder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourcePath: PROJECT_TEMPLATE_PATH,
+          destinationFolderName: nextProjectFolderName,
+        }),
+      });
+
+      const data = await readApiResponse(res);
+
+      if (!res.ok) {
+        throw new Error(
+          data.detail ||
+            data.message ||
+            "Failed to create project folder from template",
+        );
+      }
+
+      setTemplateProjectName("");
+      await fetchProjectFolders();
+
+      setSelectedProjectPath(data.folder.path);
+      setCurrentBrowsePath(data.folder.path);
+      setSelectedUploadPath(data.folder.path);
+      await fetchChildFolders(data.folder.path);
+
+      toast.success(`Project folder created: ${data.folder.name}`);
+    } catch (error) {
+      handleError(error, "Failed to create project folder from template");
+    } finally {
+      setIsCreatingTemplateProject(false);
     }
   };
 
@@ -424,7 +624,9 @@ export default function FieldPhotosPage() {
       const data = await readApiResponse(res);
 
       if (!res.ok) {
-        throw new Error(data.detail || data.message || "Failed to create folder");
+        throw new Error(
+          data.detail || data.message || "Failed to create folder",
+        );
       }
 
       setNewFolderName("");
@@ -554,9 +756,7 @@ export default function FieldPhotosPage() {
       if (!blob) throw new Error("Failed to capture photo");
 
       const id = crypto.randomUUID();
-      const fileName = `photo-${new Date()
-        .toISOString()
-        .replace(/[:.]/g, "-")}.jpg`;
+      const fileName = `${photoTakerName}_${getLocalTimestampForFile()}.jpg`;
 
       const item: PhotoQueueItem = {
         id,
@@ -576,7 +776,9 @@ export default function FieldPhotosPage() {
         nextQueue.filter((i) => i.status !== "uploaded").length >=
         QUEUE_WARNING_THRESHOLD
       ) {
-        toast.error("Queue is getting large. Consider waiting for uploads to catch up.");
+        toast.error(
+          "Queue is getting large. Consider waiting for uploads to catch up.",
+        );
       } else {
         toast.success("Photo captured and queued");
       }
@@ -643,7 +845,8 @@ export default function FieldPhotosPage() {
         try {
           await uploadQueueItem(nextItem);
         } catch (error) {
-          const message = error instanceof Error ? error.message : "Upload failed";
+          const message =
+            error instanceof Error ? error.message : "Upload failed";
 
           await updateQueueItem(nextItem.id, {
             status: "failed",
@@ -685,7 +888,9 @@ export default function FieldPhotosPage() {
       await deleteQueueItem(item.id);
     }
 
-    syncQueueState(queueRef.current.filter((item) => item.status !== "uploaded"));
+    syncQueueState(
+      queueRef.current.filter((item) => item.status !== "uploaded"),
+    );
     toast.success("Uploaded items cleared from local log");
   };
 
@@ -712,7 +917,7 @@ export default function FieldPhotosPage() {
     <div className="min-h-screen bg-slate-100 px-4 py-20">
       <Navbar />
 
-      <div className="mx-auto max-w-5xl mt-5">
+      <div className="mx-auto max-w-5xl mt-8">
         <div className="mb-6 rounded-2xl bg-white p-6 shadow">
           <h1 className="text-2xl font-bold text-slate-900">
             Field Photo Upload
@@ -720,6 +925,9 @@ export default function FieldPhotosPage() {
           <p className="mt-1 text-sm text-slate-600">
             Select a Dropbox folder, capture photos quickly, and let uploads run
             in the background.
+          </p>
+          <p className="mt-2 text-xs text-slate-500">
+            Photo taker: <span className="font-medium">{photoTakerName}</span>
           </p>
         </div>
 
@@ -734,8 +942,9 @@ export default function FieldPhotosPage() {
 
         {isQueueNearLimit && (
           <div className="mb-6 rounded-xl border border-yellow-300 bg-yellow-50 p-4 text-sm text-yellow-800">
-            Queue warning: {activeQueueCount}/{MAX_QUEUE_ITEMS} active photos are
-            stored locally. Let uploads catch up or clear uploaded items soon.
+            Queue warning: {activeQueueCount}/{MAX_QUEUE_ITEMS} active photos
+            are stored locally. Let uploads catch up or clear uploaded items
+            soon.
           </div>
         )}
 
@@ -799,13 +1008,23 @@ export default function FieldPhotosPage() {
           <section className="rounded-2xl bg-white p-6 shadow">
             <h2 className="mb-4 text-lg font-semibold">1. Project Folder</h2>
 
+            <label className="mb-3 flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={showOnlyProjectFolders}
+                onChange={(e) => setShowOnlyProjectFolders(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-300"
+              />
+              Show Only Project Folders
+            </label>
+
             <select
               value={selectedProjectPath}
               onChange={(e) => setSelectedProjectPath(e.target.value)}
               className="mb-3 w-full rounded-lg border p-3"
             >
               <option value="">Select project folder</option>
-              {projectFolders.map((folder) => (
+              {visibleProjectFolders.map((folder) => (
                 <option key={folder.path} value={folder.path}>
                   {folder.name}
                 </option>
@@ -829,6 +1048,53 @@ export default function FieldPhotosPage() {
             </div>
           </section>
 
+          {isAdmin && (
+            <section className="rounded-2xl bg-white p-6 shadow lg:col-span-2">
+              <h2 className="mb-2 text-lg font-semibold">
+                ➕ Create Project Folder (from Template)
+              </h2>
+
+              <p className="mb-4 text-sm text-slate-600">
+                Enter only the project name. The system will copy
+                <span className="font-medium">
+                  {" "}
+                  {PROJECT_TEMPLATE_PATH}
+                </span>{" "}
+                and create the full folder structure using the next available
+                project number.
+              </p>
+
+              <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+                <input
+                  value={templateProjectName}
+                  onChange={(e) => setTemplateProjectName(e.target.value)}
+                  placeholder="Project name only, example: SMITH"
+                  className="w-full rounded-lg border p-3"
+                />
+
+                <button
+                  type="button"
+                  onClick={createProjectFolderFromTemplate}
+                  disabled={!nextProjectFolderName || isCreatingTemplateProject}
+                  className="rounded-lg bg-purple-600 px-5 py-3 font-medium text-white hover:bg-purple-700 disabled:bg-slate-400"
+                >
+                  {isCreatingTemplateProject ? "Creating..." : "Create Project"}
+                </button>
+              </div>
+
+              <div className="mt-3 rounded-lg bg-slate-100 p-3 text-sm text-slate-700">
+                <div className="text-slate-500">Generated folder name:</div>
+                <div className="break-all font-semibold text-slate-900">
+                  {nextProjectFolderName || "Enter a project name to preview"}
+                </div>
+              </div>
+
+              <p className="mt-3 text-xs text-slate-500">
+                Duplicate protection is enforced before copying, and Dropbox
+                autorename is disabled in the backend.
+              </p>
+            </section>
+          )}
           <section className="rounded-2xl bg-white p-6 shadow">
             <h2 className="mb-4 text-lg font-semibold">
               2. Folder Browser / Upload Destination
@@ -1068,8 +1334,7 @@ export default function FieldPhotosPage() {
 
                       {item.uploadedAt && (
                         <div className="text-xs text-slate-500">
-                          Uploaded:{" "}
-                          {new Date(item.uploadedAt).toLocaleString()}
+                          Uploaded: {new Date(item.uploadedAt).toLocaleString()}
                         </div>
                       )}
 
