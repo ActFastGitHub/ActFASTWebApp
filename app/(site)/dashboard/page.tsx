@@ -168,17 +168,7 @@ export default function Dashboard() {
                     desc="Manage client contents."
                   />
                 </Link>
-              )}
-
-              {canAccess("field-photos", role) && (
-                <Link href="/field-photos">
-                  <Card
-                    color="gray"
-                    title="Field Photos"
-                    desc="Capture project photos and upload directly to Dropbox folders."
-                  />
-                </Link>
-              )}
+              )}              
 
               {canAccess("projectcosting", role) && (
                 <Link href="/projectcosting">
@@ -232,6 +222,16 @@ export default function Dashboard() {
                     color="red"
                     title="Equipment Management"
                     desc="Add/edit/archive equipment; update details."
+                  />
+                </Link>
+              )}
+
+              {canAccess("field-photos", role) && (
+                <Link href="/field-photos">
+                  <Card
+                    color="gray"
+                    title="Field Photos"
+                    desc="Capture project photos and upload directly to Dropbox folders."
                   />
                 </Link>
               )}
