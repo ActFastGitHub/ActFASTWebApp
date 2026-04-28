@@ -37,10 +37,10 @@ export const OKANAGAN_BRANCH: BranchConfig = {
   navLabel: "Okanagan Branch",
   isMain: false,
   sinceLabel: "Serving since Feb 2025",
-  addressText: "6650 Okanagan Avenue, Vernon BC",
-  addressUrl: "https://maps.app.goo.gl/QJV6DdTxyCQ5bN7z5",
+  addressText: "Unit 203 - 5000 Silver Star Rd, Vernon BC",
+  addressUrl: "https://maps.app.goo.gl/oLHLKNcoWdQyvgVq7",
   mapEmbedSrc:
-    "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2099.884443476297!2d-119.3356649240987!3d50.24041997155282!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x537ddf1c722644a1%3A0x7e966be225c57ab1!2s6650%20Okanagan%20Ave%2C%20Vernon%2C%20BC%20V1H%201M2!5e1!3m2!1sen!2sca!4v1766430015000!5m2!1sen!2sca",
+    "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2307.235340892449!2d-119.2489861!3d50.2811354!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x537dd86070c31ded%3A0xbde9da8e2d62dfef!2s5000%20Silver%20Star%20Rd%20%23203%2C%20Vernon%2C%20BC%20V1B%200A9!5e1!3m2!1sen!2sca!4v1777414914235!5m2!1sen!2sca",
   phone: "+16045185129",
   email: "info@actfast.ca",
   serviceAreas: [
@@ -59,3 +59,5 @@ export const OKANAGAN_BRANCH: BranchConfig = {
 
 // ✅ Add this export to use in navbar
 export const BRANCHES: BranchConfig[] = [SURREY_BRANCH, OKANAGAN_BRANCH];
+
+

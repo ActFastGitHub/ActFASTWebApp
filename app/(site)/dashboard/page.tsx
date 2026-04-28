@@ -229,7 +229,7 @@ export default function Dashboard() {
               {canAccess("field-photos", role) && (
                 <Link href="/field-photos">
                   <Card
-                    color="gray"
+                    color="yellow"
                     title="Field Photos"
                     desc="Capture project photos and upload directly to Dropbox folders."
                   />
