@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
@@ -18,6 +18,14 @@ const CAPTURE_COOLDOWN_MS = 1000;
 const DEFAULT_IMAGE_QUALITY = 0.75;
 const PROJECT_TEMPLATE_PATH = "/FOLDER STRUCTURE";
 const PROJECT_FOLDER_REGEX = /^\d{4}-\d{3,4}-\d{2}-[A-Za-z0-9-]+$/;
+
+// LOCAL BACKUP FALLBACK TIMER
+// Change this value anytime you want the local backup reminder to appear sooner/later.
+// Current setting: 30 minutes after the oldest active queued photo was created.
+const LOCAL_BACKUP_REMINDER_AFTER_MS = 30 * 60 * 1000;
+
+// ZIP backup label. This is only used for the downloaded local backup file name.
+const LOCAL_BACKUP_BATCH_PREFIX = "ACTFAST_FIELD_PHOTOS_BACKUP";
 
 /* ─────────────────────────────
    IndexedDB settings
@@ -87,6 +95,27 @@ const getLocalTimestampForFile = () => {
   return `${yyyy}-${mm}-${dd}_${hh}-${min}-${sec}`;
 };
 
+const getLocalTimestampForBatch = () => getLocalTimestampForFile();
+
+const getSafeBackupNamePart = (value: string) => {
+  const cleaned = value
+    .trim()
+    .replace(/^\/+/, "")
+    .replace(/\//g, "_")
+    .replace(/\s+/g, "-")
+    .replace(/[^A-Za-z0-9-_]/g, "")
+    .replace(/_+/g, "_")
+    .replace(/-+/g, "-")
+    .replace(/^[-_]|[-_]$/g, "");
+
+  return cleaned || "selected-folder";
+};
+
+const getFileExtensionFromName = (fileName: string) => {
+  const extension = fileName.split(".").pop()?.toLowerCase();
+  return extension && extension.length <= 5 ? extension : "jpg";
+};
+
 /* ─────────────────────────────
    Types
 ───────────────────────────── */
@@ -97,6 +126,7 @@ type DropboxFolder = {
 };
 
 type QueueStatus = "pending" | "uploading" | "uploaded" | "failed";
+type PhotoSource = "camera" | "gallery";
 
 type PhotoQueueItem = {
   id: string;
@@ -108,6 +138,9 @@ type PhotoQueueItem = {
   uploadedAt?: number;
   attempts: number;
   error?: string;
+  source?: PhotoSource;
+  originalFileName?: string;
+  localBackupSavedAt?: number;
 };
 
 /* ─────────────────────────────
@@ -210,6 +243,7 @@ export default function FieldPhotosPage() {
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   // Prevent duplicate upload processors.
@@ -268,6 +302,19 @@ export default function FieldPhotosPage() {
   const activeQueueCount = queue.filter((i) => i.status !== "uploaded").length;
   const isQueueFull = activeQueueCount >= MAX_QUEUE_ITEMS;
   const isQueueNearLimit = activeQueueCount >= QUEUE_WARNING_THRESHOLD;
+
+  const activeQueueItems = queue.filter((item) => item.status !== "uploaded");
+  const activeItemsWithoutLocalBackup = activeQueueItems.filter(
+    (item) => !item.localBackupSavedAt,
+  );
+
+  const oldestActiveQueueAgeMs = activeQueueItems.length
+    ? Date.now() - Math.min(...activeQueueItems.map((item) => item.createdAt))
+    : 0;
+
+  const shouldShowLocalBackupReminder =
+    activeItemsWithoutLocalBackup.length > 0 &&
+    oldestActiveQueueAgeMs >= LOCAL_BACKUP_REMINDER_AFTER_MS;
 
   /* ─────────────────────────────
      Project folder helpers
@@ -451,6 +498,12 @@ export default function FieldPhotosPage() {
   ───────────────────────────── */
 
   const fetchProjectFolders = async () => {
+    if (!navigator.onLine) {
+      setIsOnline(false);
+      toast.error("You are offline. Project folders cannot refresh right now.");
+      return;
+    }
+
     try {
       setDebugError("");
 
@@ -475,6 +528,12 @@ export default function FieldPhotosPage() {
   };
 
   const fetchChildFolders = async (path: string) => {
+    if (!navigator.onLine) {
+      setIsOnline(false);
+      toast.error("You are offline. Folder browsing is paused.");
+      return;
+    }
+
     setLoadingFolders(true);
 
     try {
@@ -503,6 +562,11 @@ export default function FieldPhotosPage() {
   };
 
   const createProjectFolder = async () => {
+    if (!isOnline) {
+      toast.error("You are offline. Creating Dropbox folders is disabled for now.");
+      return;
+    }
+
     if (!newProjectName.trim()) {
       toast.error("Enter a project folder name");
       return;
@@ -539,6 +603,11 @@ export default function FieldPhotosPage() {
   };
 
   const createProjectFolderFromTemplate = async () => {
+    if (!isOnline) {
+      toast.error("You are offline. Creating Dropbox folders is disabled for now.");
+      return;
+    }
+
     if (!isAdmin) {
       toast.error("Only admin users can create project folders from template");
       return;
@@ -599,6 +668,11 @@ export default function FieldPhotosPage() {
   };
 
   const createFolderHere = async () => {
+    if (!isOnline) {
+      toast.error("You are offline. Creating Dropbox folders is disabled for now.");
+      return;
+    }
+
     if (!selectedProjectPath || !currentBrowsePath) {
       toast.error("Select a project folder first");
       return;
@@ -640,12 +714,22 @@ export default function FieldPhotosPage() {
   };
 
   const openFolder = async (folder: DropboxFolder) => {
+    if (!isOnline) {
+      toast.error("You are offline. Folder browsing is paused.");
+      return;
+    }
+
     setCurrentBrowsePath(folder.path);
     setSelectedUploadPath(folder.path);
     await fetchChildFolders(folder.path);
   };
 
   const goUpOneLevel = async () => {
+    if (!isOnline) {
+      toast.error("You are offline. Folder browsing is paused.");
+      return;
+    }
+
     if (!selectedProjectPath || !currentBrowsePath) return;
 
     if (currentBrowsePath.toLowerCase() === selectedProjectPath.toLowerCase()) {
@@ -714,6 +798,144 @@ export default function FieldPhotosPage() {
     setCameraActive(false);
   };
 
+  const queuePhotoBlob = async ({
+    blob,
+    source,
+    originalFileName,
+  }: {
+    blob: Blob;
+    source: PhotoSource;
+    originalFileName?: string;
+  }) => {
+    if (!selectedUploadPath) {
+      toast.error("Select an upload folder first");
+      return;
+    }
+
+    if (isQueueFull) {
+      toast.error(
+        `Upload queue is full. Clear uploaded items or wait for uploads to finish. Limit: ${MAX_QUEUE_ITEMS}`,
+      );
+      return;
+    }
+
+    const id = crypto.randomUUID();
+    const extension =
+      source === "gallery" && originalFileName
+        ? getFileExtensionFromName(originalFileName)
+        : "jpg";
+
+    const fileName = `${photoTakerName}_${getLocalTimestampForFile()}_${source}.${extension}`;
+
+    const item: PhotoQueueItem = {
+      id,
+      fileName,
+      folderPath: selectedUploadPath,
+      blob,
+      status: "pending",
+      createdAt: Date.now(),
+      attempts: 0,
+      source,
+      originalFileName,
+    };
+
+    const nextQueue = [...queueRef.current, item];
+    syncQueueState(nextQueue);
+    await saveQueueItem(item);
+
+    if (
+      nextQueue.filter((i) => i.status !== "uploaded").length >=
+      QUEUE_WARNING_THRESHOLD
+    ) {
+      toast.error(
+        "Queue is getting large. Consider waiting for uploads to catch up or saving a local backup.",
+      );
+    }
+
+    processUploadQueue();
+  };
+
+  const compressGalleryImage = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      throw new Error(`${file.name} is not an image file`);
+    }
+
+    const imageUrl = URL.createObjectURL(file);
+
+    try {
+      const image = new Image();
+      image.src = imageUrl;
+      await image.decode();
+
+      const canvas = document.createElement("canvas");
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas is not supported");
+
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+      const compressedBlob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, "image/jpeg", imageQuality),
+      );
+
+      return compressedBlob || file;
+    } catch {
+      // Some phone gallery formats may not decode in every browser.
+      // In that case, keep the original file instead of blocking the upload.
+      return file;
+    } finally {
+      URL.revokeObjectURL(imageUrl);
+    }
+  };
+
+  const handleGallerySelect = async (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+
+    if (!selectedUploadPath) {
+      toast.error("Select an upload folder first");
+      event.target.value = "";
+      return;
+    }
+
+    if (files.length === 0) return;
+
+    const availableSlots = MAX_QUEUE_ITEMS - activeQueueCount;
+
+    if (availableSlots <= 0) {
+      toast.error(`Upload queue is full. Limit: ${MAX_QUEUE_ITEMS}`);
+      event.target.value = "";
+      return;
+    }
+
+    const filesToQueue = files.slice(0, availableSlots);
+
+    if (files.length > availableSlots) {
+      toast.error(
+        `Only ${availableSlots} photo(s) were queued because the queue limit is ${MAX_QUEUE_ITEMS}.`,
+      );
+    }
+
+    try {
+      for (const file of filesToQueue) {
+        const blob = await compressGalleryImage(file);
+
+        await queuePhotoBlob({
+          blob,
+          source: "gallery",
+          originalFileName: file.name,
+        });
+      }
+
+      toast.success(`${filesToQueue.length} gallery photo(s) queued`);
+    } catch (error) {
+      handleError(error, "Failed to queue gallery photo(s)");
+    } finally {
+      event.target.value = "";
+    }
+  };
+
   const capturePhotoToQueue = async () => {
     if (!videoRef.current || !canvasRef.current || !selectedUploadPath) {
       toast.error("Open camera and select an upload folder first");
@@ -755,35 +977,12 @@ export default function FieldPhotosPage() {
 
       if (!blob) throw new Error("Failed to capture photo");
 
-      const id = crypto.randomUUID();
-      const fileName = `${photoTakerName}_${getLocalTimestampForFile()}.jpg`;
-
-      const item: PhotoQueueItem = {
-        id,
-        fileName,
-        folderPath: selectedUploadPath,
+      await queuePhotoBlob({
         blob,
-        status: "pending",
-        createdAt: Date.now(),
-        attempts: 0,
-      };
+        source: "camera",
+      });
 
-      const nextQueue = [...queueRef.current, item];
-      syncQueueState(nextQueue);
-      await saveQueueItem(item);
-
-      if (
-        nextQueue.filter((i) => i.status !== "uploaded").length >=
-        QUEUE_WARNING_THRESHOLD
-      ) {
-        toast.error(
-          "Queue is getting large. Consider waiting for uploads to catch up.",
-        );
-      } else {
-        toast.success("Photo captured and queued");
-      }
-
-      processUploadQueue();
+      toast.success("Photo captured and queued");
     } catch (error) {
       handleError(error, "Failed to capture photo");
     }
@@ -794,6 +993,10 @@ export default function FieldPhotosPage() {
   ───────────────────────────── */
 
   const uploadQueueItem = async (item: PhotoQueueItem) => {
+    if (!navigator.onLine) {
+      throw new Error("Device is offline");
+    }
+
     await updateQueueItem(item.id, {
       status: "uploading",
       attempts: item.attempts + 1,
@@ -868,6 +1071,11 @@ export default function FieldPhotosPage() {
   };
 
   const retryFailedUploads = () => {
+    if (!isOnline) {
+      toast.error("You are offline. Retry will be available when connection returns.");
+      return;
+    }
+
     const updated = queueRef.current.map((item) =>
       item.status === "failed"
         ? { ...item, status: "pending" as QueueStatus, error: undefined }
@@ -898,6 +1106,96 @@ export default function FieldPhotosPage() {
     await clearAllQueueItems();
     syncQueueState([]);
     toast.success("Queue history cleared");
+  };
+
+  const downloadBlob = (blob: Blob, fileName: string) => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportLocalBackupZip = async () => {
+    const itemsToBackup = queueRef.current.filter(
+      (item) => item.status !== "uploaded",
+    );
+
+    if (itemsToBackup.length === 0) {
+      toast.error("No active queued photos to back up");
+      return;
+    }
+
+    try {
+      const JSZipModule = await import("jszip");
+      const JSZip = JSZipModule.default;
+      const zip = new JSZip();
+
+      const batchName = `${LOCAL_BACKUP_BATCH_PREFIX}_${getLocalTimestampForBatch()}_${getSafeBackupNamePart(
+        selectedUploadPath || itemsToBackup[0]?.folderPath || "selected-folder",
+      )}`;
+
+      const photosFolder = zip.folder(batchName);
+      const manifest = itemsToBackup.map((item, index) => {
+        const numberedFileName = `${String(index + 1).padStart(
+          3,
+          "0",
+        )}_${item.fileName}`;
+
+        photosFolder?.file(numberedFileName, item.blob);
+
+        return {
+          backupFileName: numberedFileName,
+          originalAppFileName: item.fileName,
+          originalGalleryFileName: item.originalFileName || null,
+          source: item.source || "camera",
+          targetDropboxFolderPath: item.folderPath,
+          queueStatus: item.status,
+          attempts: item.attempts,
+          capturedOrSelectedAt: new Date(item.createdAt).toISOString(),
+          localBackupCreatedAt: new Date().toISOString(),
+          lastError: item.error || null,
+        };
+      });
+
+      photosFolder?.file(
+        "backup-manifest.json",
+        JSON.stringify(
+          {
+            backupName: batchName,
+            backupCreatedAt: new Date().toISOString(),
+            photoCount: itemsToBackup.length,
+            note: "These photos were exported from the ActFast Field Photo Upload offline queue. Dropbox upload can still continue later from the app queue.",
+            items: manifest,
+          },
+          null,
+          2,
+        ),
+      );
+
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      downloadBlob(zipBlob, `${batchName}.zip`);
+
+      const backupSavedAt = Date.now();
+      const updated = queueRef.current.map((item) =>
+        item.status !== "uploaded"
+          ? { ...item, localBackupSavedAt: backupSavedAt }
+          : item,
+      );
+
+      syncQueueState(updated);
+      await Promise.all(updated.map((item) => saveQueueItem(item)));
+
+      toast.success("Local ZIP backup created");
+    } catch (error) {
+      handleError(
+        error,
+        "Failed to create local ZIP backup. Make sure jszip is installed.",
+      );
+    }
   };
 
   const getRelativeBrowsePath = () => {
@@ -937,6 +1235,35 @@ export default function FieldPhotosPage() {
             <div className="mt-1 whitespace-pre-wrap break-words">
               {debugError}
             </div>
+          </div>
+        )}
+
+        {!isOnline && (
+          <div className="mb-6 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-800">
+            You are offline. Dropbox actions are temporarily disabled, but you
+            can still take photos or select gallery photos if an upload folder
+            was already selected. Photos will stay safely queued on this device.
+          </div>
+        )}
+
+        {shouldShowLocalBackupReminder && (
+          <div className="mb-6 rounded-xl border border-orange-300 bg-orange-50 p-4 text-sm text-orange-900">
+            <div className="font-bold">Local backup recommended</div>
+            <p className="mt-1">
+              Some photos have been waiting in the local queue for a while. Save
+              a ZIP backup to this device so the photos are not only stored in
+              browser storage.
+            </p>
+            <button
+              type="button"
+              onClick={exportLocalBackupZip}
+              className="mt-3 rounded-lg bg-orange-600 px-4 py-2 font-medium text-white hover:bg-orange-700"
+            >
+              Save Local ZIP Backup ({activeItemsWithoutLocalBackup.length})
+            </button>
+            <p className="mt-2 text-xs">
+              Reminder timer is controlled by LOCAL_BACKUP_REMINDER_AFTER_MS.
+            </p>
           </div>
         )}
 
@@ -1011,6 +1338,7 @@ export default function FieldPhotosPage() {
             <label className="mb-3 flex items-center gap-2 text-sm text-slate-700">
               <input
                 type="checkbox"
+                disabled={!isOnline}
                 checked={showOnlyProjectFolders}
                 onChange={(e) => setShowOnlyProjectFolders(e.target.checked)}
                 className="h-4 w-4 rounded border-slate-300"
@@ -1020,6 +1348,7 @@ export default function FieldPhotosPage() {
 
             <select
               value={selectedProjectPath}
+              disabled={!isOnline}
               onChange={(e) => setSelectedProjectPath(e.target.value)}
               className="mb-3 w-full rounded-lg border p-3"
             >
@@ -1034,6 +1363,7 @@ export default function FieldPhotosPage() {
             <div className="flex gap-2">
               <input
                 value={newProjectName}
+                disabled={!isOnline}
                 onChange={(e) => setNewProjectName(e.target.value)}
                 placeholder="Create project folder"
                 className="w-full rounded-lg border p-3"
@@ -1041,7 +1371,8 @@ export default function FieldPhotosPage() {
               <button
                 type="button"
                 onClick={createProjectFolder}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                disabled={!isOnline}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:bg-slate-400"
               >
                 Create
               </button>
@@ -1068,6 +1399,7 @@ export default function FieldPhotosPage() {
                 <input
                   value={templateProjectName}
                   onChange={(e) => setTemplateProjectName(e.target.value)}
+                  disabled={!isOnline}
                   placeholder="Project name only, example: SMITH"
                   className="w-full rounded-lg border p-3"
                 />
@@ -1075,7 +1407,7 @@ export default function FieldPhotosPage() {
                 <button
                   type="button"
                   onClick={createProjectFolderFromTemplate}
-                  disabled={!nextProjectFolderName || isCreatingTemplateProject}
+                  disabled={!isOnline || !nextProjectFolderName || isCreatingTemplateProject}
                   className="rounded-lg bg-purple-600 px-5 py-3 font-medium text-white hover:bg-purple-700 disabled:bg-slate-400"
                 >
                   {isCreatingTemplateProject ? "Creating..." : "Create Project"}
@@ -1118,8 +1450,9 @@ export default function FieldPhotosPage() {
                     type="button"
                     onClick={goUpOneLevel}
                     disabled={
+                      !isOnline ||
                       currentBrowsePath.toLowerCase() ===
-                      selectedProjectPath.toLowerCase()
+                        selectedProjectPath.toLowerCase()
                     }
                     className="rounded-lg bg-slate-700 px-4 py-2 text-white hover:bg-slate-800 disabled:bg-slate-400"
                   >
@@ -1138,6 +1471,7 @@ export default function FieldPhotosPage() {
                 <div className="mb-4 flex gap-2">
                   <input
                     value={newFolderName}
+                    disabled={!isOnline}
                     onChange={(e) => setNewFolderName(e.target.value)}
                     placeholder="Create folder here"
                     className="w-full rounded-lg border p-3"
@@ -1145,7 +1479,8 @@ export default function FieldPhotosPage() {
                   <button
                     type="button"
                     onClick={createFolderHere}
-                    className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                    disabled={!isOnline}
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:bg-slate-400"
                   >
                     Create
                   </button>
@@ -1171,7 +1506,8 @@ export default function FieldPhotosPage() {
                           key={folder.path}
                           type="button"
                           onClick={() => openFolder(folder)}
-                          className="flex w-full items-center justify-between px-3 py-3 text-left hover:bg-slate-50"
+                          disabled={!isOnline}
+                          className="flex w-full items-center justify-between px-3 py-3 text-left hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <span className="font-medium text-slate-800">
                             📁 {folder.name}
@@ -1241,10 +1577,28 @@ export default function FieldPhotosPage() {
               {isQueueFull ? "Queue Full" : "Take Photo"}
             </button>
 
+            <input
+              ref={galleryInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleGallerySelect}
+              className="hidden"
+            />
+
+            <button
+              type="button"
+              onClick={() => galleryInputRef.current?.click()}
+              disabled={!selectedUploadPath || isQueueFull}
+              className="rounded-lg bg-indigo-600 px-5 py-3 font-medium text-white hover:bg-indigo-700 disabled:bg-slate-400"
+            >
+              Upload from Gallery
+            </button>
+
             <button
               type="button"
               onClick={retryFailedUploads}
-              disabled={failedCount === 0}
+              disabled={!isOnline || failedCount === 0}
               className="rounded-lg bg-yellow-600 px-5 py-3 font-medium text-white hover:bg-yellow-700 disabled:bg-slate-400"
             >
               Retry Failed ({failedCount})
@@ -1257,6 +1611,15 @@ export default function FieldPhotosPage() {
               className="rounded-lg bg-slate-600 px-5 py-3 font-medium text-white hover:bg-slate-700 disabled:bg-slate-400"
             >
               Clear Uploaded
+            </button>
+
+            <button
+              type="button"
+              onClick={exportLocalBackupZip}
+              disabled={activeQueueItems.length === 0}
+              className="rounded-lg bg-orange-600 px-5 py-3 font-medium text-white hover:bg-orange-700 disabled:bg-slate-400"
+            >
+              Save Local Backup ({activeQueueItems.length})
             </button>
 
             <button
@@ -1282,7 +1645,7 @@ export default function FieldPhotosPage() {
 
           <p className="mb-4 text-sm text-slate-600">
             Failed photos retry automatically when possible. You can also
-            manually press Retry Failed.
+            manually press Retry Failed or save a local ZIP backup.
           </p>
 
           {queue.length === 0 ? (
@@ -1329,8 +1692,25 @@ export default function FieldPhotosPage() {
                       </div>
 
                       <div className="text-xs text-slate-500">
+                        Source: {item.source || "camera"}
+                      </div>
+
+                      <div className="text-xs text-slate-500">
                         Attempts: {item.attempts}
                       </div>
+
+                      {item.originalFileName && (
+                        <div className="text-xs text-slate-500">
+                          Original: {item.originalFileName}
+                        </div>
+                      )}
+
+                      {item.localBackupSavedAt && (
+                        <div className="text-xs font-medium text-orange-700">
+                          Local backup saved:{" "}
+                          {new Date(item.localBackupSavedAt).toLocaleString()}
+                        </div>
+                      )}
 
                       {item.uploadedAt && (
                         <div className="text-xs text-slate-500">
