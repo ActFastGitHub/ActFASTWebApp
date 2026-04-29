@@ -8,7 +8,8 @@ import { dropboxApiFetch, isInsideRoot } from "@/app/libs/dropbox";
 
 export const runtime = "nodejs";
 
-const PHOTO_OWNER_REGEX = /^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}__([a-z0-9-_]+)__(camera|gallery)\.(jpg|jpeg|webp|png)$/i;
+const PHOTO_OWNER_REGEX =
+  /^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}__([a-z0-9-_]+)__(camera|gallery)\.(jpg|jpeg|webp|png)$/i;
 
 const cleanFileNamePart = (value: string) =>
   value
@@ -22,7 +23,8 @@ const isAdminRole = (role?: string | null) =>
     String(role || "").toLowerCase(),
   );
 
-const getFileNameFromPath = (path: string) => path.split("/").filter(Boolean).pop() || "";
+const getFileNameFromPath = (path: string) =>
+  path.split("/").filter(Boolean).pop() || "";
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
@@ -59,7 +61,10 @@ export async function POST(request: Request) {
 
     const isAdmin = isAdminRole(profile?.role);
     const currentUserName = cleanFileNamePart(
-      profile?.nickname || profile?.firstName || session.user.name || session.user.email,
+      profile?.nickname ||
+        profile?.firstName ||
+        session.user.name ||
+        session.user.email,
     );
 
     const fileName = getFileNameFromPath(dropboxPath);

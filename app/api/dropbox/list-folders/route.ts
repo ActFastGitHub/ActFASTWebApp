@@ -1,114 +1,3 @@
-// // app/api/dropbox/list-folders/route.ts
-
-// import { NextResponse } from "next/server";
-// import { getServerSession } from "next-auth";
-// import { authOptions } from "@/app/libs/authOption";
-// import {
-//   dropboxApiFetch,
-//   getDropboxRootPath,
-//   isInsideRoot,
-// } from "@/app/libs/dropbox";
-
-// export const runtime = "nodejs";
-
-// type DropboxEntry = {
-//   ".tag": string;
-//   name: string;
-//   path_display: string;
-//   path_lower: string;
-// };
-
-// type DropboxListResponse = {
-//   entries: DropboxEntry[];
-//   cursor: string;
-//   has_more: boolean;
-// };
-
-// export async function POST(request: Request) {
-//   const session = await getServerSession(authOptions);
-
-//   if (!session) {
-//     return NextResponse.json(
-//       { message: "Unauthorized", status: 401 },
-//       { status: 401 },
-//     );
-//   }
-
-//   try {
-//     const body = await request.json().catch(() => ({}));
-
-//     const rootPath = getDropboxRootPath();
-//     const requestedPath = body?.path || rootPath;
-
-//     if (!isInsideRoot(requestedPath)) {
-//       return NextResponse.json(
-//         { message: "Invalid Dropbox path", status: 400 },
-//         { status: 400 },
-//       );
-//     }
-
-//     let data = await dropboxApiFetch<DropboxListResponse>("/files/list_folder", {
-//       path: requestedPath,
-//       recursive: false,
-//       include_deleted: false,
-//       include_has_explicit_shared_members: false,
-//       include_mounted_folders: true,
-//       include_non_downloadable_files: true,
-//       limit: 2000,
-//     });
-
-//     const allEntries: DropboxEntry[] = [...data.entries];
-
-//     while (data.has_more) {
-//       data = await dropboxApiFetch<DropboxListResponse>(
-//         "/files/list_folder/continue",
-//         {
-//           cursor: data.cursor,
-//         },
-//       );
-
-//       allEntries.push(...data.entries);
-//     }
-
-//     const isRootLevel =
-//       requestedPath.toLowerCase() === rootPath.toLowerCase();
-
-//     const folders = allEntries
-//       .filter((entry) => entry[".tag"] === "folder")
-//       .map((entry) => ({
-//         name: entry.name,
-//         path: entry.path_display,
-//       }))
-//       .sort((a, b) => {
-//         // Project folders = descending
-//         if (isRootLevel) {
-//           return b.name.localeCompare(a.name, undefined, {
-//             numeric: true,
-//             sensitivity: "base",
-//           });
-//         }
-
-//         // Room/category folders = ascending
-//         return a.name.localeCompare(b.name, undefined, {
-//           numeric: true,
-//           sensitivity: "base",
-//         });
-//       });
-
-//     return NextResponse.json({
-//       folders,
-//       currentPath: requestedPath,
-//       totalFolders: folders.length,
-//       status: 200,
-//     });
-//   } catch (error) {
-//     return NextResponse.json(
-//       { message: (error as Error).message, status: 500 },
-//       { status: 500 },
-//     );
-//   }
-// }
-
 // app/api/dropbox/list-folders/route.ts
 
 import { NextResponse } from "next/server";
@@ -205,7 +94,6 @@ const isNonAdminBrowsablePath = (path: string) => {
   const allowedBrowseRoots = [
     projectRoot,
     picturesPath,
-    contentsWetPicsPath,
     nrContentPhotosPath,
   ].map(normalizePath);
 
@@ -241,19 +129,37 @@ const isNonAdminVisibleChild = (parentPath: string, folderPath: string) => {
   }
 
   if (normalizedParent === normalizePath(projectRoot)) {
-    return [picturesPath, contentsWetPicsPath]
-      .map(normalizePath)
-      .includes(normalizedFolder);
+    // Non-admin users should not browse the parent 0-CONTENTS-WET-PICS folder.
+    // They can only jump directly to 0-CONTENTS-WET-PICS/2 NR CONTENT PHOTOS.
+    return normalizedFolder === normalizePath(picturesPath);
   }
 
   if (normalizedParent === normalizePath(contentsWetPicsPath)) {
-    return normalizedFolder === normalizePath(nrContentPhotosPath);
+    return false;
   }
 
   if (normalizedParent === normalizePath(picturesPath)) return true;
   if (normalizedParent === normalizePath(nrContentPhotosPath)) return true;
 
   return false;
+};
+
+const dropboxPathExists = async (path: string) => {
+  try {
+    await dropboxApiFetch<DropboxEntry>("/files/get_metadata", {
+      path,
+      include_deleted: false,
+    });
+    return true;
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message.toLowerCase()
+        : String(error).toLowerCase();
+    if (message.includes("path/not_found") || message.includes("not_found"))
+      return false;
+    throw error;
+  }
 };
 
 export async function POST(request: Request) {
@@ -317,26 +223,63 @@ export async function POST(request: Request) {
     const isRootLevel =
       normalizePath(requestedPath) === normalizePath(rootPath);
 
-    const folders = allEntries
+    let folders = allEntries
       .filter((entry) => entry[".tag"] === "folder")
       .map((entry) => ({ name: entry.name, path: entry.path_display }))
       .filter((folder) => {
         if (isAdmin) return true;
         return isNonAdminVisibleChild(requestedPath, folder.path);
-      })
-      .sort((a, b) => {
-        if (isRootLevel) {
-          return b.name.localeCompare(a.name, undefined, {
-            numeric: true,
-            sensitivity: "base",
+      });
+
+    // Non-admin shortcut: show the approved NR photo folder directly at project level.
+    // This avoids exposing/browsing the parent 0-CONTENTS-WET-PICS folder.
+    if (!isAdmin) {
+      const requestedProjectName = getProjectNameFromPath(requestedPath);
+      const requestedProjectRoot = requestedProjectName
+        ? joinDropboxPath(rootPath, requestedProjectName)
+        : "";
+
+      if (
+        requestedProjectRoot &&
+        normalizePath(requestedPath) === normalizePath(requestedProjectRoot)
+      ) {
+        const directNrContentPhotosPath = joinDropboxPath(
+          requestedProjectRoot,
+          CONTENTS_WET_PICS_FOLDER_NAME,
+          NR_CONTENT_PHOTOS_FOLDER_NAME,
+        );
+
+        const directFolderAlreadyShown = folders.some(
+          (folder) =>
+            normalizePath(folder.path) ===
+            normalizePath(directNrContentPhotosPath),
+        );
+
+        if (
+          !directFolderAlreadyShown &&
+          (await dropboxPathExists(directNrContentPhotosPath))
+        ) {
+          folders.push({
+            name: NR_CONTENT_PHOTOS_FOLDER_NAME,
+            path: directNrContentPhotosPath,
           });
         }
+      }
+    }
 
-        return a.name.localeCompare(b.name, undefined, {
+    folders = folders.sort((a, b) => {
+      if (isRootLevel) {
+        return b.name.localeCompare(a.name, undefined, {
           numeric: true,
           sensitivity: "base",
         });
+      }
+
+      return a.name.localeCompare(b.name, undefined, {
+        numeric: true,
+        sensitivity: "base",
       });
+    });
 
     return NextResponse.json({
       folders,

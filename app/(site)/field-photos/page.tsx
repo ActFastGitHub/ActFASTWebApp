@@ -1877,6 +1877,13 @@ type DropboxFolder = {
 type QueueStatus = "pending" | "uploading" | "uploaded" | "failed";
 type PhotoSource = "camera" | "gallery";
 
+type CameraFacingDevice = {
+  deviceId: string;
+  label: string;
+  isBackCamera: boolean;
+  isUltraWide: boolean;
+};
+
 type DropboxImageFile = {
   name: string;
   path: string;
@@ -2038,6 +2045,11 @@ export default function FieldPhotosPage() {
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraZoom, setCameraZoom] = useState(1);
   const [cameraZoomOptions, setCameraZoomOptions] = useState<number[]>([]);
+  const [cameraDevices, setCameraDevices] = useState<CameraFacingDevice[]>([]);
+  const [activeCameraDeviceId, setActiveCameraDeviceId] = useState("");
+  const [ultraWideCameraDeviceId, setUltraWideCameraDeviceId] = useState("");
+  const [standardBackCameraDeviceId, setStandardBackCameraDeviceId] =
+    useState("");
   const [torchSupported, setTorchSupported] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const [loadingFolders, setLoadingFolders] = useState(false);
@@ -2169,6 +2181,35 @@ export default function FieldPhotosPage() {
   useEffect(() => {
     if (queuePage > queueTotalPages) setQueuePage(queueTotalPages);
   }, [queuePage, queueTotalPages]);
+
+  /* ─────────────────────────────
+     Camera modal scroll lock
+
+     When the camera is open, the page behaves like a real phone camera app.
+     Users cannot scroll away from the camera controls until they close it.
+  ───────────────────────────── */
+
+  useEffect(() => {
+    if (!cameraActive) return;
+
+    const originalBodyOverflow = document.body.style.overflow;
+    const originalHtmlOverflow = document.documentElement.style.overflow;
+
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") stopCamera();
+    };
+
+    window.addEventListener("keydown", handleEscapeKey);
+
+    return () => {
+      document.body.style.overflow = originalBodyOverflow;
+      document.documentElement.style.overflow = originalHtmlOverflow;
+      window.removeEventListener("keydown", handleEscapeKey);
+    };
+  }, [cameraActive]);
 
   useEffect(() => {
     if (galleryPage > galleryTotalPages) setGalleryPage(galleryTotalPages);
@@ -2632,19 +2673,107 @@ export default function FieldPhotosPage() {
      Camera actions
   ───────────────────────────── */
 
-  const startCamera = async () => {
+  const getAvailableBackCameras = async (): Promise<CameraFacingDevice[]> => {
+    if (!navigator.mediaDevices?.enumerateDevices) return [];
+
+    const devices = await navigator.mediaDevices.enumerateDevices();
+
+    return devices
+      .filter((device) => device.kind === "videoinput")
+      .map((device, index) => {
+        const label = device.label || `Camera ${index + 1}`;
+        const lowerLabel = label.toLowerCase();
+
+        return {
+          deviceId: device.deviceId,
+          label,
+          isBackCamera:
+            /back|rear|environment|wide|ultra/.test(lowerLabel) ||
+            (!/front|user|facetime/.test(lowerLabel) && index > 0),
+          isUltraWide: /ultra|0\.5|0,5|0\.6|0,6/.test(lowerLabel),
+        };
+      })
+      .filter(
+        (device) =>
+          device.isBackCamera || !/front|user|facetime/i.test(device.label),
+      );
+  };
+
+  const getVideoTrackCapabilities = (track?: MediaStreamTrack) => {
+    return track?.getCapabilities?.() as MediaTrackCapabilities & {
+      zoom?: { min?: number; max?: number; step?: number };
+      torch?: boolean;
+    };
+  };
+
+  const refreshCameraDeviceInfo = async (
+    activeDeviceId: string,
+    track?: MediaStreamTrack,
+  ) => {
+    const devices = await getAvailableBackCameras();
+    const ultraWideDevice = devices.find((device) => device.isUltraWide);
+    const standardBackDevice =
+      devices.find((device) => !device.isUltraWide && device.isBackCamera) ||
+      devices.find((device) => !device.isUltraWide) ||
+      devices[0];
+
+    setCameraDevices(devices);
+    setUltraWideCameraDeviceId(ultraWideDevice?.deviceId || "");
+    setStandardBackCameraDeviceId(standardBackDevice?.deviceId || "");
+    setActiveCameraDeviceId(activeDeviceId);
+
+    const capabilities = getVideoTrackCapabilities(track);
+    const zoomOptions = new Set<number>();
+
+    // Many phones expose 0.6x as a separate ultra-wide camera, not as zoom below 1x.
+    if (
+      ultraWideDevice ||
+      (capabilities?.zoom?.min && capabilities.zoom.min <= 0.6)
+    ) {
+      zoomOptions.add(0.6);
+    }
+
+    zoomOptions.add(1);
+
+    const maxZoom = capabilities?.zoom?.max;
+
+    if (maxZoom && maxZoom > 1) {
+      [2, 3].forEach((zoom) => {
+        if (zoom <= maxZoom) {
+          zoomOptions.add(zoom);
+        }
+      });
+    }
+
+    setCameraZoomOptions(Array.from(zoomOptions).sort((a, b) => a - b));
+    setTorchSupported(Boolean(capabilities?.torch));
+  };
+
+  const startCamera = async (preferredDeviceId?: string, preferredZoom = 1) => {
     if (!selectedUploadPath) {
       toast.error("Select an upload folder first");
       return;
     }
 
     try {
+      // Stop the existing stream before switching lenses. This is required on many phones.
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+
+      const videoConstraints: MediaTrackConstraints = preferredDeviceId
+        ? {
+            deviceId: { exact: preferredDeviceId },
+            width: { ideal: SMART_IMAGE_MAX_EDGE_PX },
+            height: { ideal: SMART_IMAGE_MAX_EDGE_PX },
+          }
+        : {
+            facingMode: { ideal: "environment" },
+            width: { ideal: SMART_IMAGE_MAX_EDGE_PX },
+            height: { ideal: SMART_IMAGE_MAX_EDGE_PX },
+          };
+
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: SMART_IMAGE_MAX_EDGE_PX },
-          height: { ideal: SMART_IMAGE_MAX_EDGE_PX },
-        },
+        video: videoConstraints,
         audio: false,
       });
 
@@ -2655,22 +2784,24 @@ export default function FieldPhotosPage() {
       }
 
       const [videoTrack] = stream.getVideoTracks();
-      const capabilities =
-        videoTrack?.getCapabilities?.() as MediaTrackCapabilities & {
-          zoom?: { min?: number; max?: number; step?: number };
-          torch?: boolean;
-        };
+      const settings = videoTrack?.getSettings?.();
+      const activeDeviceId = settings?.deviceId || preferredDeviceId || "";
 
-      if (capabilities?.zoom?.max && capabilities.zoom.max > 1) {
-        const maxZoom = capabilities.zoom.max;
-        setCameraZoomOptions([0.6, 1, 2, 3].filter((zoom) => zoom <= maxZoom));
-      } else {
-        setCameraZoomOptions([]);
-      }
+      await refreshCameraDeviceInfo(activeDeviceId, videoTrack);
 
-      setTorchSupported(Boolean(capabilities?.torch));
       setTorchOn(false);
       setCameraActive(true);
+
+      if (preferredZoom >= 1) {
+        const capabilities = getVideoTrackCapabilities(videoTrack);
+        if (capabilities?.zoom?.max && preferredZoom <= capabilities.zoom.max) {
+          await videoTrack.applyConstraints({
+            advanced: [{ zoom: preferredZoom } as MediaTrackConstraintSet],
+          });
+        }
+      }
+
+      setCameraZoom(preferredZoom);
     } catch {
       toast.error("Camera access denied or unavailable");
     }
@@ -2682,6 +2813,10 @@ export default function FieldPhotosPage() {
     setCameraActive(false);
     setCameraZoom(1);
     setCameraZoomOptions([]);
+    setCameraDevices([]);
+    setActiveCameraDeviceId("");
+    setUltraWideCameraDeviceId("");
+    setStandardBackCameraDeviceId("");
     setTorchSupported(false);
     setTorchOn(false);
   };
@@ -2690,13 +2825,52 @@ export default function FieldPhotosPage() {
     const track = streamRef.current?.getVideoTracks()[0];
     if (!track) return;
 
+    if (zoom < 1) {
+      const capabilities = getVideoTrackCapabilities(track);
+
+      if (capabilities?.zoom?.min && capabilities.zoom.min <= zoom) {
+        try {
+          await track.applyConstraints({
+            advanced: [{ zoom } as MediaTrackConstraintSet],
+          });
+          setCameraZoom(zoom);
+          return;
+        } catch {
+          // Continue to ultra-wide device switching below.
+        }
+      }
+
+      if (
+        ultraWideCameraDeviceId &&
+        activeCameraDeviceId !== ultraWideCameraDeviceId
+      ) {
+        await startCamera(ultraWideCameraDeviceId, 0.6);
+        return;
+      }
+
+      toast.error(
+        "0.6x needs the phone's ultra-wide camera. This browser did not expose it.",
+      );
+      return;
+    }
+
+    if (
+      Math.abs(zoom - 1) < 0.05 &&
+      standardBackCameraDeviceId &&
+      activeCameraDeviceId === ultraWideCameraDeviceId &&
+      standardBackCameraDeviceId !== ultraWideCameraDeviceId
+    ) {
+      await startCamera(standardBackCameraDeviceId, 1);
+      return;
+    }
+
     try {
       await track.applyConstraints({
         advanced: [{ zoom } as MediaTrackConstraintSet],
       });
       setCameraZoom(zoom);
     } catch {
-      toast.error("Zoom is not supported on this device/browser");
+      toast.error("Zoom is not supported on this selected camera/browser");
     }
   };
 
@@ -2710,7 +2884,9 @@ export default function FieldPhotosPage() {
       });
       setTorchOn((prev) => !prev);
     } catch {
-      toast.error("Flash/torch is not supported on this device/browser");
+      toast.error(
+        "Flash/torch is not supported on this selected camera/browser",
+      );
     }
   };
 
@@ -3216,6 +3392,19 @@ export default function FieldPhotosPage() {
     await openFolder(folder);
   };
 
+  const openDirectProjectPhotoFolder = async (
+    relativePath: string,
+    label: string,
+  ) => {
+    if (!selectedProjectPath) {
+      toast.error("Select a project first");
+      return;
+    }
+
+    const directPath = `${selectedProjectPath}/${relativePath}`;
+    await openFolder({ name: label, path: directPath });
+  };
+
   const getSafeRoomFolderParentPath = () => {
     if (!selectedProjectPath || !currentBrowsePath) return "";
 
@@ -3341,9 +3530,10 @@ export default function FieldPhotosPage() {
 
     if (Math.abs(difference) < 18) return;
 
+    const minZoom = cameraZoomOptions[0] || 1;
     const maxZoom = cameraZoomOptions[cameraZoomOptions.length - 1] || 3;
     const nextZoom = Math.min(
-      Math.max(cameraZoom + (difference > 0 ? 0.25 : -0.25), 1),
+      Math.max(cameraZoom + (difference > 0 ? 0.25 : -0.25), minZoom),
       maxZoom,
     );
 
@@ -3693,26 +3883,36 @@ export default function FieldPhotosPage() {
                     <div className="grid gap-2 sm:grid-cols-2">
                       <button
                         type="button"
-                        onClick={() => openKnownFolder("1-PICTURES")}
-                        disabled={
-                          !isOnline || !findChildFolderByName("1-PICTURES")
+                        onClick={() =>
+                          openDirectProjectPhotoFolder(
+                            "1-PICTURES",
+                            "1-PICTURES",
+                          )
                         }
+                        disabled={!isOnline || !selectedProjectPath}
                         className="rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:bg-slate-300"
                       >
                         Open 1-PICTURES
                       </button>
                       <button
                         type="button"
-                        onClick={() => openKnownFolder("0-CONTENTS-WET-PICS")}
-                        disabled={
-                          !isOnline ||
-                          !findChildFolderByName("0-CONTENTS-WET-PICS")
+                        onClick={() =>
+                          openDirectProjectPhotoFolder(
+                            "0-CONTENTS-WET-PICS/2 NR CONTENT PHOTOS",
+                            "2 NR CONTENT PHOTOS",
+                          )
                         }
+                        disabled={!isOnline || !selectedProjectPath}
                         className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:bg-slate-300"
                       >
-                        Open Contents Wet Pics
+                        Open 0-CONTENTS-WET-PICS / 2 NR CONTENT PHOTOS
                       </button>
                     </div>
+                    <p className="mt-2 text-xs text-slate-500">
+                      The NR content photo button jumps directly to the approved
+                      folder. Non-admin users will not browse the parent
+                      0-CONTENTS-WET-PICS folder.
+                    </p>
                   </div>
                   <div className="mb-3 rounded-xl border p-3">
                     <label className="mb-2 block text-sm font-semibold text-slate-800">
@@ -3790,12 +3990,32 @@ export default function FieldPhotosPage() {
           </div>
 
           <div className="space-y-4">
-            <section className="overflow-hidden rounded-2xl bg-white shadow">
-              <div className="flex items-center justify-between border-b p-4">
+            <section
+              className={
+                cameraActive
+                  ? "fixed inset-0 z-50 flex flex-col overflow-hidden bg-black text-white"
+                  : "overflow-hidden rounded-2xl bg-white shadow"
+              }
+            >
+              <div
+                className={
+                  cameraActive
+                    ? "flex shrink-0 items-center justify-between border-b border-white/10 bg-black/90 p-4 text-white"
+                    : "flex items-center justify-between border-b p-4"
+                }
+              >
                 <div>
                   <h2 className="text-lg font-semibold">3. Camera</h2>
-                  <p className="text-xs text-slate-500">
-                    Designed to feel closer to a phone camera app.
+                  <p
+                    className={
+                      cameraActive
+                        ? "text-xs text-white/60"
+                        : "text-xs text-slate-500"
+                    }
+                  >
+                    {cameraActive
+                      ? "Camera mode is active. Close the camera to return to the page."
+                      : "Designed to feel closer to a phone camera app."}
                   </p>
                 </div>
                 {cameraActive && (
@@ -3809,7 +4029,11 @@ export default function FieldPhotosPage() {
                 )}
               </div>
               <div
-                className="relative bg-black"
+                className={
+                  cameraActive
+                    ? "relative min-h-0 flex-1 bg-black"
+                    : "relative bg-black"
+                }
                 onTouchStart={handleCameraTouchStart}
                 onTouchMove={handleCameraTouchMove}
               >
@@ -3818,7 +4042,11 @@ export default function FieldPhotosPage() {
                   autoPlay
                   playsInline
                   muted
-                  className="h-[55vh] min-h-[360px] w-full object-contain landscape:h-[72vh]"
+                  className={
+                    cameraActive
+                      ? "h-full w-full object-contain"
+                      : "h-[55vh] min-h-[360px] w-full object-contain landscape:h-[72vh]"
+                  }
                 />
                 <canvas ref={canvasRef} className="hidden" />
                 {!cameraActive && (
@@ -3836,7 +4064,13 @@ export default function FieldPhotosPage() {
                 )}
                 {cameraActive && (
                   <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-3">
-                    <div className="pointer-events-auto flex justify-end">
+                    <div className="pointer-events-auto flex items-start justify-between gap-2">
+                      <div className="rounded-full bg-black/50 px-3 py-2 text-xs font-medium text-white backdrop-blur">
+                        {cameraZoom < 1 ? "Ultra-wide lens" : "Rear camera"}
+                        {cameraDevices.length > 1
+                          ? ` • ${cameraDevices.length} cameras detected`
+                          : ""}
+                      </div>
                       <button
                         type="button"
                         onClick={toggleTorch}
@@ -3870,13 +4104,25 @@ export default function FieldPhotosPage() {
                 )}
               </div>
               {cameraActive && cameraZoomOptions.length > 1 && (
-                <div className="border-t bg-slate-50 p-4">
-                  <label className="mb-2 block text-xs font-medium text-slate-600">
+                <div
+                  className={
+                    cameraActive
+                      ? "shrink-0 border-t border-white/10 bg-black/90 p-4"
+                      : "border-t bg-slate-50 p-4"
+                  }
+                >
+                  <label
+                    className={
+                      cameraActive
+                        ? "mb-2 block text-xs font-medium text-white/70"
+                        : "mb-2 block text-xs font-medium text-slate-600"
+                    }
+                  >
                     Pinch or slide to zoom: {cameraZoom.toFixed(2)}x
                   </label>
                   <input
                     type="range"
-                    min={1}
+                    min={cameraZoomOptions[0] || 1}
                     max={cameraZoomOptions[cameraZoomOptions.length - 1] || 3}
                     step={0.1}
                     value={cameraZoom}
@@ -3885,11 +4131,17 @@ export default function FieldPhotosPage() {
                   />
                 </div>
               )}
-              <div className="grid gap-2 p-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div
+                className={
+                  cameraActive
+                    ? "grid shrink-0 gap-2 bg-black/95 p-4 sm:grid-cols-2 lg:grid-cols-3"
+                    : "grid gap-2 p-4 sm:grid-cols-2 lg:grid-cols-3"
+                }
+              >
                 {!cameraActive ? (
                   <button
                     type="button"
-                    onClick={startCamera}
+                    onClick={() => startCamera()}
                     disabled={!selectedUploadPath}
                     className="rounded-xl bg-green-600 px-5 py-3 font-medium text-white hover:bg-green-700 disabled:bg-slate-400"
                   >
@@ -3931,7 +4183,13 @@ export default function FieldPhotosPage() {
                 </button>
               </div>
               {selectedUploadPath && (
-                <div className="border-t bg-slate-50 p-4 text-xs text-slate-600">
+                <div
+                  className={
+                    cameraActive
+                      ? "shrink-0 border-t border-white/10 bg-black/90 p-4 text-xs text-white/60"
+                      : "border-t bg-slate-50 p-4 text-xs text-slate-600"
+                  }
+                >
                   Upload destination:{" "}
                   <span className="break-all font-medium">
                     {selectedUploadPath}
