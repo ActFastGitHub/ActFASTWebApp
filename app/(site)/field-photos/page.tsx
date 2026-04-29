@@ -938,6 +938,43 @@ export default function FieldPhotosPage() {
      Camera actions
   ───────────────────────────── */
 
+  const getCameraLensPriority = (label: string, index: number) => {
+    const lowerLabel = label.toLowerCase();
+
+    // Phone browsers do not use one universal name for lenses.
+    // Pixel/Samsung/Chrome may expose ultra-wide as "camera 0", "back 0",
+    // "rear 0", "wide", "macro", or just another generic rear camera.
+    if (
+      /ultra|ultrawide|ultra wide|wide angle|wide-angle|0\.5|0,5|0\.6|0,6|macro/.test(
+        lowerLabel,
+      )
+    ) {
+      return 0;
+    }
+
+    if (
+      /\b(camera|back|rear|environment|lens)\s*0\b|\b0\s*(camera|back|rear|lens)\b/.test(
+        lowerLabel,
+      )
+    ) {
+      return 1;
+    }
+
+    if (/wide/.test(lowerLabel) && !/tele/.test(lowerLabel)) {
+      return 2;
+    }
+
+    if (
+      /\b(camera|back|rear|environment|lens)\s*1\b|\b1\s*(camera|back|rear|lens)\b/.test(
+        lowerLabel,
+      )
+    ) {
+      return 3;
+    }
+
+    return 10 + index;
+  };
+
   const getAvailableBackCameras = async (): Promise<CameraFacingDevice[]> => {
     if (!navigator.mediaDevices?.enumerateDevices) return [];
 
@@ -951,21 +988,18 @@ export default function FieldPhotosPage() {
         const label = device.label || `Camera ${index + 1}`;
         const lowerLabel = label.toLowerCase();
 
-        // Phone browsers do not standardize lens names. Different Android/iPhone
-        // browsers may call the 0.6x lens "ultra wide", "wide angle", "0.5x",
-        // or may only expose it as another rear camera with a generic label.
         const looksFrontFacing = /front|user|facetime|selfie/.test(lowerLabel);
         const looksBackFacing =
-          /back|rear|environment|wide|ultra|tele|macro/.test(lowerLabel);
-        const looksUltraWideOrMacro =
-          /ultra|ultrawide|ultra wide|wide angle|wide-angle|0\.5|0,5|0\.6|0,6|macro/.test(
-            lowerLabel,
-          );
+          /back|rear|environment|wide|ultra|tele|macro/.test(lowerLabel) ||
+          (!looksFrontFacing && videoInputs.length <= 2
+            ? index > 0
+            : !looksFrontFacing);
+        const looksUltraWideOrMacro = getCameraLensPriority(label, index) <= 2;
 
         return {
           deviceId: device.deviceId,
           label,
-          isBackCamera: looksBackFacing || (!looksFrontFacing && index > 0),
+          isBackCamera: looksBackFacing,
           isUltraWide: looksUltraWideOrMacro,
         };
       })
@@ -976,23 +1010,39 @@ export default function FieldPhotosPage() {
       );
   };
 
-  const getFallbackWideCameraDevice = (
+  const getWideCameraCandidates = (
     devices: CameraFacingDevice[],
     activeDeviceId: string,
     standardDeviceId: string,
   ) => {
-    const namedWideLens = devices.find((device) => device.isUltraWide);
-    if (namedWideLens) return namedWideLens;
-
-    return (
-      devices.find(
+    return devices
+      .filter(
         (device) =>
           device.deviceId &&
           device.deviceId !== activeDeviceId &&
           device.deviceId !== standardDeviceId,
-      ) || null
-    );
+      )
+      .sort((a, b) => {
+        const aIndex = devices.findIndex(
+          (device) => device.deviceId === a.deviceId,
+        );
+        const bIndex = devices.findIndex(
+          (device) => device.deviceId === b.deviceId,
+        );
+        return (
+          getCameraLensPriority(a.label, aIndex) -
+          getCameraLensPriority(b.label, bIndex)
+        );
+      });
   };
+
+  const getFallbackWideCameraDevice = (
+    devices: CameraFacingDevice[],
+    activeDeviceId: string,
+    standardDeviceId: string,
+  ) =>
+    getWideCameraCandidates(devices, activeDeviceId, standardDeviceId)[0] ||
+    null;
 
   const getVideoTrackCapabilities = (track?: MediaStreamTrack) => {
     return track?.getCapabilities?.() as MediaTrackCapabilities & {
@@ -1047,10 +1097,13 @@ export default function FieldPhotosPage() {
     setTorchSupported(Boolean(capabilities?.torch));
   };
 
-  const startCamera = async (preferredDeviceId?: string, preferredZoom = 1) => {
+  const startCamera = async (
+    preferredDeviceId?: string,
+    preferredZoom = 1,
+  ): Promise<boolean> => {
     if (!selectedUploadPath) {
       toast.error("Select an upload folder first");
-      return;
+      return false;
     }
 
     try {
@@ -1100,8 +1153,10 @@ export default function FieldPhotosPage() {
       }
 
       setCameraZoom(preferredZoom);
+      return true;
     } catch {
       toast.error("Camera access denied or unavailable");
+      return false;
     }
   };
 
@@ -1141,35 +1196,40 @@ export default function FieldPhotosPage() {
         }
       }
 
-      // Most phones expose 0.6x as a separate physical camera.
-      if (
-        ultraWideCameraDeviceId &&
-        activeCameraDeviceId !== ultraWideCameraDeviceId
-      ) {
-        await startCamera(ultraWideCameraDeviceId, 0.6);
-        setCameraLensLabel("0.6x wide/macro lens");
-        return;
-      }
-
-      // Final fallback: re-check devices after permission and try any alternate rear lens.
+      // Most phones expose 0.6x as a separate physical camera. The hard part is
+      // that browsers often label it generically, so we try every safe rear-lens
+      // candidate instead of depending on the name containing "0.6" or "ultra".
       const devices = await getAvailableBackCameras();
-      const fallbackDevice = getFallbackWideCameraDevice(
+      const candidates = getWideCameraCandidates(
         devices,
         activeCameraDeviceId,
         standardBackCameraDeviceId,
       );
 
-      if (
-        fallbackDevice?.deviceId &&
-        fallbackDevice.deviceId !== activeCameraDeviceId
-      ) {
-        await startCamera(fallbackDevice.deviceId, 0.6);
-        setCameraLensLabel("Alternate rear lens");
-        return;
+      const orderedCandidates = [
+        ...candidates.filter(
+          (device) => device.deviceId === ultraWideCameraDeviceId,
+        ),
+        ...candidates.filter(
+          (device) => device.deviceId !== ultraWideCameraDeviceId,
+        ),
+      ];
+
+      for (const candidate of orderedCandidates) {
+        const switched = await startCamera(candidate.deviceId, 0.6);
+        if (switched) {
+          setCameraLensLabel(
+            candidate.isUltraWide
+              ? "0.6x wide/macro lens"
+              : `Alternate rear lens: ${candidate.label}`,
+          );
+          setCameraZoom(0.6);
+          return;
+        }
       }
 
       toast.error(
-        "0.6x needs the phone browser to expose the ultra-wide/macro lens. The native camera app may support it even when the browser does not.",
+        "This browser is not exposing a separate 0.6x/ultra-wide lens. I tried the available rear camera devices, but only the normal rear camera is available to the web app.",
       );
       return;
     }
@@ -2347,14 +2407,14 @@ export default function FieldPhotosPage() {
             <section
               className={
                 cameraActive
-                  ? "fixed inset-0 z-50 flex flex-col overflow-hidden bg-black text-white"
+                  ? "fixed inset-0 z-50 flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-black text-white"
                   : "overflow-hidden rounded-2xl bg-white shadow"
               }
             >
               <div
                 className={
                   cameraActive
-                    ? "absolute left-0 right-0 top-0 z-20 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent p-3 text-white sm:p-4"
+                    ? "absolute left-0 right-0 top-0 z-30 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent p-3 text-white sm:p-4"
                     : "flex items-center justify-between border-b p-4"
                 }
               >
@@ -2394,7 +2454,7 @@ export default function FieldPhotosPage() {
               <div
                 className={
                   cameraActive
-                    ? "relative min-h-0 flex-1 bg-black"
+                    ? "relative min-h-0 flex-1 touch-none bg-black"
                     : "relative bg-black"
                 }
                 onTouchStart={handleCameraTouchStart}
@@ -2407,7 +2467,7 @@ export default function FieldPhotosPage() {
                   muted
                   className={
                     cameraActive
-                      ? "h-full w-full object-cover portrait:object-cover landscape:object-contain"
+                      ? "h-full w-full object-cover"
                       : "h-[55vh] min-h-[360px] w-full object-contain landscape:h-[72vh]"
                   }
                 />
@@ -2426,13 +2486,15 @@ export default function FieldPhotosPage() {
                   </div>
                 )}
                 {cameraActive && (
-                  <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-3 pt-20 sm:p-4 sm:pt-24">
+                  <div className="pointer-events-none absolute inset-0 z-20 p-3 pt-20 sm:p-4 sm:pt-24">
                     <div className="pointer-events-auto flex items-start justify-between gap-2">
-                      <div className="rounded-full bg-black/45 px-3 py-1.5 text-[11px] font-semibold text-white backdrop-blur sm:text-xs">
-                        {cameraLensLabel}
-                        {cameraDevices.length > 1
-                          ? ` • ${cameraDevices.length} lenses detected`
-                          : ""}
+                      <div className="max-w-[70vw] rounded-full bg-black/45 px-3 py-1.5 text-[11px] font-semibold text-white backdrop-blur sm:text-xs">
+                        <span className="block truncate">
+                          {cameraLensLabel}
+                          {cameraDevices.length > 1
+                            ? ` • ${cameraDevices.length} lenses detected`
+                            : ""}
+                        </span>
                       </div>
                       <button
                         type="button"
@@ -2443,52 +2505,14 @@ export default function FieldPhotosPage() {
                         {torchOn ? "⚡ On" : "⚡ Flash"}
                       </button>
                     </div>
-
-                    <div className="pointer-events-auto mx-auto mb-24 flex max-w-full flex-wrap justify-center gap-2 rounded-full bg-black/45 px-3 py-2 backdrop-blur sm:mb-28">
-                      {(cameraZoomOptions.length > 0
-                        ? cameraZoomOptions
-                        : [0.6, 1]
-                      ).map((zoom) => (
-                        <button
-                          key={zoom}
-                          type="button"
-                          onClick={() => applyCameraZoom(zoom)}
-                          className={
-                            "rounded-full px-3 py-1.5 text-sm font-black shadow-sm transition sm:px-4 " +
-                            (Math.abs(cameraZoom - zoom) < 0.05
-                              ? "scale-110 bg-white text-black"
-                              : "bg-white/15 text-white hover:bg-white/25")
-                          }
-                        >
-                          {zoom}x
-                        </button>
-                      ))}
-                    </div>
                   </div>
                 )}
               </div>
 
-              {cameraActive && cameraZoomOptions.length > 1 && (
-                <div className="absolute bottom-24 left-1/2 z-20 w-[min(420px,82vw)] -translate-x-1/2 rounded-full bg-black/45 px-4 py-2 backdrop-blur sm:bottom-28">
-                  <label className="sr-only">
-                    Pinch or slide to zoom: {cameraZoom.toFixed(2)}x
-                  </label>
-                  <input
-                    type="range"
-                    min={cameraZoomOptions[0] || 0.6}
-                    max={cameraZoomOptions[cameraZoomOptions.length - 1] || 3}
-                    step={0.1}
-                    value={cameraZoom}
-                    onChange={(e) => applyCameraZoom(Number(e.target.value))}
-                    className="w-full accent-white"
-                  />
-                </div>
-              )}
-
               <div
                 className={
                   cameraActive
-                    ? "absolute bottom-0 left-0 right-0 z-30 grid grid-cols-[1fr_auto_1fr] items-center gap-3 bg-gradient-to-t from-black via-black/90 to-transparent px-4 pb-5 pt-8 sm:px-8 sm:pb-6"
+                    ? "absolute bottom-0 left-0 right-0 z-40 bg-gradient-to-t from-black via-black/90 to-transparent px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-5 sm:px-8"
                     : "grid gap-2 p-4 sm:grid-cols-2 lg:grid-cols-3"
                 }
               >
@@ -2502,35 +2526,58 @@ export default function FieldPhotosPage() {
                     Open Camera
                   </button>
                 ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => galleryInputRef.current?.click()}
-                      disabled={!selectedUploadPath || isQueueFull}
-                      className="justify-self-end rounded-full bg-white/15 px-3 py-2 text-xs font-bold text-white backdrop-blur hover:bg-white/25 disabled:opacity-40 sm:px-4 sm:text-sm"
-                    >
-                      Gallery
-                    </button>
-                    <button
-                      type="button"
-                      onClick={capturePhotoToQueue}
-                      disabled={isQueueFull}
-                      className="h-16 w-16 rounded-full border-4 border-white bg-white shadow-[0_0_0_6px_rgba(255,255,255,0.18)] transition hover:scale-105 disabled:opacity-50 sm:h-20 sm:w-20"
-                      aria-label="Take photo"
-                    >
-                      <span className="sr-only">
-                        {isQueueFull ? "Queue Full" : "Take Photo"}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setGalleryOpen(true)}
-                      disabled={!currentBrowsePath}
-                      className="justify-self-start rounded-full bg-white/15 px-3 py-2 text-xs font-bold text-white backdrop-blur hover:bg-white/25 disabled:opacity-40 sm:px-4 sm:text-sm"
-                    >
-                      Folder
-                    </button>
-                  </>
+                  <div className="mx-auto grid w-full max-w-md gap-3">
+                    <div className="mx-auto flex max-w-full flex-wrap justify-center gap-2 rounded-full bg-black/45 px-2.5 py-2 backdrop-blur">
+                      {(cameraZoomOptions.length > 0
+                        ? cameraZoomOptions
+                        : [0.6, 1]
+                      ).map((zoom) => (
+                        <button
+                          key={zoom}
+                          type="button"
+                          onClick={() => applyCameraZoom(zoom)}
+                          className={
+                            "rounded-full px-3 py-1.5 text-xs font-black shadow-sm transition sm:px-4 sm:text-sm " +
+                            (Math.abs(cameraZoom - zoom) < 0.05
+                              ? "scale-110 bg-white text-black"
+                              : "bg-white/15 text-white hover:bg-white/25")
+                          }
+                        >
+                          {zoom}x
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => galleryInputRef.current?.click()}
+                        disabled={!selectedUploadPath || isQueueFull}
+                        className="justify-self-end rounded-full bg-white/15 px-3 py-2 text-xs font-bold text-white backdrop-blur hover:bg-white/25 disabled:opacity-40 sm:px-4 sm:text-sm"
+                      >
+                        Gallery
+                      </button>
+                      <button
+                        type="button"
+                        onClick={capturePhotoToQueue}
+                        disabled={isQueueFull}
+                        className="h-16 w-16 rounded-full border-4 border-white bg-white shadow-[0_0_0_6px_rgba(255,255,255,0.18)] transition hover:scale-105 disabled:opacity-50 sm:h-20 sm:w-20"
+                        aria-label="Take photo"
+                      >
+                        <span className="sr-only">
+                          {isQueueFull ? "Queue Full" : "Take Photo"}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setGalleryOpen(true)}
+                        disabled={!currentBrowsePath}
+                        className="justify-self-start rounded-full bg-white/15 px-3 py-2 text-xs font-bold text-white backdrop-blur hover:bg-white/25 disabled:opacity-40 sm:px-4 sm:text-sm"
+                      >
+                        Folder
+                      </button>
+                    </div>
+                  </div>
                 )}
                 <input
                   ref={galleryInputRef}
