@@ -1,10 +1,26 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import {
+  FaBoxes,
+  FaCamera,
+  FaClipboardList,
+  FaCogs,
+  FaDollarSign,
+  FaHardHat,
+  FaHome,
+  FaIdBadge,
+  FaQrcode,
+  FaRegStar,
+  FaStar,
+  FaTruckMoving,
+  FaUsers,
+  FaWarehouse,
+} from "react-icons/fa";
 
 import Navbar from "@/app/components/navBar";
 import Modal from "@/app/components/modal";
@@ -22,39 +38,190 @@ const ACL: Record<string, string[]> = {
 };
 
 const norm = (s?: string) => s?.toLowerCase().trim() ?? "";
+
 const canAccess = (slug: string, role: string) =>
   !ACL[slug]?.length || ACL[slug].includes(role);
 
-const Card = ({
-  color,
-  title,
-  desc,
-}: {
-  color: string;
+type AppItem = {
+  id: string;
   title: string;
   desc: string;
-}) => (
-  <div
-    className={`block rounded-lg bg-${color}-500 p-4 text-white shadow-lg transition hover:bg-${color}-600`}
-  >
-    <h2 className="mb-1 text-lg font-semibold">{title}</h2>
-    <p className="text-sm text-gray-200">{desc}</p>
-  </div>
-);
+  href: string;
+  accessSlug?: string;
+  adminOnly?: boolean;
+  icon: React.ReactNode;
+  gradient: string;
+};
+
+const apps: AppItem[] = [
+  {
+    id: "pods-mapping",
+    title: "Pods Mapping",
+    desc: "Availability and pod contents.",
+    href: "/pods-mapping",
+    accessSlug: "pods-mapping",
+    icon: <FaWarehouse />,
+    gradient: "from-blue-500 to-cyan-500",
+  },
+  {
+    id: "memberpage",
+    title: "Member View",
+    desc: "Employee profiles and details.",
+    href: "/memberpage",
+    accessSlug: "memberpage",
+    icon: <FaUsers />,
+    gradient: "from-emerald-500 to-green-600",
+  },
+  {
+    id: "projectspage",
+    title: "Project Details",
+    desc: "Create, edit, and view projects.",
+    href: "/projectspage",
+    accessSlug: "projectspage",
+    icon: <FaClipboardList />,
+    gradient: "from-violet-500 to-purple-600",
+  },
+  {
+    id: "contentspage",
+    title: "Contents",
+    desc: "Manage client contents.",
+    href: "/contentspage",
+    accessSlug: "contentspage",
+    icon: <FaBoxes />,
+    gradient: "from-amber-400 to-yellow-600",
+  },
+  {
+    id: "projectcosting",
+    title: "Project Costing",
+    desc: "Final repairs costs and budgets.",
+    href: "/projectcosting",
+    accessSlug: "projectcosting",
+    icon: <FaDollarSign />,
+    gradient: "from-rose-500 to-red-600",
+  },
+  {
+    id: "projectmanagement",
+    title: "Project Board",
+    desc: "Prototype project management.",
+    href: "/projectmanagement",
+    accessSlug: "projectmanagement",
+    icon: <FaHardHat />,
+    gradient: "from-orange-500 to-red-500",
+  },
+  {
+    id: "inventorymanagementpage",
+    title: "Inventory",
+    desc: "Office supplies and inventory.",
+    href: "/inventorymanagementpage",
+    accessSlug: "inventorymanagementpage",
+    icon: <FaIdBadge />,
+    gradient: "from-teal-500 to-emerald-600",
+  },
+  {
+    id: "equipment",
+    title: "Equipment",
+    desc: "Warehouse vs. deployed equipment.",
+    href: "/equipment",
+    icon: <FaTruckMoving />,
+    gradient: "from-sky-500 to-blue-600",
+  },
+  {
+    id: "equipment-move",
+    title: "Equipment Move",
+    desc: "Record OUT and IN movements.",
+    href: "/equipment/move",
+    icon: <FaCogs />,
+    gradient: "from-indigo-500 to-purple-600",
+  },
+  {
+    id: "equipment-admin",
+    title: "Equipment Admin",
+    desc: "Add, edit, or archive equipment.",
+    href: "/equipment/admin/manage",
+    adminOnly: true,
+    icon: <FaHome />,
+    gradient: "from-red-500 to-rose-700",
+  },
+  {
+    id: "field-photos",
+    title: "Field Photos",
+    desc: "Upload project photos to Dropbox.",
+    href: "/field-photos",
+    accessSlug: "field-photos",
+    icon: <FaCamera />,
+    gradient: "from-yellow-400 to-orange-500",
+  },
+  {
+    id: "qr-labels",
+    title: "QR Labels",
+    desc: "Generate bulk asset stickers.",
+    href: "/equipment/qr-labels",
+    adminOnly: true,
+    icon: <FaQrcode />,
+    gradient: "from-slate-600 to-gray-800",
+  },
+];
+
+function AppTile({
+  app,
+  isFavorite,
+  onToggleFavorite,
+}: {
+  app: AppItem;
+  isFavorite: boolean;
+  onToggleFavorite: (id: string) => void;
+}) {
+  return (
+    <div className="group relative">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onToggleFavorite(app.id);
+        }}
+        className="absolute right-2 top-2 z-20 rounded-full bg-white/90 p-2 text-yellow-500 shadow-sm transition hover:scale-110"
+        aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+      >
+        {isFavorite ? <FaStar /> : <FaRegStar />}
+      </button>
+
+      <Link
+        href={app.href}
+        className="block rounded-[2rem] bg-white/80 p-4 shadow-lg ring-1 ring-black/5 backdrop-blur transition duration-200 hover:-translate-y-1 hover:shadow-2xl"
+      >
+        <div
+          className={`mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-[1.6rem] bg-gradient-to-br ${app.gradient} text-3xl text-white shadow-md transition group-hover:scale-105`}
+        >
+          {app.icon}
+        </div>
+
+        <div className="text-center">
+          <h2 className="text-base font-bold text-gray-900">{app.title}</h2>
+          <p className="mt-1 min-h-[40px] text-xs leading-5 text-gray-500">
+            {app.desc}
+          </p>
+        </div>
+      </Link>
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const router = useRouter();
   const { data: session, status } = useSession();
 
   const [user, setUser] = useState<UserProps | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [favorites, setFavorites] = useState<string[]>([]);
   const toastShownRef = useRef(false);
 
   useEffect(() => {
     if (typeof window === "undefined" || status !== "authenticated") return;
+
     const provider = new URLSearchParams(window.location.search).get(
       "provider",
     );
+
     if (provider && !toastShownRef.current) {
       toast.success(`${provider} successful login`);
       toastShownRef.current = true;
@@ -68,6 +235,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (status !== "authenticated" || !session?.user?.email) return;
+
     (async () => {
       try {
         const res = await fetch(`/api/user/profile/${session.user.email}`);
@@ -78,6 +246,30 @@ export default function Dashboard() {
       }
     })();
   }, [status, session?.user?.email, session?.user?.role]);
+
+  const favoriteStorageKey = useMemo(() => {
+    return session?.user?.email
+      ? `actfast-dashboard-favorites-${session.user.email}`
+      : "actfast-dashboard-favorites";
+  }, [session?.user?.email]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const saved = window.localStorage.getItem(favoriteStorageKey);
+    if (saved) {
+      try {
+        setFavorites(JSON.parse(saved));
+      } catch {
+        setFavorites([]);
+      }
+    }
+  }, [favoriteStorageKey]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(favoriteStorageKey, JSON.stringify(favorites));
+  }, [favoriteStorageKey, favorites]);
 
   if (status === "loading" || user === null) {
     return (
@@ -91,164 +283,88 @@ export default function Dashboard() {
 
   const role = norm(user?.role ?? session?.user?.role);
 
+  const visibleApps = apps.filter((app) => {
+    if (app.adminOnly && role !== "admin" && role !== "owner") return false;
+    if (app.accessSlug && !canAccess(app.accessSlug, role)) return false;
+    return true;
+  });
+
+  const favoriteApps = visibleApps.filter((app) => favorites.includes(app.id));
+  const regularApps = visibleApps.filter((app) => !favorites.includes(app.id));
+
+  const toggleFavorite = (id: string) => {
+    setFavorites((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  };
+
   return (
-    <div className="relative bg-gray-100">
+    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-50 to-slate-200">
       <Navbar />
 
-      <div className="flex">
-        <aside
-          className={`fixed inset-y-0 left-0 w-32 transform bg-gray-800 text-white sm:w-48 ${
-            sidebarOpen ? "translate-x-0" : "-translate-x-full"
-          } transition-transform duration-300`}
-        >
-          <div className="p-4">
-            <h2 className="pt-20 text-2xl font-bold">Sidebar</h2>
-            <ul className="space-y-1">
-              <li>(For Future Content)</li>
-              <li>(For Future Content)</li>
-              <li>(For Future Content)</li>
-            </ul>
-          </div>
-        </aside>
+      <main className="mx-auto w-full max-w-7xl px-4 pb-12 pt-28 sm:px-6 lg:px-8">
+        <section className="mb-8 rounded-[2rem] bg-white/70 p-6 shadow-xl ring-1 ring-white/70 backdrop-blur">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">
+            ActFAST App Launcher
+          </p>
 
-        <main
-          className={`flex-1 transition-all duration-300 md:mt-4 ${
-            sidebarOpen ? "ml-32 sm:ml-48" : "ml-0"
-          }`}
-        >
-          <div className="p-6 pt-24">
-            <button
-              onClick={() => setSidebarOpen((p) => !p)}
-              className="mb-4 rounded bg-blue-500 px-4 py-2 text-white"
-            >
-              Toggle Sidebar
-            </button>
+          <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h1 className="text-3xl font-black text-gray-900 sm:text-4xl">
+                Welcome back,{" "}
+                <span className="text-blue-600">
+                  {user?.nickname || session?.user?.name || "User"}
+                </span>
+              </h1>
+              <p className="mt-2 max-w-2xl text-sm text-gray-600">
+                Choose an app below. Tap the star to pin your favorite tools at
+                the top.
+              </p>
+            </div>
 
-            <h1 className="mb-4 text-2xl font-bold">
-              Welcome to your dashboard{" "}
-              <span className="text-3xl text-red-600">{user?.nickname}</span>
-            </h1>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {canAccess("pods-mapping", role) && (
-                <Link href="/pods-mapping">
-                  <Card
-                    color="blue"
-                    title="Pods Mapping"
-                    desc="Check availability & contents of each pod."
-                  />
-                </Link>
-              )}
-
-              {canAccess("memberpage", role) && (
-                <Link href="/memberpage">
-                  <Card
-                    color="green"
-                    title="Member View"
-                    desc="View and edit employee details."
-                  />
-                </Link>
-              )}
-
-              {canAccess("projectspage", role) && (
-                <Link href="/projectspage">
-                  <Card
-                    color="purple"
-                    title="Project Details"
-                    desc="Create, edit, view projects."
-                  />
-                </Link>
-              )}
-
-              {canAccess("contentspage", role) && (
-                <Link href="/contentspage">
-                  <Card
-                    color="yellow"
-                    title="Contents Management"
-                    desc="Manage client contents."
-                  />
-                </Link>
-              )}              
-
-              {canAccess("projectcosting", role) && (
-                <Link href="/projectcosting">
-                  <Card
-                    color="red"
-                    title="Project Costing (Final Repairs)"
-                    desc="Project costing & management."
-                  />
-                </Link>
-              )}
-
-              {canAccess("projectmanagement", role) && (
-                <Link href="/projectmanagement">
-                  <Card
-                    color="orange"
-                    title="Project Management (Prototype)"
-                    desc="Digitized project board."
-                  />
-                </Link>
-              )}
-
-              {canAccess("inventorymanagementpage", role) && (
-                <Link href="/inventorymanagementpage">
-                  <Card
-                    color="green"
-                    title="Inventory Management"
-                    desc="Manage inventory & supplies."
-                  />
-                </Link>
-              )}
-
-              <Link href="/equipment">
-                <Card
-                  color="blue"
-                  title="Equipment Tracking"
-                  desc="See what's in warehouse vs. deployed, with days deployed."
-                />
-              </Link>
-
-              <Link href="/equipment/move">
-                <Card
-                  color="purple"
-                  title="Equipment Move (OUT/IN)"
-                  desc="Record OUT to site or IN to warehouse. Supports lists & ranges."
-                />
-              </Link>
-
-              {(role === "admin" || role === "owner") && (
-                <Link href="/equipment/admin/manage">
-                  <Card
-                    color="red"
-                    title="Equipment Management"
-                    desc="Add/edit/archive equipment; update details."
-                  />
-                </Link>
-              )}
-
-              {canAccess("field-photos", role) && (
-                <Link href="/field-photos">
-                  <Card
-                    color="yellow"
-                    title="Field Photos"
-                    desc="Capture project photos and upload directly to Dropbox folders."
-                  />
-                </Link>
-              )}
-
-              {(role === "admin" || role === "owner") && (
-                <Link href="/equipment/qr-labels">
-                  <Card
-                    color="gray"
-                    title="QR Labels (Bulk)"
-                    desc="Generate & print QR stickers for existing assets."
-                  />
-                </Link>
-              )}
+            <div className="rounded-2xl bg-gray-900 px-4 py-3 text-sm text-white shadow-lg">
+              Role: <span className="font-bold uppercase">{role || "user"}</span>
             </div>
           </div>
-        </main>
-      </div>
+        </section>
+
+        {favoriteApps.length > 0 && (
+          <section className="mb-10">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-xl font-black text-gray-900">Favorites</h2>
+              <p className="text-xs text-gray-500">
+                Saved on this browser for your account.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+              {favoriteApps.map((app) => (
+                <AppTile
+                  key={app.id}
+                  app={app}
+                  isFavorite={favorites.includes(app.id)}
+                  onToggleFavorite={toggleFavorite}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        <section>
+          <h2 className="mb-4 text-xl font-black text-gray-900">All Apps</h2>
+
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+            {regularApps.map((app) => (
+              <AppTile
+                key={app.id}
+                app={app}
+                isFavorite={favorites.includes(app.id)}
+                onToggleFavorite={toggleFavorite}
+              />
+            ))}
+          </div>
+        </section>
+      </main>
 
       <Modal showModal={false} onClose={() => null} />
     </div>
