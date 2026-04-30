@@ -91,14 +91,17 @@ const isNonAdminBrowsablePath = (path: string) => {
     NR_CONTENT_PHOTOS_FOLDER_NAME,
   );
 
-  const allowedBrowseRoots = [
-    projectRoot,
-    picturesPath,
-    nrContentPhotosPath,
-  ].map(normalizePath);
+  const normalizedPicturesPath = normalizePath(picturesPath);
+  const normalizedNrContentPhotosPath = normalizePath(nrContentPhotosPath);
 
-  return allowedBrowseRoots.some(
-    (allowedPath) => normalizedPath === allowedPath,
+  // Non-admin users may browse inside these approved photo areas,
+  // including any subfolders they create under them.
+  return (
+    normalizedPath === normalizePath(projectRoot) ||
+    normalizedPath === normalizedPicturesPath ||
+    normalizedPath.startsWith(`${normalizedPicturesPath}/`) ||
+    normalizedPath === normalizedNrContentPhotosPath ||
+    normalizedPath.startsWith(`${normalizedNrContentPhotosPath}/`)
   );
 };
 
@@ -138,8 +141,17 @@ const isNonAdminVisibleChild = (parentPath: string, folderPath: string) => {
     return false;
   }
 
-  if (normalizedParent === normalizePath(picturesPath)) return true;
-  if (normalizedParent === normalizePath(nrContentPhotosPath)) return true;
+  const normalizedPicturesPath = normalizePath(picturesPath);
+  const normalizedNrContentPhotosPath = normalizePath(nrContentPhotosPath);
+
+  // Allow folders inside the approved photo areas too.
+  // Example: 1-PICTURES/Living Room or
+  // 0-CONTENTS-WET-PICS/2 NR CONTENT PHOTOS/Living Room.
+  if (normalizedParent === normalizedPicturesPath) return true;
+  if (normalizedParent.startsWith(`${normalizedPicturesPath}/`)) return true;
+  if (normalizedParent === normalizedNrContentPhotosPath) return true;
+  if (normalizedParent.startsWith(`${normalizedNrContentPhotosPath}/`))
+    return true;
 
   return false;
 };

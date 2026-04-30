@@ -9,6 +9,7 @@ import {
   FaBoxes,
   FaCamera,
   FaClipboardList,
+  FaFileSignature,
   FaCogs,
   FaDollarSign,
   FaHardHat,
@@ -32,6 +33,7 @@ const ACL: Record<string, string[]> = {
   projectspage: [],
   contentspage: [],
   "field-photos": [],
+  "project-updates": [],
   projectcosting: ["admin", "owner"],
   projectmanagement: ["admin", "owner"],
   inventorymanagementpage: ["admin", "owner"],
@@ -150,6 +152,15 @@ const apps: AppItem[] = [
     accessSlug: "field-photos",
     icon: <FaCamera />,
     gradient: "from-yellow-400 to-orange-500",
+  },
+  {
+    id: "project-updates",
+    title: "Project Updates",
+    desc: "Daily updates, photos, and WhatsApp reports.",
+    href: "/project-updates",
+    accessSlug: "project-updates",
+    icon: <FaFileSignature />,
+    gradient: "from-lime-500 to-green-600",
   },
   {
     id: "qr-labels",
@@ -323,7 +334,8 @@ export default function Dashboard() {
             </div>
 
             <div className="rounded-2xl bg-gray-900 px-4 py-3 text-sm text-white shadow-lg">
-              Role: <span className="font-bold uppercase">{role || "user"}</span>
+              Role:{" "}
+              <span className="font-bold uppercase">{role || "user"}</span>
             </div>
           </div>
         </section>

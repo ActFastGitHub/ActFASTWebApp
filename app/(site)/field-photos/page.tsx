@@ -2341,10 +2341,10 @@ export default function FieldPhotosPage() {
                   <div className="mb-3 rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">
                     <div className="font-semibold">Folder safety tip</div>
                     <p className="mt-1">
-                      For rooms like Living Room or Bedroom, use “Create Room /
-                      Area Folder”. It will create the folder under the main
-                      photo folder instead of accidentally nesting it inside
-                      another room.
+                      For rooms like Living Room or Bedroom, use “Create
+                      Subfolder / Area Folder”. It will create the folder under
+                      the main photo folder instead of accidentally nesting it
+                      inside another room.
                     </p>
                   </div>
                   <div className="mb-3 rounded-xl border p-3">
@@ -2363,7 +2363,7 @@ export default function FieldPhotosPage() {
                         disabled={!isOnline || !selectedProjectPath}
                         className="rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:bg-slate-300"
                       >
-                        Open 1-PICTURES
+                        PICTURES
                       </button>
                       <button
                         type="button"
@@ -2376,7 +2376,7 @@ export default function FieldPhotosPage() {
                         disabled={!isOnline || !selectedProjectPath}
                         className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:bg-slate-300"
                       >
-                        Open 0-CONTENTS-WET-PICS / 2 NR CONTENT PHOTOS
+                        NR PHOTOS
                       </button>
                     </div>
                     <p className="mt-2 text-xs text-slate-500">
@@ -2387,14 +2387,14 @@ export default function FieldPhotosPage() {
                   </div>
                   <div className="mb-3 rounded-xl border p-3">
                     <label className="mb-2 block text-sm font-semibold text-slate-800">
-                      Create room / area folder
+                      Create subfolder
                     </label>
                     <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
                       <input
                         value={newFolderName}
                         disabled={!isOnline}
                         onChange={(e) => setNewFolderName(e.target.value)}
-                        placeholder="Example: Living Room"
+                        placeholder="Example: Living Room, Kitchen, Before Repairs"
                         className="w-full rounded-lg border p-3"
                       />
                       <button
@@ -2403,7 +2403,7 @@ export default function FieldPhotosPage() {
                         disabled={!isOnline}
                         className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:bg-slate-400"
                       >
-                        Create Room
+                        Create Subfolder
                       </button>
                     </div>
                     <p className="mt-2 text-xs text-slate-500">
