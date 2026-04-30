@@ -1010,18 +1010,21 @@ export default function FieldPhotosPage() {
       );
   };
 
-  const getWideCameraCandidates = (
+  /**
+   * Returns every alternate rear-facing camera the browser exposes.
+   *
+   * Important mobile-browser reality:
+   * Many phones do NOT name the ultra-wide lens as "0.6x" or "ultra-wide".
+   * Some browsers expose multiple rear cameras as generic labels like "Camera 0",
+   * "Camera 1", or just "Back Camera". Because of that, we do not rely only
+   * on the label. We allow the user to cycle through every non-front camera.
+   */
+  const getAlternateRearCameraCandidates = (
     devices: CameraFacingDevice[],
     activeDeviceId: string,
-    standardDeviceId: string,
   ) => {
     return devices
-      .filter(
-        (device) =>
-          device.deviceId &&
-          device.deviceId !== activeDeviceId &&
-          device.deviceId !== standardDeviceId,
-      )
+      .filter((device) => device.deviceId && device.deviceId !== activeDeviceId)
       .sort((a, b) => {
         const aIndex = devices.findIndex(
           (device) => device.deviceId === a.deviceId,
@@ -1034,6 +1037,27 @@ export default function FieldPhotosPage() {
           getCameraLensPriority(b.label, bIndex)
         );
       });
+  };
+
+  const getWideCameraCandidates = (
+    devices: CameraFacingDevice[],
+    activeDeviceId: string,
+    standardDeviceId: string,
+  ) => {
+    const alternateDevices = getAlternateRearCameraCandidates(
+      devices,
+      activeDeviceId,
+    );
+
+    // Prefer likely wide/macro devices first, but keep every alternate rear device
+    // as fallback because labels can be generic or misleading.
+    return alternateDevices.sort((a, b) => {
+      const aScore =
+        (a.deviceId === standardDeviceId ? 20 : 0) + (a.isUltraWide ? -10 : 0);
+      const bScore =
+        (b.deviceId === standardDeviceId ? 20 : 0) + (b.isUltraWide ? -10 : 0);
+      return aScore - bScore;
+    });
   };
 
   const getFallbackWideCameraDevice = (
@@ -1175,6 +1199,36 @@ export default function FieldPhotosPage() {
     setTorchOn(false);
   };
 
+  const switchToNextRearLens = async () => {
+    const devices = await getAvailableBackCameras();
+
+    if (devices.length <= 1) {
+      toast.error(
+        "This browser is only exposing one rear camera to the web app. Try Chrome/Samsung Internet, allow camera permission, then reload.",
+      );
+      return;
+    }
+
+    const currentIndex = devices.findIndex(
+      (device) => device.deviceId === activeCameraDeviceId,
+    );
+    const nextIndex =
+      currentIndex >= 0 ? (currentIndex + 1) % devices.length : 0;
+    const nextDevice = devices[nextIndex];
+
+    const switched = await startCamera(nextDevice.deviceId, 1);
+
+    if (switched) {
+      setCameraZoom(1);
+      setCameraLensLabel(
+        `Rear lens ${nextIndex + 1} of ${devices.length}: ${nextDevice.label}`,
+      );
+      toast.success(
+        `Switched to rear lens ${nextIndex + 1} of ${devices.length}`,
+      );
+    }
+  };
+
   const applyCameraZoom = async (zoom: number) => {
     const track = streamRef.current?.getVideoTracks()[0];
     if (!track) return;
@@ -1224,12 +1278,15 @@ export default function FieldPhotosPage() {
               : `Alternate rear lens: ${candidate.label}`,
           );
           setCameraZoom(0.6);
+          toast.success(
+            "Switched to an alternate rear lens. If this is not ultra-wide, tap Switch Lens to cycle again.",
+          );
           return;
         }
       }
 
       toast.error(
-        "This browser is not exposing a separate 0.6x/ultra-wide lens. I tried the available rear camera devices, but only the normal rear camera is available to the web app.",
+        "This browser is only exposing one rear lens right now. Try the Switch Lens button after reloading, or test Chrome/Samsung Internet outside any in-app browser.",
       );
       return;
     }
@@ -2496,14 +2553,24 @@ export default function FieldPhotosPage() {
                             : ""}
                         </span>
                       </div>
-                      <button
-                        type="button"
-                        onClick={toggleTorch}
-                        disabled={!torchSupported}
-                        className="rounded-full bg-black/45 px-3 py-1.5 text-xs font-bold text-white backdrop-blur disabled:opacity-45 sm:px-4 sm:py-2 sm:text-sm"
-                      >
-                        {torchOn ? "⚡ On" : "⚡ Flash"}
-                      </button>
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={switchToNextRearLens}
+                          disabled={cameraDevices.length <= 1}
+                          className="rounded-full bg-black/45 px-3 py-1.5 text-xs font-bold text-white backdrop-blur disabled:opacity-45 sm:px-4 sm:py-2 sm:text-sm"
+                        >
+                          ↔ Lens
+                        </button>
+                        <button
+                          type="button"
+                          onClick={toggleTorch}
+                          disabled={!torchSupported}
+                          className="rounded-full bg-black/45 px-3 py-1.5 text-xs font-bold text-white backdrop-blur disabled:opacity-45 sm:px-4 sm:py-2 sm:text-sm"
+                        >
+                          {torchOn ? "⚡ On" : "⚡ Flash"}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -2546,6 +2613,14 @@ export default function FieldPhotosPage() {
                           {zoom}x
                         </button>
                       ))}
+                      <button
+                        type="button"
+                        onClick={switchToNextRearLens}
+                        disabled={cameraDevices.length <= 1}
+                        className="rounded-full bg-white/15 px-3 py-1.5 text-xs font-black text-white shadow-sm transition hover:bg-white/25 disabled:opacity-40 sm:px-4 sm:text-sm"
+                      >
+                        Switch Lens
+                      </button>
                     </div>
 
                     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
