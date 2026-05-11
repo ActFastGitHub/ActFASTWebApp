@@ -1,114 +1,227 @@
-// api/projects/subcontractor/route.tsx
+// app/api/projects/subcontractor/route.tsx
+
+export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
 import prisma from "@/app/libs/prismadb";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/libs/authOption";
-
 import { recalcProjectCosts } from "@/app/utils/recalcProjectCosts";
+import { canManageFinalRepairs } from "@/app/libs/roles";
+import { createAuditLog, getRequestAuditMeta } from "@/app/libs/auditLog";
+
+function jsonError(message: string, status: number, detail?: string) {
+  return NextResponse.json({ message, detail, status }, { status });
+}
+
+async function getCurrentProfile(email: string) {
+  return prisma.profile.findUnique({
+    where: { userEmail: email },
+    select: {
+      nickname: true,
+      firstName: true,
+      role: true,
+    },
+  });
+}
+
+function cleanString(value: unknown) {
+  return String(value || "").trim();
+}
+
+function nullableString(value: unknown) {
+  const cleaned = cleanString(value);
+  return cleaned || null;
+}
+
+function toNumber(value: unknown, fallback = 0) {
+  if (value === null || value === undefined || value === "") return fallback;
+
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : fallback;
+}
+
+function toSafePage(value: string | null) {
+  const page = Number(value || 1);
+  return Number.isFinite(page) ? Math.max(page, 1) : 1;
+}
+
+function toSafeLimit(value: string | null) {
+  const limit = Number(value || 20);
+
+  if (!Number.isFinite(limit)) return 20;
+
+  return Math.min(Math.max(limit, 1), 100);
+}
 
 export async function POST(request: Request) {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.email) {
+    return jsonError("Unauthorized", 401);
+  }
+
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user?.email) {
-      return NextResponse.json({ status: 401, error: "Unauthorized" });
+    const profile = await getCurrentProfile(session.user.email);
+
+    if (!profile) {
+      return jsonError("User profile not found", 404);
     }
 
-    const body = await request.json();
+    if (!canManageFinalRepairs(profile.role)) {
+      return jsonError("Admin access required", 403);
+    }
+
+    const body = await request.json().catch(() => ({}));
+
     const { projectCode, name, expertise, contactInfo, agreedCost } =
       body.data || {};
 
-    if (!projectCode) {
-      return NextResponse.json({
-        status: 400,
-        error: "projectCode is required",
-      });
-    }
-    if (!name) {
-      return NextResponse.json({
-        status: 400,
-        error: "Subcontractor name is required",
-      });
+    const cleanedProjectCode = cleanString(projectCode);
+    const cleanedName = cleanString(name);
+
+    if (!cleanedProjectCode) {
+      return jsonError("projectCode is required", 400);
     }
 
-    const userProfile = await prisma.profile.findUnique({
-      where: { userEmail: session.user.email },
-      select: { nickname: true },
+    if (!cleanedName) {
+      return jsonError("Subcontractor name is required", 400);
+    }
+
+    const project = await prisma.project.findUnique({
+      where: { code: cleanedProjectCode },
+      select: { code: true },
     });
 
-    if (!userProfile) {
-      return NextResponse.json({
-        status: 404,
-        error: "User profile not found",
-      });
+    if (!project) {
+      return jsonError("Project does not exist", 404);
     }
 
-    // agreedCost used for now; totalCost is adjusted in recalcProjectCosts
     const newSubcontractor = await prisma.subcontractor.create({
       data: {
-        projectCode,
-        name,
-        expertise,
-        contactInfo,
-        agreedCost: agreedCost ?? 0,
-        createdById: userProfile.nickname,
-        createdAt: new Date(),
+        projectCode: cleanedProjectCode,
+        name: cleanedName,
+        expertise: cleanString(expertise),
+        contactInfo: nullableString(contactInfo),
+        agreedCost: toNumber(agreedCost, 0),
+        createdById: profile.nickname || null,
+        lastModifiedById: profile.nickname || null,
       },
     });
 
-    // Recalculate the project subtotals
-    await recalcProjectCosts(projectCode);
+    await recalcProjectCosts(cleanedProjectCode);
 
-    return NextResponse.json({ subcontractor: newSubcontractor, status: 201 });
+    await createAuditLog({
+      actorEmail: session.user.email,
+      actorNickname: profile.nickname || profile.firstName || null,
+      actorRole: profile.role || null,
+      action: "CREATE",
+      entity: "Subcontractor",
+      entityId: newSubcontractor.id,
+      projectCode: newSubcontractor.projectCode,
+      summary: `Created subcontractor: ${newSubcontractor.name}`,
+      changes: newSubcontractor,
+      ...getRequestAuditMeta(request),
+    });
+
+    return NextResponse.json({
+      subcontractor: newSubcontractor,
+      status: 201,
+    });
   } catch (error) {
     console.error("Error creating subcontractor:", error);
-    return NextResponse.json({ status: 500, error: "Internal server error" });
+
+    return jsonError(
+      "Internal server error",
+      500,
+      error instanceof Error ? error.message : "Unknown error",
+    );
   }
 }
 
-// GET with searchTerm logic
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const projectCode = searchParams.get("projectCode");
-    const searchTerm = searchParams.get("searchTerm") || ""; // <-- get the searchTerm
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
+
+    const projectCode = cleanString(searchParams.get("projectCode"));
+    const searchTerm = cleanString(searchParams.get("searchTerm"));
+    const page = toSafePage(searchParams.get("page"));
+    const limit = toSafeLimit(searchParams.get("limit"));
 
     const where: any = {};
+
     if (projectCode) {
       where.projectCode = projectCode;
     }
 
-    // If we have a searchTerm, search in "name" and "expertise"
-    // For partial matching, use "contains" + mode: "insensitive"
     if (searchTerm) {
       where.OR = [
-        { name: { contains: searchTerm, mode: "insensitive" } },
-        { expertise: { contains: searchTerm, mode: "insensitive" } },
+        {
+          name: {
+            contains: searchTerm,
+            mode: "insensitive",
+          },
+        },
+        {
+          expertise: {
+            contains: searchTerm,
+            mode: "insensitive",
+          },
+        },
+        {
+          contactInfo: {
+            contains: searchTerm,
+            mode: "insensitive",
+          },
+        },
       ];
     }
 
-    const subcontractors = await prisma.subcontractor.findMany({
-      where,
-      skip: (page - 1) * limit,
-      take: limit,
-      include: {
-        createdBy: {
-          select: { firstName: true, lastName: true, nickname: true },
+    const [subcontractors, totalSubcontractors] = await Promise.all([
+      prisma.subcontractor.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          createdBy: {
+            select: {
+              firstName: true,
+              lastName: true,
+              nickname: true,
+            },
+          },
+          lastModifiedBy: {
+            select: {
+              firstName: true,
+              lastName: true,
+              nickname: true,
+            },
+          },
         },
-        lastModifiedBy: {
-          select: { firstName: true, lastName: true, nickname: true },
+        orderBy: {
+          createdAt: "desc",
         },
-      },
-    });
+      }),
+      prisma.subcontractor.count({ where }),
+    ]);
 
-    const totalSubcontractors = await prisma.subcontractor.count({ where });
     const totalPages = Math.ceil(totalSubcontractors / limit);
 
-    return NextResponse.json({ subcontractors, totalPages, status: 200 });
+    return NextResponse.json({
+      subcontractors,
+      totalSubcontractors,
+      totalPages,
+      page,
+      limit,
+      status: 200,
+    });
   } catch (error) {
     console.error("Error fetching subcontractors:", error);
-    return NextResponse.json({ status: 500, error: "Internal server error" });
+
+    return jsonError(
+      "Internal server error",
+      500,
+      error instanceof Error ? error.message : "Unknown error",
+    );
   }
 }

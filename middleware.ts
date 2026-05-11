@@ -12,9 +12,9 @@ const ACL: Record<string, string[]> = {
   "memberpage": [],
   "projectspage": [],
   "contentspage": [],
-  "projectcosting": ["admin", "owner"],
-  "projectmanagement": ["admin", "owner"],
-  "inventorymanagementpage": ["admin", "owner"],
+  "projectcosting": ["admin", "owner", "superadmin", "super-admin"],
+  "projectmanagement": ["admin", "owner", "superadmin", "super-admin"],
+  "inventorymanagementpage": ["admin", "owner", "superadmin", "super-admin"],
 };
 
 const norm = (s?: string) => s?.toLowerCase().trim() ?? "";
@@ -45,7 +45,7 @@ export async function middleware(req: NextRequest) {
   ) {
     const token = await getToken({ req, secret: process.env.SECRET });
     const role = norm((token as any)?.role);
-    if (!token || !["admin", "owner"].includes(role)) {
+    if (!token || !["admin", "owner", "superadmin", "super-admin"].includes(role)) {
       return NextResponse.redirect(new URL("/unauthorized", req.url));
     }
   }

@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
 import Navbar from "@/app/components/navBar";
+import { isAdminRole } from "@/app/libs/roles";
 
 /* ─────────────────────────────
    Safety / performance settings
@@ -257,10 +258,7 @@ async function readApiResponse(res: Response) {
   }
 
   throw new Error(
-    `Server returned non-JSON response. Status: ${res.status}. Preview: ${text.slice(
-      0,
-      300,
-    )}`,
+    `Server returned non-JSON response. Status: ${res.status}. Preview: ${text.slice(0, 300)}`,
   );
 }
 
@@ -523,8 +521,7 @@ export default function FieldPhotosPage() {
           session.user?.email ||
           "unknown";
 
-        const role = String(data?.role || "").toLowerCase();
-        setIsAdmin(role === "admin");
+        setIsAdmin(isAdminRole(data?.role));
         setPhotoTakerName(cleanFileNamePart(name));
       } catch {
         const fallback = session.user?.name || session.user?.email || "unknown";
@@ -1732,10 +1729,7 @@ export default function FieldPhotosPage() {
 
       const photosFolder = zip.folder(batchName);
       const manifest = itemsToBackup.map((item, index) => {
-        const numberedFileName = `${String(index + 1).padStart(
-          3,
-          "0",
-        )}_${item.fileName}`;
+        const numberedFileName = `${String(index + 1).padStart(3, "0")}_${item.fileName}`;
 
         photosFolder?.file(numberedFileName, item.blob);
 

@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/app/libs/prismadb";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/libs/authOption";
+import { createAuditLog, getRequestAuditMeta } from "@/app/libs/auditLog";
 
 /**
  * POST - Create a new OfficeSupply item
@@ -25,11 +26,15 @@ export async function POST(request: Request) {
       });
     }
 
-    // Get the user's profile (to record who last updated)
     const userProfile = await prisma.profile.findUnique({
       where: { userEmail: session.user.email },
-      select: { nickname: true },
+      select: {
+        nickname: true,
+        firstName: true,
+        role: true,
+      },
     });
+
     if (!userProfile) {
       return NextResponse.json({
         status: 404,
@@ -37,7 +42,6 @@ export async function POST(request: Request) {
       });
     }
 
-    // If the status is provided, we set statusUpdatedAt as "now"
     let statusUpdatedAt: Date | undefined;
     if (status) {
       statusUpdatedAt = new Date();
@@ -54,6 +58,18 @@ export async function POST(request: Request) {
         lastUpdatedById: userProfile.nickname,
         createdAt: new Date(),
       },
+    });
+
+    await createAuditLog({
+      actorEmail: session.user.email,
+      actorNickname: userProfile.nickname || userProfile.firstName || null,
+      actorRole: userProfile.role || null,
+      action: "CREATE",
+      entity: "OfficeSupply",
+      entityId: newSupply.id,
+      summary: `Created office supply: ${newSupply.name}`,
+      changes: newSupply,
+      ...getRequestAuditMeta(request),
     });
 
     return NextResponse.json({ officeSupply: newSupply, status: 201 });
@@ -73,7 +89,6 @@ export async function GET(request: Request) {
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
 
-    // Build a dynamic where-clause for searching name/description/category/status
     const where: any = {};
     if (searchTerm) {
       where.OR = [

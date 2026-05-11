@@ -21,11 +21,13 @@ import {
   FaTruckMoving,
   FaUsers,
   FaWarehouse,
+  FaShieldAlt,
 } from "react-icons/fa";
 
 import Navbar from "@/app/components/navBar";
 import Modal from "@/app/components/modal";
 import { UserProps } from "@/app/libs/interfaces";
+import { isAdminRole, isSuperAdminRole } from "@/app/libs/roles";
 
 const ACL: Record<string, string[]> = {
   "pods-mapping": [],
@@ -34,9 +36,9 @@ const ACL: Record<string, string[]> = {
   contentspage: [],
   "field-photos": [],
   "project-updates": [],
-  projectcosting: ["admin", "owner"],
-  projectmanagement: ["admin", "owner"],
-  inventorymanagementpage: ["admin", "owner"],
+  projectcosting: ["admin", "owner", "superadmin", "super-admin"],
+  projectmanagement: ["admin", "owner", "superadmin", "super-admin"],
+  inventorymanagementpage: ["admin", "owner", "superadmin", "super-admin"],
 };
 
 const norm = (s?: string) => s?.toLowerCase().trim() ?? "";
@@ -51,6 +53,7 @@ type AppItem = {
   href: string;
   accessSlug?: string;
   adminOnly?: boolean;
+  superAdminOnly?: boolean;
   icon: React.ReactNode;
   gradient: string;
 };
@@ -170,6 +173,33 @@ const apps: AppItem[] = [
     adminOnly: true,
     icon: <FaQrcode />,
     gradient: "from-slate-600 to-gray-800",
+  },
+  {
+    id: "super-admin",
+    title: "Super Admin",
+    desc: "Audit logs and backups.",
+    href: "/super-admin",
+    superAdminOnly: true,
+    icon: <FaShieldAlt />,
+    gradient: "from-slate-800 to-black",
+  },
+  {
+    id: "final-repairs-agreements",
+    title: "FR Agreements",
+    desc: "Customer material selections.",
+    href: "/final-repairs-agreements",
+    accessSlug: "projectcosting",
+    icon: <FaFileSignature />,
+    gradient: "from-blue-600 to-indigo-700",
+  },
+  {
+    id: "material-catalog",
+    title: "Material Catalog",
+    desc: "Reusable FR material database.",
+    href: "/material-catalog",
+    accessSlug: "projectcosting",
+    icon: <FaBoxes />,
+    gradient: "from-cyan-600 to-blue-700",
   },
 ];
 
@@ -295,7 +325,8 @@ export default function Dashboard() {
   const role = norm(user?.role ?? session?.user?.role);
 
   const visibleApps = apps.filter((app) => {
-    if (app.adminOnly && role !== "admin" && role !== "owner") return false;
+    if (app.superAdminOnly && !isSuperAdminRole(role)) return false;
+    if (app.adminOnly && !isAdminRole(role)) return false;
     if (app.accessSlug && !canAccess(app.accessSlug, role)) return false;
     return true;
   });

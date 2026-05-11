@@ -1,3 +1,5 @@
+// app\components\VersionInfo.tsx
+
 import version from "@/version.json";
 
 export default function VersionInfo() {

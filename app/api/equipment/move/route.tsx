@@ -8,6 +8,7 @@ import type {
   MoveResponse,
   MovementDirection,
 } from "@/app/types/equipment";
+import { createAuditLog, getRequestAuditMeta } from "@/app/libs/auditLog";
 
 /* ===========================
  *  Helpers
@@ -32,8 +33,12 @@ function uniqBy<T, K extends string | number>(arr: T[], key: (x: T) => K): T[] {
 }
 
 function labelForMover(
-  p?: { firstName: string | null; lastName: string | null; nickname: string | null } | null,
-  fallback?: string | null
+  p?: {
+    firstName: string | null;
+    lastName: string | null;
+    nickname: string | null;
+  } | null,
+  fallback?: string | null,
 ) {
   const name = `${p?.firstName ?? ""} ${p?.lastName ?? ""}`.trim();
   return name || p?.nickname || fallback || null;
@@ -48,22 +53,29 @@ export async function GET(req: NextRequest) {
     const days = parseIntOr(searchParams.get("days"), 30);
     const includeOlder = searchParams.get("includeOlder") === "1";
     const page = Math.max(1, parseIntOr(searchParams.get("page"), 1));
-    const pageSize = Math.min(100, Math.max(1, parseIntOr(searchParams.get("pageSize"), 20)));
+    const pageSize = Math.min(
+      100,
+      Math.max(1, parseIntOr(searchParams.get("pageSize"), 20)),
+    );
 
     const type = (searchParams.get("type") || "").trim();
     const projectCode = (searchParams.get("projectCode") || "").trim();
-    const direction = (searchParams.get("direction") || "").trim() as MovementDirection | "";
+    const direction = (searchParams.get("direction") || "").trim() as
+      | MovementDirection
+      | "";
 
     const since = new Date();
     since.setDate(since.getDate() - days);
 
     const whereMovement: any = {};
     if (!includeOlder) whereMovement.at = { gte: since };
-    if (direction === "IN" || direction === "OUT") whereMovement.direction = direction;
+    if (direction === "IN" || direction === "OUT") {
+      whereMovement.direction = direction;
+    }
     if (projectCode) whereMovement.projectCode = projectCode;
 
     const whereEquip: any = {};
-    if (type) whereEquip.typeCode = type; // ⬅️ schema field
+    if (type) whereEquip.typeCode = type;
 
     const [total, rows] = await prisma.$transaction([
       prisma.equipmentMovement.count({
@@ -87,7 +99,9 @@ export async function GET(req: NextRequest) {
           projectCode: true,
           byId: true,
           by: { select: { firstName: true, lastName: true, nickname: true } },
-          equipment: { select: { id: true, typeCode: true, assetNumber: true } }, // ⬅️ select typeCode
+          equipment: {
+            select: { id: true, typeCode: true, assetNumber: true },
+          },
         },
       }),
     ]);
@@ -100,7 +114,7 @@ export async function GET(req: NextRequest) {
       by: labelForMover(m.by, m.byId ?? null),
       equipment: {
         id: m.equipment.id,
-        type: m.equipment.typeCode, // ⬅️ map to DTO field
+        type: m.equipment.typeCode,
         assetNumber: m.equipment.assetNumber,
       },
       archived: m.at < since,
@@ -117,7 +131,7 @@ export async function GET(req: NextRequest) {
     console.error("[/api/equipment/move GET] error", err);
     return NextResponse.json(
       { status: 500, error: "Failed to fetch movements" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -131,7 +145,7 @@ export async function POST(req: NextRequest) {
     if (!session?.user?.email) {
       return NextResponse.json<MoveResponse>(
         { status: 401 as const, error: "Unauthorized" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -145,54 +159,74 @@ export async function POST(req: NextRequest) {
     if (direction !== "IN" && direction !== "OUT") {
       return NextResponse.json<MoveResponse>(
         { status: 400 as const, error: "Invalid direction" },
-        { status: 400 }
-      );
-    }
-    if (direction === "OUT" && !projectCode) {
-      return NextResponse.json<MoveResponse>(
-        { status: 400 as const, error: "Project code is required for OUT" },
-        { status: 400 }
-      );
-    }
-    if (!Array.isArray(body.items) || body.items.length === 0) {
-      return NextResponse.json<MoveResponse>(
-        { status: 400 as const, error: "No items provided" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // Normalize & dedupe
+    if (direction === "OUT" && !projectCode) {
+      return NextResponse.json<MoveResponse>(
+        { status: 400 as const, error: "Project code is required for OUT" },
+        { status: 400 },
+      );
+    }
+
+    if (!Array.isArray(body.items) || body.items.length === 0) {
+      return NextResponse.json<MoveResponse>(
+        { status: 400 as const, error: "No items provided" },
+        { status: 400 },
+      );
+    }
+
     const items = uniqBy(
       body.items.map((it) => ({
         type: (it.type || "").trim(),
         assetNumber: Number(it.assetNumber),
       })),
-      (x) => `${x.type}#${x.assetNumber}`
-    ).filter((x) => x.type && Number.isInteger(x.assetNumber) && x.assetNumber > 0);
+      (x) => `${x.type}#${x.assetNumber}`,
+    ).filter(
+      (x) => x.type && Number.isInteger(x.assetNumber) && x.assetNumber > 0,
+    );
 
     if (items.length === 0) {
       return NextResponse.json<MoveResponse>(
         { status: 400 as const, error: "No valid items after parsing" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // current user (who)
     const prof = await prisma.profile.findUnique({
-      where: { userEmail: session.user.email! },
-      select: { nickname: true },
+      where: { userEmail: session.user.email },
+      select: {
+        nickname: true,
+        firstName: true,
+        role: true,
+      },
     });
+
     const byId = prof?.nickname ?? null;
 
-    // Validate existence (NO implicit creation)
-    const orClauses = items.map((x) => ({ typeCode: x.type, assetNumber: x.assetNumber })); // ⬅️ schema fields
+    const orClauses = items.map((x) => ({
+      typeCode: x.type,
+      assetNumber: x.assetNumber,
+    }));
+
     const existing = await prisma.equipment.findMany({
       where: { OR: orClauses },
-      select: { id: true, typeCode: true, assetNumber: true }, // ⬅️ select schema fields
+      select: {
+        id: true,
+        typeCode: true,
+        assetNumber: true,
+        status: true,
+        currentProjectCode: true,
+        lastMovedAt: true,
+        archived: true,
+      },
     });
 
     const key = (t: string, n: number) => `${t}#${n}`;
-    const existingSet = new Set(existing.map((e) => key(e.typeCode, e.assetNumber)));
+    const existingSet = new Set(
+      existing.map((e) => key(e.typeCode, e.assetNumber)),
+    );
 
     const missing = items
       .filter((x) => !existingSet.has(key(x.type, x.assetNumber)))
@@ -205,13 +239,16 @@ export async function POST(req: NextRequest) {
           error: "Some items do not exist. Ask an admin to create them first.",
           missing,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const existingMap = new Map(existing.map((e) => [key(e.typeCode, e.assetNumber), e.id]));
+    const existingMap = new Map(
+      existing.map((e) => [key(e.typeCode, e.assetNumber), e.id]),
+    );
 
-    // Transaction: create movements + update equipments
+    const beforeById = new Map(existing.map((e) => [e.id, e]));
+
     const results = await prisma.$transaction(async (tx) => {
       await tx.equipmentMovement.createMany({
         data: items.map((x) => ({
@@ -228,6 +265,7 @@ export async function POST(req: NextRequest) {
 
       for (const x of items) {
         const id = existingMap.get(key(x.type, x.assetNumber))!;
+
         if (direction === "OUT") {
           await tx.equipment.update({
             where: { id },
@@ -254,12 +292,54 @@ export async function POST(req: NextRequest) {
       return { moved: items.length };
     });
 
-    return NextResponse.json<MoveResponse>({ status: 200 as const, moved: results.moved });
+    const after = await prisma.equipment.findMany({
+      where: { id: { in: existing.map((e) => e.id) } },
+      select: {
+        id: true,
+        typeCode: true,
+        assetNumber: true,
+        status: true,
+        currentProjectCode: true,
+        lastMovedAt: true,
+        archived: true,
+      },
+    });
+
+    await createAuditLog({
+      actorEmail: session.user.email,
+      actorNickname: prof?.nickname || prof?.firstName || null,
+      actorRole: prof?.role || null,
+      action: "CREATE",
+      entity: "EquipmentMovement",
+      projectCode: direction === "OUT" ? projectCode : null,
+      summary: `Recorded ${direction} movement for ${results.moved} equipment item(s)`,
+      changes: {
+        direction,
+        projectCode: direction === "OUT" ? projectCode : null,
+        moved: results.moved,
+        movedAt: when,
+        note,
+        rawMessage,
+        items: after.map((item) => ({
+          equipmentId: item.id,
+          typeCode: item.typeCode,
+          assetNumber: item.assetNumber,
+          before: beforeById.get(item.id) || null,
+          after: item,
+        })),
+      },
+      ...getRequestAuditMeta(req),
+    });
+
+    return NextResponse.json<MoveResponse>({
+      status: 200 as const,
+      moved: results.moved,
+    });
   } catch (err) {
     console.error("[/api/equipment/move POST] error", err);
     return NextResponse.json<MoveResponse>(
       { status: 500 as const, error: "Failed to record movements" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

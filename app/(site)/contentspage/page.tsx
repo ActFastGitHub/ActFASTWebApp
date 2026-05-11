@@ -1,3 +1,5 @@
+// app\(site)\contentspage\page.tsx
+
 "use client";
 
 import React, { useEffect, useState, FormEvent, ChangeEvent } from "react";
@@ -8,6 +10,7 @@ import toast from "react-hot-toast";
 import axios from "axios";
 import { sortProjects } from "@/app/utils/projectSorted";
 import { FaEdit, FaTrashAlt, FaEye, FaEyeSlash } from "react-icons/fa";
+import { isAdminRole } from "@/app/libs/roles";
 
 type Item = {
   id: string;
@@ -63,6 +66,7 @@ const dateRangeOptions = [
 const ItemsManagement = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const canManageItems = isAdminRole(session?.user?.role);
   const [items, setItems] = useState<Item[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -409,9 +413,7 @@ const ItemsManagement = () => {
                     >
                       {showDetails[item.id] ? <FaEyeSlash /> : <FaEye />}
                     </button>
-                    {["admin", "lead", "owner"].includes(
-                      session?.user.role,
-                    ) && (
+                    {canManageItems && (
                       <button
                         onClick={() => handleEditToggle(item.id)}
                         className="rounded bg-blue-500 p-2 text-white hover:bg-blue-600"
@@ -419,15 +421,14 @@ const ItemsManagement = () => {
                         <FaEdit />
                       </button>
                     )}
-                    {["admin", "lead", "owner"].includes(session?.user.role) &&
-                      !item.packedStatus && (
-                        <button
-                          onClick={() => deleteItem(item.id)}
-                          className="rounded bg-red-500 p-2 text-white hover:bg-red-600"
-                        >
-                          <FaTrashAlt />
-                        </button>
-                      )}
+                    {canManageItems && !item.packedStatus && (
+                      <button
+                        onClick={() => deleteItem(item.id)}
+                        className="rounded bg-red-500 p-2 text-white hover:bg-red-600"
+                      >
+                        <FaTrashAlt />
+                      </button>
+                    )}
                   </div>
                 </div>
                 {showDetails[item.id] && (

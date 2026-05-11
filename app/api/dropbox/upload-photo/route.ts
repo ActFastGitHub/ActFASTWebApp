@@ -11,6 +11,8 @@ import {
   isInsideRoot,
   joinDropboxPath,
 } from "@/app/libs/dropbox";
+import { isAdminRole } from "@/app/libs/roles";
+import { createAuditLog, getRequestAuditMeta } from "@/app/libs/auditLog";
 
 export const runtime = "nodejs";
 
@@ -30,11 +32,6 @@ const cleanFileNamePart = (value: string) =>
     .toLowerCase()
     .replace(/\s+/g, "-")
     .replace(/[^a-z0-9-_]/g, "") || "unknown";
-
-const isAdminRole = (role?: string | null) =>
-  ["admin", "superadmin", "super-admin", "owner"].includes(
-    String(role || "").toLowerCase(),
-  );
 
 const isAllowedProjectFolderName = (folderName: string) =>
   PROJECT_FOLDER_REGEX.test(folderName) ||
@@ -183,6 +180,29 @@ export async function POST(request: Request) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const uploaded = await dropboxContentUpload(dropboxPath, buffer);
+
+    await createAuditLog({
+      actorEmail: session.user.email,
+      actorNickname: profile?.nickname || profile?.firstName || null,
+      actorRole: profile?.role || null,
+      action: "CREATE",
+      entity: "DropboxPhoto",
+      entityId: dropboxPath,
+      projectCode: getProjectNameFromPath(folderPath) || null,
+      summary: `Uploaded Dropbox photo: ${safeFileName}`,
+      changes: {
+        folderPath,
+        dropboxPath,
+        fileName: safeFileName,
+        uploader: uploaderName,
+        source: safeSource,
+        originalFileName: originalFileName || null,
+        fileSize: file.size,
+        fileType: file.type,
+        uploadedMetadata: uploaded,
+      },
+      ...getRequestAuditMeta(request),
+    });
 
     return NextResponse.json({
       message: "Upload successful",

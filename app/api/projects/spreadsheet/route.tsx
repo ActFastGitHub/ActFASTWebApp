@@ -1,107 +1,183 @@
-// /app/api/projects/spreadsheet/route.tsx
+// app/api/projects/spreadsheet/route.tsx
+
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
 import prisma from "@/app/libs/prismadb";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/libs/authOption";
+import { canManageFinalRepairs } from "@/app/libs/roles";
+import {
+  buildChangeSet,
+  createAuditLog,
+  getRequestAuditMeta,
+} from "@/app/libs/auditLog";
+
+function jsonError(message: string, status: number, detail?: string) {
+  return NextResponse.json({ message, detail, status }, { status });
+}
+
+async function getCurrentProfile(email: string) {
+  return prisma.profile.findUnique({
+    where: { userEmail: email },
+    select: {
+      nickname: true,
+      firstName: true,
+      role: true,
+    },
+  });
+}
+
+function cleanString(value: unknown) {
+  return String(value || "").trim();
+}
+
+function isValidSpreadsheetData(data: any) {
+  return data && Array.isArray(data.columns) && Array.isArray(data.rows);
+}
 
 export async function GET(request: Request) {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.email) {
+    return jsonError("Unauthorized", 401);
+  }
+
   try {
     const { searchParams } = new URL(request.url);
-    const projectCode = searchParams.get("projectCode");
+    const projectCode = cleanString(searchParams.get("projectCode"));
+
     if (!projectCode) {
-      return NextResponse.json(
-        { error: "Missing projectCode" },
-        { status: 400 },
-      );
+      return jsonError("Missing projectCode", 400);
     }
 
-    // Include lastUpdatedBy for display
     const entry = await prisma.spreadsheetEntry.findUnique({
       where: { projectCode },
       include: {
         lastUpdatedBy: {
-          select: { firstName: true, lastName: true, nickname: true },
+          select: {
+            firstName: true,
+            lastName: true,
+            nickname: true,
+          },
         },
       },
     });
 
     if (!entry) {
-      // Return an empty structure if none found
       return NextResponse.json({
         data: { columns: [], rows: [] },
         lastUpdatedBy: null,
-        lastUpdatedAt: null
+        lastUpdatedAt: null,
+        status: 200,
       });
     }
 
     return NextResponse.json({
       data: entry.data,
       lastUpdatedBy: entry.lastUpdatedBy,
-      lastUpdatedAt: entry.updatedAt
+      lastUpdatedAt: entry.updatedAt,
+      status: 200,
     });
   } catch (error) {
     console.error("Spreadsheet GET error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
+
+    return jsonError(
+      "Internal server error",
+      500,
+      error instanceof Error ? error.message : "Unknown error",
     );
   }
 }
 
 export async function POST(request: Request) {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.email) {
+    return jsonError("Unauthorized", 401);
+  }
+
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user?.email) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const profile = await getCurrentProfile(session.user.email);
+
+    if (!profile) {
+      return jsonError("User profile not found", 404);
     }
 
-    const body = await request.json();
-    const { projectCode, data } = body;
-    // data => { columns: string[], rows: string[][] }
+    if (!canManageFinalRepairs(profile.role)) {
+      return jsonError("Admin access required", 403);
+    }
+
+    const body = await request.json().catch(() => ({}));
+    const projectCode = cleanString(body.projectCode);
+    const data = body.data;
 
     if (!projectCode) {
-      return NextResponse.json(
-        { error: "Missing projectCode" },
-        { status: 400 },
-      );
+      return jsonError("Missing projectCode", 400);
     }
-    if (!data || !Array.isArray(data.columns) || !Array.isArray(data.rows)) {
-      return NextResponse.json(
-        {
-          error: "Payload must contain { columns: string[], rows: string[][] }",
-        },
-        { status: 400 },
+
+    if (!isValidSpreadsheetData(data)) {
+      return jsonError(
+        "Payload must contain { columns: string[], rows: string[][] }",
+        400,
       );
     }
 
-    // Find user profile
-    const userProfile = await prisma.profile.findUnique({
-      where: { userEmail: session.user.email },
-      select: { nickname: true },
+    const existingEntry = await prisma.spreadsheetEntry.findUnique({
+      where: { projectCode },
     });
 
-    // Upsert
     const entry = await prisma.spreadsheetEntry.upsert({
-      where: { projectCode }, // because projectCode is unique
+      where: { projectCode },
       update: {
         data,
-        lastUpdatedById: userProfile?.nickname ?? null,
+        lastUpdatedById: profile.nickname || null,
       },
       create: {
         projectCode,
         data,
-        lastUpdatedById: userProfile?.nickname ?? null,
+        lastUpdatedById: profile.nickname || null,
       },
     });
 
-    return NextResponse.json({ data: entry.data, status: 200 });
+    const action = existingEntry ? "UPDATE" : "CREATE";
+
+    await createAuditLog({
+      actorEmail: session.user.email,
+      actorNickname: profile.nickname || profile.firstName || null,
+      actorRole: profile.role || null,
+      action,
+      entity: "SpreadsheetEntry",
+      entityId: entry.id,
+      projectCode,
+      summary: existingEntry
+        ? `Updated spreadsheet for ${projectCode}`
+        : `Created spreadsheet for ${projectCode}`,
+      changes: existingEntry
+        ? buildChangeSet(
+            existingEntry as any,
+            {
+              data,
+              lastUpdatedById: profile.nickname || null,
+            } as any,
+          )
+        : entry,
+      ...getRequestAuditMeta(request),
+    });
+
+    return NextResponse.json({
+      data: entry.data,
+      spreadsheetEntry: entry,
+      status: 200,
+    });
   } catch (error) {
     console.error("Spreadsheet POST error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
+
+    return jsonError(
+      "Internal server error",
+      500,
+      error instanceof Error ? error.message : "Unknown error",
     );
   }
 }

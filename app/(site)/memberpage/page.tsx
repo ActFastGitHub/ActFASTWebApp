@@ -1,3 +1,5 @@
+// app\(site)\memberpage\page.tsx
+
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -20,6 +22,7 @@ import {
   FaUserSlash,
   FaUsers,
 } from "react-icons/fa";
+import { isAdminRole } from "@/app/libs/roles";
 
 const ViewAllProfiles = () => {
   const { data: session, status } = useSession();
@@ -27,7 +30,9 @@ const ViewAllProfiles = () => {
 
   const [profiles, setProfiles] = useState<Partial<UserProps>[]>([]);
   const [isFormVisible, setIsFormVisible] = useState(false);
-  const [editProfileData, setEditProfileData] = useState<Partial<UserProps>>({});
+  const [editProfileData, setEditProfileData] = useState<Partial<UserProps>>(
+    {},
+  );
   const [disabled, setDisabled] = useState(false);
   const [editable, setEditable] = useState(false);
 
@@ -39,7 +44,7 @@ const ViewAllProfiles = () => {
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const isAdmin = session?.user?.role === "admin";
+  const isAdmin = isAdminRole(session?.user?.role);
 
   useEffect(() => {
     if (status !== "loading" && !session) router.push("/login");
@@ -66,8 +71,12 @@ const ViewAllProfiles = () => {
     if (session?.user?.email) fetchProfiles();
   }, [session?.user?.email, isAdmin]);
 
-  const activeEmployeeCount = profiles.filter((profile) => profile.active).length;
-  const inactiveEmployeeCount = profiles.filter((profile) => !profile.active).length;
+  const activeEmployeeCount = profiles.filter(
+    (profile) => profile.active,
+  ).length;
+  const inactiveEmployeeCount = profiles.filter(
+    (profile) => !profile.active,
+  ).length;
 
   const availableRoles = useMemo(() => {
     const roles = profiles
@@ -163,7 +172,9 @@ const ViewAllProfiles = () => {
     <div className="relative min-h-screen bg-gradient-to-br from-slate-100 via-blue-50 to-slate-200">
       <Navbar />
 
-      <main className={`mx-auto max-w-7xl px-4 pb-12 pt-28 sm:px-6 lg:px-8 ${isFormVisible ? "blur-sm" : ""}`}>
+      <main
+        className={`mx-auto max-w-7xl px-4 pb-12 pt-28 sm:px-6 lg:px-8 ${isFormVisible ? "blur-sm" : ""}`}
+      >
         <section className="mb-8 rounded-[2rem] bg-white/75 p-6 shadow-xl ring-1 ring-white/70 backdrop-blur">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">
             ActFAST Directory
@@ -175,15 +186,28 @@ const ViewAllProfiles = () => {
                 Registered Users
               </h1>
               <p className="mt-2 max-w-2xl text-sm text-gray-600">
-                View employee profiles, contact details, roles, and account status.
+                View employee profiles, contact details, roles, and account
+                status.
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <StatCard icon={<FaUsers />} label="Total" value={profiles.length} />
-              <StatCard icon={<FaUserCheck />} label="Active" value={activeEmployeeCount} />
+              <StatCard
+                icon={<FaUsers />}
+                label="Total"
+                value={profiles.length}
+              />
+              <StatCard
+                icon={<FaUserCheck />}
+                label="Active"
+                value={activeEmployeeCount}
+              />
               {isAdmin && (
-                <StatCard icon={<FaUserSlash />} label="Inactive" value={inactiveEmployeeCount} />
+                <StatCard
+                  icon={<FaUserSlash />}
+                  label="Inactive"
+                  value={inactiveEmployeeCount}
+                />
               )}
             </div>
           </div>
@@ -243,7 +267,9 @@ const ViewAllProfiles = () => {
           </section>
         ) : (
           <div className="rounded-[2rem] bg-white/80 p-10 text-center shadow-lg">
-            <p className="text-lg font-bold text-gray-800">No profiles found.</p>
+            <p className="text-lg font-bold text-gray-800">
+              No profiles found.
+            </p>
             <p className="mt-2 text-sm text-gray-500">
               Try adjusting the search or filters.
             </p>
@@ -267,7 +293,9 @@ const ViewAllProfiles = () => {
       {showDeleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-[2rem] bg-white p-6 shadow-2xl">
-            <h2 className="text-xl font-black text-gray-900">Confirm Deletion</h2>
+            <h2 className="text-xl font-black text-gray-900">
+              Confirm Deletion
+            </h2>
             <p className="mt-3 text-sm leading-6 text-gray-600">
               Are you sure you want to delete{" "}
               <strong>
@@ -398,9 +426,7 @@ const ProfileCard = ({
 const StatusBadge = ({ active }: { active: boolean }) => (
   <span
     className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide shadow-sm ${
-      active
-        ? "bg-emerald-100 text-emerald-700"
-        : "bg-red-100 text-red-700"
+      active ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
     }`}
   >
     {active ? "Active" : "Inactive"}

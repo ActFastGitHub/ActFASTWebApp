@@ -5,6 +5,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/libs/authOption";
 import prisma from "@/app/libs/prismadb";
 import { dropboxApiFetch, isInsideRoot } from "@/app/libs/dropbox";
+import { isAdminRole } from "@/app/libs/roles";
+import { createAuditLog, getRequestAuditMeta } from "@/app/libs/auditLog";
 
 export const runtime = "nodejs";
 
@@ -18,13 +20,16 @@ const cleanFileNamePart = (value: string) =>
     .replace(/\s+/g, "-")
     .replace(/[^a-z0-9-_]/g, "") || "unknown";
 
-const isAdminRole = (role?: string | null) =>
-  ["admin", "superadmin", "super-admin", "owner"].includes(
-    String(role || "").toLowerCase(),
-  );
-
 const getFileNameFromPath = (path: string) =>
   path.split("/").filter(Boolean).pop() || "";
+
+const getProjectCodeFromDropboxPath = (path: string) => {
+  const parts = path.split("/").filter(Boolean);
+  return (
+    parts.find((part) => /^\d{4}-\d{3,4}-\d{2}-[A-Za-z0-9-]+$/.test(part)) ||
+    null
+  );
+};
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
@@ -83,6 +88,24 @@ export async function POST(request: Request) {
 
     const deleted = await dropboxApiFetch("/files/delete_v2", {
       path: dropboxPath,
+    });
+
+    await createAuditLog({
+      actorEmail: session.user.email,
+      actorNickname: profile?.nickname || profile?.firstName || null,
+      actorRole: profile?.role || null,
+      action: "DELETE",
+      entity: "DropboxPhoto",
+      entityId: dropboxPath,
+      projectCode: getProjectCodeFromDropboxPath(dropboxPath),
+      summary: `Deleted Dropbox photo: ${fileName}`,
+      changes: {
+        deletedPath: dropboxPath,
+        fileName,
+        photoOwner: photoOwner || null,
+        deletedMetadata: deleted,
+      },
+      ...getRequestAuditMeta(request),
     });
 
     return NextResponse.json({

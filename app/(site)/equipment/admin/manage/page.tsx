@@ -1,3 +1,5 @@
+// app\(site)\equipment\admin\manage\page.tsx
+
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -25,6 +27,7 @@ import toast from "react-hot-toast";
 import type { EquipmentDTO, EquipmentStatus } from "@/app/types/equipment";
 import { STATUSES } from "@/app/types/equipment";
 import { sortProjects } from "@/app/utils/projectSorted";
+import { isAdminRole } from "@/app/libs/roles";
 
 type TypeItem = { code: string };
 type Project = { id: string; code: string };
@@ -40,8 +43,10 @@ type SortKey =
   | "createdAt";
 
 export default function EquipmentManagePage() {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
+
+  const canManageEquipmentPage = isAdminRole(session?.user?.role);
 
   /* ───── auth redirect ───── */
   useEffect(() => {
@@ -50,9 +55,16 @@ export default function EquipmentManagePage() {
         typeof window !== "undefined"
           ? window.location.href
           : "/equipment/admin/manage";
+
       router.push(`/login?callbackUrl=${encodeURIComponent(dest)}`);
+      return;
     }
-  }, [status, router]);
+
+    if (status === "authenticated" && !canManageEquipmentPage) {
+      toast.error("You do not have access to Equipment Management");
+      router.push("/");
+    }
+  }, [status, router, canManageEquipmentPage]);
 
   /* ───── Add form ───── */
   const [assetNumber, setAssetNumber] = useState<number | "">("");
@@ -823,6 +835,24 @@ export default function EquipmentManagePage() {
             »
           </button>
         </div>
+      </div>
+    );
+  }
+
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-gray-100 pt-24">
+        <Navbar />
+        <div className="p-6 text-center text-gray-600">Loading…</div>
+      </div>
+    );
+  }
+
+  if (status === "authenticated" && !canManageEquipmentPage) {
+    return (
+      <div className="min-h-screen bg-gray-100 pt-24">
+        <Navbar />
+        <div className="p-6 text-center text-gray-600">Redirecting…</div>
       </div>
     );
   }

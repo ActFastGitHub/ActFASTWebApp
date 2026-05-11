@@ -1,373 +1,3 @@
-// generator client {
-//   provider = "prisma-client-js"
-// }
-
-// datasource db {
-//   provider = "mongodb"
-//   url      = env("DATABASE_URL")
-// }
-
-// model User {
-//   id             String    @id @default(auto()) @map("_id") @db.ObjectId
-//   name           String?
-//   email          String?   @unique
-//   emailVerified  DateTime?
-//   image          String?
-//   provider       String?
-//   hashedPassword String?
-//   createdAt      DateTime  @default(now())
-//   updatedAt      DateTime  @updatedAt
-
-//   // (NEW) for password reset
-//   passwordResetToken   String?
-//   passwordResetExpires DateTime?
-
-//   accounts Account[]
-//   Profile  Profile?
-// }
-
-// model Account {
-//   id                String  @id @default(auto()) @map("_id") @db.ObjectId
-//   userId            String  @db.ObjectId
-//   type              String
-//   provider          String
-//   providerAccountId String
-//   refresh_token     String? @db.String
-//   access_token      String? @db.String
-//   expires_at        Int?
-//   token_type        String?
-//   scope             String?
-//   id_token          String? @db.String
-//   session_state     String?
-
-//   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-//   @@unique([provider, providerAccountId])
-// }
-
-// model Profile {
-//   id String @id @default(auto()) @map("_id") @db.ObjectId
-
-//   lastName    String?
-//   firstName   String?
-//   nickname    String? @unique
-//   birthday    String?
-//   phonenumber String?
-//   image       String?
-
-//   employeeID     String?
-//   role           String?
-//   driversLicense String?
-//   active         Boolean?
-//   isDeleted      Boolean  @default(false)
-
-//   userEmail String @unique @map("userEmail")
-//   user      User   @relation(fields: [userEmail], references: [email], onDelete: Cascade)
-
-//   location Location? @relation("ProfileToLocation")
-
-//   boxesModified Box[]  @relation("LastModifiedProfile")
-//   itemsAdded    Item[] @relation("AddedByProfile")
-//   itemsModified Item[] @relation("ModifiedByProfile")
-
-//   materialsCreated  Material[] @relation("MaterialCreatedBy")
-//   materialsModified Material[] @relation("MaterialModifiedBy")
-
-//   subcontractorsCreated  Subcontractor[] @relation("SubcontractorCreatedBy")
-//   subcontractorsModified Subcontractor[] @relation("SubcontractorModifiedBy")
-
-//   laborCostsCreated  LaborCost[] @relation("LaborCostCreatedBy")
-//   laborCostsModified LaborCost[] @relation("LaborCostModifiedBy")
-
-//   OfficeSupplyModified OfficeSupply[]     @relation("OfficeSupplyModifiedBy")
-//   SpreadsheetModified  SpreadsheetEntry[] @relation("SpreadsheetModifiedBy")
-
-//   // NEW back-rel for EquipmentMovement.by
-//   equipmentMovements EquipmentMovement[] @relation("ProfileEquipmentMovements")
-// }
-
-// model Location {
-//   id        String   @id @default(auto()) @map("_id") @db.ObjectId
-//   lng       Float
-//   lat       Float
-//   address   Address?
-//   profile   Profile? @relation("ProfileToLocation", fields: [profileId], references: [id], onDelete: Cascade)
-//   profileId String?  @unique @db.ObjectId
-// }
-
-// model Address {
-//   id              String    @id @default(auto()) @map("_id") @db.ObjectId
-//   fullAddress     String
-//   pointOfInterest String
-//   city            String
-//   country         String
-//   location        Location? @relation(fields: [locationId], references: [id], onDelete: Cascade)
-//   locationId      String?   @unique @db.ObjectId
-// }
-
-// model Box {
-//   id               String   @id @default(auto()) @map("_id") @db.ObjectId
-//   boxNumber        String   @unique
-//   name             String
-//   color            String
-//   level            Int
-//   previousName     String?
-
-//     // New fields
-//   length           Float?
-//   width            Float?
-//   height           Float?
-//   notes            String?
-
-//   createdAt        DateTime @default(now())
-//   updatedAt        DateTime @updatedAt
-//   lastModifiedById String?
-
-//   lastModifiedBy Profile? @relation("LastModifiedProfile", fields: [lastModifiedById], references: [nickname])
-
-//   items Item[] @relation("BoxItems")
-// }
-
-// model Item {
-//   id               String    @id @default(auto()) @map("_id") @db.ObjectId
-//   name             String
-//   description      String?
-//   location         String?
-//   boxed            Boolean?  @default(false)
-//   category         String?
-//   packedInAt       DateTime?
-//   packedOutAt      DateTime?
-//   addedAt          DateTime  @default(now())
-//   lastModifiedAt   DateTime  @updatedAt
-//   addedById        String?
-//   lastModifiedById String?
-//   boxId            String?
-//   projectCode      String?
-//   notes            String?
-//   packedStatus     String?
-
-//   addedBy        Profile? @relation("AddedByProfile", fields: [addedById], references: [nickname])
-//   lastModifiedBy Profile? @relation("ModifiedByProfile", fields: [lastModifiedById], references: [nickname])
-//   box            Box?     @relation("BoxItems", fields: [boxId], references: [boxNumber])
-// }
-
-// model Project {
-//   id                String  @id @default(auto()) @map("_id") @db.ObjectId
-//   code              String  @unique
-//   insured           String?
-//   address           String?
-//   email             String?
-//   phoneNumber       String?
-//   insuranceProvider String?
-//   claimNo           String?
-//   adjuster          String?
-//   typeOfDamage      String?
-//   category          String?
-//   dateOfLoss        String?
-//   dateAttended      String?
-//   lockBoxCode       String?
-//   notes             String?
-
-//   materials          Material[]         @relation("ProjectMaterials")
-//   spreadsheetEntries SpreadsheetEntry[] @relation("ProjectSpreadsheets")
-
-//   // Overview
-//   nrList        String?
-//   projectStatus String? // Not Started, Emergency, Final Repairs, Overdue, Completed, (Special Cases: Waiting)
-
-//   // Emergency 
-//   siteReport        String?
-//   icc               String?
-//   emergencyEstimate String?
-//   contentsEstimate  String?
-//   frEstimate        String?
-//   acmSample         String?
-//   urgent            String?
-
-//   // Final Repairs
-//   dateApproved         String?
-//   lengthWeek           String?
-//   frStartDate          String?
-//   packBackDate         String?
-//   actualPackBackDate   String?
-//   completionDate       String?
-//   actualCompletionDate String?
-
-//   insulation  String?
-//   drywall     String?
-//   painting    String?
-//   flooring    String?
-//   tiles       String?
-//   cabinetries String?
-//   electrical  String?
-//   plumbing    String?
-//   issues      String?
-
-//   // Strata Details
-//   strataClaimNo           String?
-//   strataAdjuster          String?
-//   strataEmergencyEstimate String?
-//   strataContentsEstimate  String?
-//   strataFREstimate        String?
-
-//   budget         Float           @default(0.0)
-//   scope          String?
-//   subcontractors Subcontractor[] @relation("ProjectSubcontractors")
-//   laborCosts     LaborCost[]     @relation("ProjectLabor")
-
-//   totalMaterialCost      Float @default(0.0)
-//   totalSubcontractorCost Float @default(0.0)
-//   totalLaborCost         Float @default(0.0)
-//   totalProjectCost       Float @default(0.0)
-
-//   // Equipment 
-//   equipments         Equipment[]         @relation("ProjectEquipments")
-//   equipmentMovements EquipmentMovement[] @relation("ProjectEquipmentMovements")
-// }
-
-// model Material {
-//   id          String  @id @default(auto()) @map("_id") @db.ObjectId
-//   projectCode String
-//   project     Project @relation("ProjectMaterials", fields: [projectCode], references: [code])
-
-//   name              String
-//   type              String
-//   description       String?
-//   unitOfMeasurement String?
-//   quantityOrdered   Int
-//   supplierName      String?
-//   supplierContact   String?
-//   costPerUnit       Float
-//   totalCost         Float   @default(0.0)
-//   status            String?
-
-//   subcontractorCode String?        @db.ObjectId
-//   subcontractor     Subcontractor? @relation("SubcontractorMaterials", fields: [subcontractorCode], references: [id])
-
-//   createdById      String?
-//   createdAt        DateTime @default(now())
-//   lastModifiedById String?
-//   lastModifiedAt   DateTime @updatedAt
-
-//   createdBy      Profile? @relation("MaterialCreatedBy", fields: [createdById], references: [nickname])
-//   lastModifiedBy Profile? @relation("MaterialModifiedBy", fields: [lastModifiedById], references: [nickname])
-// }
-
-// model Subcontractor {
-//   id          String  @id @default(auto()) @map("_id") @db.ObjectId
-//   projectCode String
-//   project     Project @relation("ProjectSubcontractors", fields: [projectCode], references: [code])
-
-//   name        String
-//   expertise   String
-//   contactInfo String?
-//   agreedCost  Float      @default(0.0) // Fixed cost per contract
-//   materials   Material[] @relation("SubcontractorMaterials")
-
-//   totalCost Float @default(0.0) // Sum of agreed cost + materials purchased
-
-//   createdById      String?
-//   createdAt        DateTime @default(now())
-//   lastModifiedById String?
-//   lastModifiedAt   DateTime @updatedAt
-
-//   createdBy      Profile? @relation("SubcontractorCreatedBy", fields: [createdById], references: [nickname])
-//   lastModifiedBy Profile? @relation("SubcontractorModifiedBy", fields: [lastModifiedById], references: [nickname])
-// }
-
-// model LaborCost {
-//   id          String  @id @default(auto()) @map("_id") @db.ObjectId
-//   projectCode String
-//   project     Project @relation("ProjectLabor", fields: [projectCode], references: [code])
-
-//   employeeName String // Name of in-house employee
-//   role         String? // Optional role description
-//   hoursWorked  Float
-//   hourlyRate   Float   @default(35.0) // Fixed hourly rate for in-house employees
-//   totalCost    Float   @default(0.0) // Computed: hoursWorked * hourlyRate
-
-//   createdById      String?
-//   createdAt        DateTime @default(now())
-//   lastModifiedById String?
-//   lastModifiedAt   DateTime @updatedAt
-
-//   createdBy      Profile? @relation("LaborCostCreatedBy", fields: [createdById], references: [nickname])
-//   lastModifiedBy Profile? @relation("LaborCostModifiedBy", fields: [lastModifiedById], references: [nickname])
-// }
-
-// model OfficeSupply {
-//   id              String    @id @default(auto()) @map("_id") @db.ObjectId
-//   name            String
-//   description     String?
-//   category        String?
-//   status          String?
-//   quantity        Int?
-//   statusUpdatedAt DateTime?
-//   lastUpdatedById String?
-//   lastUpdatedBy   Profile?  @relation("OfficeSupplyModifiedBy", fields: [lastUpdatedById], references: [nickname])
-
-//   createdAt DateTime @default(now())
-//   updatedAt DateTime @updatedAt
-// }
-
-// model SpreadsheetEntry {
-//   id          String  @id @default(auto()) @map("_id") @db.ObjectId
-//   projectCode String @unique
-//   // Add a named relation to match what's on `Project`
-//   project     Project @relation("ProjectSpreadsheets", fields: [projectCode], references: [code])
-
-//   // The 2D "spreadsheet" data:
-//   data Json @default("[]")
-
-//   // Track who last updated:
-//   lastUpdatedById String?
-//   lastUpdatedBy   Profile? @relation("SpreadsheetModifiedBy", fields: [lastUpdatedById], references: [nickname])
-
-//   createdAt DateTime @default(now())
-//   updatedAt DateTime @updatedAt
-// }
-
-// model Equipment {
-//   id                 String   @id @default(auto()) @map("_id") @db.ObjectId
-//   typeCode           String
-//   assetNumber        Int
-//   model              String?
-//   serial             String?
-//   status             String   // "WAREHOUSE" | "DEPLOYED" | "MAINTENANCE" | "LOST"
-//   archived           Boolean  @default(false)
-
-//   currentProjectCode String?
-//   currentProject     Project? @relation("ProjectEquipments", fields: [currentProjectCode], references: [code])
-
-//   lastMovedAt        DateTime?
-//   createdAt          DateTime @default(now())
-//   updatedAt          DateTime @updatedAt
-
-//   movements EquipmentMovement[]
-
-//   @@unique([typeCode, assetNumber]) // numbers repeat, but only unique within a type
-// }
-
-// model EquipmentMovement {
-//   id          String    @id @default(auto()) @map("_id") @db.ObjectId
-
-//   equipmentId String    @db.ObjectId
-//   equipment   Equipment @relation(fields: [equipmentId], references: [id])
-
-//   direction   String    // "IN" | "OUT"
-//   at          DateTime  @default(now())
-
-//   projectCode String?
-//   project     Project?  @relation("ProjectEquipmentMovements", fields: [projectCode], references: [code])
-
-//   byId        String?   // Profile.nickname
-//   by          Profile?  @relation("ProfileEquipmentMovements", fields: [byId], references: [nickname])
-
-//   source      String?
-//   note        String?
-//   rawMessage  String?
-// }
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -577,6 +207,8 @@ model Project {
   electrical  String?
   plumbing    String?
   issues      String?
+
+  finalRepairsAgreements FinalRepairsAgreement[] @relation("ProjectFinalRepairsAgreements")
 
   // Strata Details
   strataClaimNo           String?
@@ -796,4 +428,173 @@ model ProjectUpdate {
   @@index([submittedById])
   @@index([createdAt])
   @@index([isDeleted])
+}
+
+model FinalRepairsAgreement {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  projectCode String
+  project     Project @relation("ProjectFinalRepairsAgreements", fields: [projectCode], references: [code])
+
+  agreementNumber String?
+
+  customerName  String?
+  customerEmail String?
+  customerPhone String?
+
+  status String @default("DRAFT") // DRAFT | READY_FOR_SIGNATURE | SIGNED | CANCELLED
+
+  generalNotes String?
+
+  dropboxFolderPath   String?
+  dropboxDocumentPath String?
+  signedDocumentPath  String?
+
+  signedAt String?
+  signedBy String?
+
+  createdById      String?
+  createdAt        DateTime @default(now())
+  lastModifiedById String?
+  lastModifiedAt   DateTime @updatedAt
+
+  isDeleted   Boolean   @default(false)
+  deletedAt   DateTime?
+  deletedById String?
+
+  selections FinalRepairMaterialSelection[] @relation("AgreementSelections")
+
+  @@index([projectCode])
+  @@index([status])
+  @@index([createdAt])
+  @@index([isDeleted])
+}
+
+model FinalRepairMaterialSelection {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  agreementId String                @db.ObjectId
+  agreement   FinalRepairsAgreement @relation("AgreementSelections", fields: [agreementId], references: [id], onDelete: Cascade)
+
+  projectCode String
+
+  category String // FLOORING | TILE | CABINET | BASEBOARD | DOOR_CASING | STAIR_NOSING | STAIR_RAILING | OTHER
+
+  itemName        String
+  description     String?
+  supplierName    String?
+  modelNumber     String?
+  colorName       String?
+  size            String?
+  unit            String?
+  quantity        Float?
+  unitCost        Float?
+  totalCost       Float   @default(0.0)
+  allowanceAmount Float?
+
+  notes String?
+
+  sortOrder Int @default(0)
+
+  createdAt      DateTime @default(now())
+  lastModifiedAt DateTime @updatedAt
+  catalogItemId  String?  @db.ObjectId
+
+  roomName         String?
+  location         String?
+  section          String?
+  approvalStatus   String  @default("PENDING") // PENDING | APPROVED | DECLINED | ORDERED | INSTALLED
+  customerDecision String?
+
+  @@index([agreementId])
+  @@index([projectCode])
+  @@index([category])
+}
+
+model MaterialCatalogItem {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  category String
+  itemName String
+
+  description  String?
+  supplierName String?
+  modelNumber  String?
+  colorName    String?
+  size         String?
+  unit         String?
+  defaultCost  Float?
+  notes        String?
+
+  active Boolean @default(true)
+
+  createdById      String?
+  createdAt        DateTime @default(now())
+  lastModifiedById String?
+  lastModifiedAt   DateTime @updatedAt
+
+  usageCount Int       @default(0)
+  lastUsedAt DateTime?
+  source     String? // MANUAL | AGREEMENT_SELECTION | IMPORTED | AI_SUGGESTED
+
+  defaultSection   String?
+  recommendedRooms String[] @default([])
+  tags             String[] @default([])
+
+  @@index([category])
+  @@index([supplierName])
+  @@index([active])
+}
+
+model AuditLog {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  actorEmail    String?
+  actorNickname String?
+  actorRole     String?
+
+  action   String // CREATE | UPDATE | DELETE | RESTORE | EXPORT | BACKUP
+  entity   String // FinalRepairsAgreement | FinalRepairMaterialSelection | MaterialCatalogItem | ProjectUpdate | etc.
+  entityId String?
+
+  projectCode String?
+
+  summary String?
+  changes Json?
+
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@index([actorEmail])
+  @@index([action])
+  @@index([entity])
+  @@index([entityId])
+  @@index([projectCode])
+  @@index([createdAt])
+}
+
+model BackupLog {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  requestedByEmail    String?
+  requestedByNickname String?
+
+  backupType String // MANUAL_EXPORT | ATLAS_BACKUP_NOTE | JSON_EXPORT
+  status     String @default("STARTED") // STARTED | SUCCESS | FAILED
+
+  fileName    String?
+  filePath    String?
+  fileSize    Int?
+  recordCount Int?
+
+  notes        String?
+  errorMessage String?
+
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@index([requestedByEmail])
+  @@index([status])
+  @@index([createdAt])
 }

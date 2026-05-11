@@ -1,87 +1,155 @@
+// app/api/projects/materials/[id]/route.tsx
+
 import { NextResponse } from "next/server";
 import prisma from "@/app/libs/prismadb";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/libs/authOption";
-
 import { recalcProjectCosts } from "@/app/utils/recalcProjectCosts";
+import { canManageFinalRepairs } from "@/app/libs/roles";
+import {
+  buildChangeSet,
+  createAuditLog,
+  getRequestAuditMeta,
+} from "@/app/libs/auditLog";
+
+export const runtime = "nodejs";
+
+function jsonError(message: string, status: number, detail?: string) {
+  return NextResponse.json({ message, detail, status }, { status });
+}
+
+async function getCurrentProfile(email: string) {
+  return prisma.profile.findUnique({
+    where: { userEmail: email },
+    select: {
+      nickname: true,
+      firstName: true,
+      role: true,
+    },
+  });
+}
+
+function toNumber(value: unknown, fallback = 0) {
+  if (value === null || value === undefined || value === "") return fallback;
+
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : fallback;
+}
+
+function cleanString(value: unknown) {
+  return String(value || "").trim();
+}
+
+function nullableString(value: unknown) {
+  const cleaned = cleanString(value);
+  return cleaned || null;
+}
 
 export async function PATCH(
   request: Request,
   { params }: { params: { id: string } },
 ) {
   const session = await getServerSession(authOptions);
-  if (!session || !session.user?.email) {
-    return NextResponse.json({ message: "Unauthorized access", status: 401 });
+
+  if (!session?.user?.email) {
+    return jsonError("Unauthorized access", 401);
   }
 
   try {
+    const profile = await getCurrentProfile(session.user.email);
+
+    if (!profile) {
+      return jsonError("User profile not found", 404);
+    }
+
+    if (!canManageFinalRepairs(profile.role)) {
+      return jsonError("Admin access required", 403);
+    }
+
     const { id } = params;
-    const { data } = await request.json();
+    const body = await request.json().catch(() => ({}));
+    const data = body.data;
+
     if (!data) {
-      return NextResponse.json({ message: "No data provided", status: 400 });
-    }
-    const {
-      projectCode,
-      type,
-      description,
-      unitOfMeasurement,
-      quantityOrdered,
-      costPerUnit,
-      supplierName,
-      supplierContact,
-      status,
-    } = data;
-
-    if (!projectCode) {
-      return NextResponse.json({
-        status: 400,
-        message: "projectCode is required",
-      });
-    }
-    if (!type) {
-      return NextResponse.json({
-        status: 400,
-        message: "Material 'type' cannot be empty",
-      });
+      return jsonError("No data provided", 400);
     }
 
-    const userProfile = await prisma.profile.findUnique({
-      where: { userEmail: session.user.email },
-      select: { nickname: true },
+    const existingMaterial = await prisma.material.findUnique({
+      where: { id },
     });
 
-    if (!userProfile) {
-      return NextResponse.json({ message: "User profile not found", status: 404 });
+    if (!existingMaterial) {
+      return jsonError("Material not found", 404);
     }
 
-    // Recompute total cost
-    const computedCost = (quantityOrdered ?? 0) * (costPerUnit ?? 0);
+    const projectCode = cleanString(data.projectCode);
+    const type = cleanString(data.type);
+
+    if (!projectCode) {
+      return jsonError("projectCode is required", 400);
+    }
+
+    if (!type) {
+      return jsonError("Material 'type' cannot be empty", 400);
+    }
+
+    const quantityOrdered = toNumber(data.quantityOrdered, 0);
+    const costPerUnit = toNumber(data.costPerUnit, 0);
+    const computedCost = quantityOrdered * costPerUnit;
+
+    const updateData = {
+      projectCode,
+      type,
+      description: nullableString(data.description),
+      unitOfMeasurement: nullableString(data.unitOfMeasurement),
+      quantityOrdered,
+      costPerUnit,
+      totalCost: computedCost,
+      supplierName: nullableString(data.supplierName),
+      supplierContact: nullableString(data.supplierContact),
+      status: nullableString(data.status),
+      lastModifiedById: profile.nickname || null,
+      lastModifiedAt: new Date(),
+    };
+
+    const changes = buildChangeSet(existingMaterial as any, updateData as any);
 
     const updatedMaterial = await prisma.material.update({
       where: { id },
-      data: {
-        projectCode,
-        type,
-        description,
-        unitOfMeasurement,
-        quantityOrdered: quantityOrdered ?? 0,
-        costPerUnit: costPerUnit ?? 0,
-        totalCost: computedCost,
-        supplierName,
-        supplierContact,
-        status,
-        lastModifiedById: userProfile.nickname,
-        lastModifiedAt: new Date(),
-      },
+      data: updateData,
     });
 
-    // Recalc totals
-    await recalcProjectCosts(projectCode);
+    await recalcProjectCosts(existingMaterial.projectCode);
 
-    return NextResponse.json({ material: updatedMaterial, status: 200 });
+    if (existingMaterial.projectCode !== updatedMaterial.projectCode) {
+      await recalcProjectCosts(updatedMaterial.projectCode);
+    }
+
+    await createAuditLog({
+      actorEmail: session.user.email,
+      actorNickname: profile.nickname || profile.firstName || null,
+      actorRole: profile.role || null,
+      action: "UPDATE",
+      entity: "Material",
+      entityId: updatedMaterial.id,
+      projectCode: updatedMaterial.projectCode,
+      summary: `Updated material: ${updatedMaterial.name}`,
+      changes,
+      ...getRequestAuditMeta(request),
+    });
+
+    return NextResponse.json({
+      material: updatedMaterial,
+      status: 200,
+    });
   } catch (error) {
     console.error("Error updating material:", error);
-    return NextResponse.json({ status: 500, error: "Internal server error" });
+
+    return jsonError(
+      "Internal server error",
+      500,
+      error instanceof Error ? error.message : "Unknown error",
+    );
   }
 }
 
@@ -90,27 +158,63 @@ export async function DELETE(
   { params }: { params: { id: string } },
 ) {
   const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ message: "Unauthorized access", status: 401 });
+
+  if (!session?.user?.email) {
+    return jsonError("Unauthorized access", 401);
   }
 
   try {
-    const { id } = params;
+    const profile = await getCurrentProfile(session.user.email);
 
-    // Before deleting, find the material to get its projectCode
-    const mat = await prisma.material.findUnique({ where: { id } });
-    if (!mat) {
-      return NextResponse.json({ status: 404, message: "Not found" });
+    if (!profile) {
+      return jsonError("User profile not found", 404);
     }
 
-    await prisma.material.delete({ where: { id } });
+    if (!canManageFinalRepairs(profile.role)) {
+      return jsonError("Admin access required", 403);
+    }
 
-    // Recalc totals
-    await recalcProjectCosts(mat.projectCode);
+    const { id } = params;
 
-    return NextResponse.json({ message: "Material deleted", status: 200 });
+    const existingMaterial = await prisma.material.findUnique({
+      where: { id },
+    });
+
+    if (!existingMaterial) {
+      return jsonError("Material not found", 404);
+    }
+
+    const deletedMaterial = await prisma.material.delete({
+      where: { id },
+    });
+
+    await recalcProjectCosts(existingMaterial.projectCode);
+
+    await createAuditLog({
+      actorEmail: session.user.email,
+      actorNickname: profile.nickname || profile.firstName || null,
+      actorRole: profile.role || null,
+      action: "DELETE",
+      entity: "Material",
+      entityId: deletedMaterial.id,
+      projectCode: deletedMaterial.projectCode,
+      summary: `Deleted material: ${deletedMaterial.name}`,
+      changes: deletedMaterial,
+      ...getRequestAuditMeta(request),
+    });
+
+    return NextResponse.json({
+      message: "Material deleted",
+      material: deletedMaterial,
+      status: 200,
+    });
   } catch (error) {
     console.error("Error deleting material:", error);
-    return NextResponse.json({ status: 500, error: "Internal server error" });
+
+    return jsonError(
+      "Internal server error",
+      500,
+      error instanceof Error ? error.message : "Unknown error",
+    );
   }
 }

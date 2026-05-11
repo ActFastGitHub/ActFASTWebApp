@@ -1,3 +1,5 @@
+// app\(site)\create-profile\page.tsx
+
 "use client";
 
 import { useRouter } from "next/navigation";

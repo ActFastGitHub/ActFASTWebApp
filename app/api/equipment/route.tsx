@@ -1,4 +1,8 @@
 // app/api/equipment/route.ts
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/app/libs/prismadb";
 import type { EquipmentDTO } from "@/app/types/equipment";

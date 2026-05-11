@@ -10,6 +10,7 @@ import {
   isInsideRoot,
   joinDropboxPath,
 } from "@/app/libs/dropbox";
+import { isAdminRole } from "@/app/libs/roles";
 
 export const runtime = "nodejs";
 
@@ -51,11 +52,6 @@ const cleanFileNamePart = (value: string) =>
     .toLowerCase()
     .replace(/\s+/g, "-")
     .replace(/[^a-z0-9-_]/g, "") || "unknown";
-
-const isAdminRole = (role?: string | null) =>
-  ["admin", "superadmin", "super-admin", "owner"].includes(
-    String(role || "").toLowerCase(),
-  );
 
 const isAllowedProjectFolderName = (folderName: string) =>
   PROJECT_FOLDER_REGEX.test(folderName) ||

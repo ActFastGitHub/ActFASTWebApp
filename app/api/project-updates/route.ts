@@ -11,6 +11,12 @@ import {
   isInsideRoot,
   joinDropboxPath,
 } from "@/app/libs/dropbox";
+import {
+  buildChangeSet,
+  createAuditLog,
+  getRequestAuditMeta,
+} from "@/app/libs/auditLog";
+import { isAdminRole, normalizeRole } from "@/app/libs/roles";
 
 export const runtime = "nodejs";
 
@@ -32,15 +38,6 @@ type DropboxCopyResponse = {
     path_display: string;
     path_lower: string;
   };
-};
-
-type DropboxTemporaryLinkResponse = {
-  metadata: {
-    name: string;
-    path_display: string;
-    path_lower: string;
-  };
-  link: string;
 };
 
 type ProjectUpdateForLog = {
@@ -86,6 +83,18 @@ function getExtension(fileNameOrPath: string, fallback = "jpg") {
   return match?.[1]?.toLowerCase() || fallback;
 }
 
+function formatReadableDateTime(date: Date) {
+  return date.toLocaleString("en-CA", {
+    year: "numeric",
+    month: "long",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: TIME_ZONE,
+  });
+}
+
 function getDateParts(date = new Date()) {
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: TIME_ZONE,
@@ -105,30 +114,13 @@ function getDateParts(date = new Date()) {
       return acc;
     }, {});
 
-  const year = parts.year;
-  const month = parts.month;
-  const day = parts.day;
   const hour = parts.hour === "24" ? "00" : parts.hour;
-  const minute = parts.minute;
-  const second = parts.second;
 
   return {
-    dateFolderName: `${year}-${month}-${day}`,
-    timeForFileName: `${hour}${minute}${second}`,
+    dateFolderName: `${parts.year}-${parts.month}-${parts.day}`,
+    timeForFileName: `${hour}${parts.minute}${parts.second}`,
     readableDateTime: formatReadableDateTime(date),
   };
-}
-
-function formatReadableDateTime(date: Date) {
-  return date.toLocaleString("en-CA", {
-    year: "numeric",
-    month: "long",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-    timeZone: TIME_ZONE,
-  });
 }
 
 function getDropboxErrorMessage(error: unknown) {
@@ -144,12 +136,6 @@ function isDropboxConflictError(error: unknown) {
     message.includes("conflict") ||
     message.includes("already_exists") ||
     message.includes("folder")
-  );
-}
-
-function isAdminRole(role?: string | null) {
-  return ["admin", "superadmin", "super-admin", "owner"].includes(
-    String(role || "").toLowerCase(),
   );
 }
 
@@ -188,32 +174,11 @@ async function copyDropboxFile(fromPath: string, toPath: string) {
   return copied.metadata.path_display || copied.metadata.path_lower || toPath;
 }
 
-async function getDropboxTextFile(path: string) {
-  try {
-    const temporaryLink = await dropboxApiFetch<DropboxTemporaryLinkResponse>(
-      "/files/get_temporary_link",
-      { path },
-    );
-
-    const response = await fetch(temporaryLink.link);
-    if (!response.ok) return "";
-
-    return await response.text();
-  } catch {
-    return "";
-  }
-}
-
 async function overwriteDropboxTextFile(path: string, text: string) {
-  /*
-    Your existing dropboxContentUpload helper uses mode: "add", so it cannot truly
-    overwrite a text log. To keep the existing helper untouched, this function first
-    deletes the old log if it exists, then uploads the new version.
-  */
   try {
     await dropboxApiFetch("/files/delete_v2", { path });
   } catch {
-    // Ignore not_found. Upload below will create the file.
+    // Ignore missing old log file.
   }
 
   await dropboxContentUpload(path, Buffer.from(text, "utf8"));
@@ -589,7 +554,29 @@ export async function POST(request: Request) {
       savedPhotoPaths,
     });
 
-    await rebuildDropboxProjectLog(projectCode);
+    const rebuiltLog = await rebuildDropboxProjectLog(projectCode);
+
+    await createAuditLog({
+      actorEmail: session.user.email,
+      actorNickname: profile?.nickname || profile?.firstName || null,
+      actorRole: normalizeRole(profile?.role),
+      action: "CREATE",
+      entity: "ProjectUpdate",
+      entityId: savedUpdate.id,
+      projectCode,
+      summary: `Created project update for ${projectCode}`,
+      changes: {
+        created: savedUpdate,
+        dropbox: {
+          dateFolderPath,
+          logPath,
+          savedPhotoNames,
+          savedPhotoPaths,
+          rebuiltLog,
+        },
+      },
+      ...getRequestAuditMeta(request),
+    });
 
     return NextResponse.json({
       status: 200,
@@ -634,7 +621,6 @@ export async function PATCH(request: Request) {
     const isAdmin = isAdminRole(profile?.role);
 
     const body = await request.json().catch(() => ({}));
-
     const updateId = String(body.updateId || "").trim();
 
     if (!updateId) {
@@ -683,7 +669,7 @@ export async function PATCH(request: Request) {
         body.whatsappShareStatus || "ATTEMPTED",
       ).trim();
 
-      const allowedStatuses = ["PENDING", "ATTEMPTED", "FAILED"];
+      const allowedStatuses = ["PENDING", "ATTEMPTED", "SUCCESS", "FAILED"];
 
       if (!allowedStatuses.includes(whatsappShareStatus)) {
         return NextResponse.json(
@@ -694,7 +680,9 @@ export async function PATCH(request: Request) {
 
       patchData.whatsappShareStatus = whatsappShareStatus;
       patchData.whatsappSharedAt =
-        whatsappShareStatus === "ATTEMPTED" ? new Date() : null;
+        whatsappShareStatus === "ATTEMPTED" || whatsappShareStatus === "SUCCESS"
+          ? new Date()
+          : null;
     }
 
     if (isAdmin && body.updates !== undefined) {
@@ -709,17 +697,37 @@ export async function PATCH(request: Request) {
       patchData.editedAt = new Date();
     }
 
+    const changes = buildChangeSet(existingUpdate as any, patchData as any);
+
     const updated = await prisma.projectUpdate.update({
       where: { id: updateId },
       data: patchData,
     });
 
+    let rebuiltLog: Awaited<ReturnType<typeof rebuildDropboxProjectLog>> = null;
+
     if (
       isAdmin &&
       (body.updates !== undefined || body.leftToDo !== undefined)
     ) {
-      await rebuildDropboxProjectLog(existingUpdate.projectCode);
+      rebuiltLog = await rebuildDropboxProjectLog(existingUpdate.projectCode);
     }
+
+    await createAuditLog({
+      actorEmail: session.user.email,
+      actorNickname: profile?.nickname || profile?.firstName || null,
+      actorRole: normalizeRole(profile?.role),
+      action: "UPDATE",
+      entity: "ProjectUpdate",
+      entityId: updated.id,
+      projectCode: updated.projectCode,
+      summary: `Updated project update for ${updated.projectCode}`,
+      changes: {
+        ...changes,
+        ...(rebuiltLog ? { rebuiltDropboxLog: rebuiltLog } : {}),
+      },
+      ...getRequestAuditMeta(request),
+    });
 
     return NextResponse.json({
       status: 200,
@@ -793,7 +801,36 @@ export async function DELETE(request: Request) {
       },
     });
 
-    await rebuildDropboxProjectLog(existingUpdate.projectCode);
+    const rebuiltLog = await rebuildDropboxProjectLog(
+      existingUpdate.projectCode,
+    );
+
+    await createAuditLog({
+      actorEmail: session.user.email,
+      actorNickname: profile?.nickname || profile?.firstName || null,
+      actorRole: normalizeRole(profile?.role),
+      action: "DELETE",
+      entity: "ProjectUpdate",
+      entityId: deleted.id,
+      projectCode: deleted.projectCode,
+      summary: `Deleted project update for ${deleted.projectCode}`,
+      changes: {
+        isDeleted: {
+          before: false,
+          after: true,
+        },
+        deletedAt: {
+          before: null,
+          after: deleted.deletedAt,
+        },
+        deletedById: {
+          before: null,
+          after: deleted.deletedById,
+        },
+        rebuiltDropboxLog: rebuiltLog,
+      },
+      ...getRequestAuditMeta(request),
+    });
 
     return NextResponse.json({
       status: 200,

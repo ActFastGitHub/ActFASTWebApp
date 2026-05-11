@@ -1,3 +1,5 @@
+// app\components\VideoSection.tsx
+
 "use client";
 
 import React from "react";

@@ -5,10 +5,14 @@
 import React, { ChangeEvent, FormEvent, useState } from "react";
 import { Session } from "next-auth";
 import { FaEdit, FaTrashAlt, FaEye, FaEyeSlash } from "react-icons/fa";
-// (CHANGED) import Chevron icons from heroicons for collapse arrow
+import { isAdminRole } from "@/app/libs/roles";
 import { ChevronDownIcon, ChevronRightIcon } from "@heroicons/react/24/solid";
 
-import { Project, LaborCost, EditLaborCostData } from "@/app/types/materialsPageTypes";
+import {
+  Project,
+  LaborCost,
+  EditLaborCostData,
+} from "@/app/types/materialsPageTypes";
 
 type Props = {
   session: Session | null;
@@ -65,6 +69,7 @@ const LaborCostSection = ({
 
   // (CHANGED) function to toggle
   const handleToggle = () => setIsCollapsed((prev) => !prev);
+  const canManageLabor = isAdminRole(session?.user?.role);
 
   return (
     <div className="mb-6 rounded bg-white p-4 shadow">
@@ -217,7 +222,9 @@ const LaborCostSection = ({
                 <div key={lab.id} className="rounded bg-gray-100 p-4 shadow-md">
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-xl font-bold">{lab.employeeName}</div>
+                      <div className="text-xl font-bold">
+                        {lab.employeeName}
+                      </div>
                       <p className="text-gray-600">{lab.role}</p>
                     </div>
                     <div className="flex space-x-2">
@@ -227,9 +234,7 @@ const LaborCostSection = ({
                       >
                         {showLaborDetails[lab.id] ? <FaEyeSlash /> : <FaEye />}
                       </button>
-                      {["admin", "lead", "owner"].includes(
-                        session?.user.role as string,
-                      ) && (
+                      {canManageLabor && (
                         <button
                           onClick={() => handleLaborEditToggle(lab.id)}
                           className="rounded bg-blue-500 p-2 text-white hover:bg-blue-600"
@@ -237,9 +242,7 @@ const LaborCostSection = ({
                           <FaEdit />
                         </button>
                       )}
-                      {["admin", "lead", "owner"].includes(
-                        session?.user.role as string,
-                      ) && (
+                      {canManageLabor && (
                         <button
                           onClick={() => deleteLaborCost(lab.id)}
                           className="rounded bg-red-500 p-2 text-white hover:bg-red-600"
@@ -268,7 +271,7 @@ const LaborCostSection = ({
                         })}
                       </p>
 
-                      <hr className="my-2 border-0 h-[1px] bg-gray-400" />
+                      <hr className="my-2 h-[1px] border-0 bg-gray-400" />
                       <p>
                         Created By:{" "}
                         {lab.createdBy

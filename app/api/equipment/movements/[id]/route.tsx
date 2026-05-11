@@ -1,102 +1,128 @@
 // app/api/equipment/movements/[id]/route.tsx
 
-// import { NextResponse } from "next/server";
-// import prisma from "@/app/libs/prismadb";
-// import { getServerSession } from "next-auth";
-// import { authOptions } from "@/app/libs/authOption";
-// import type { DeleteResponse } from "@/app/types/equipment";
-
-// async function canDelete() {
-//   const session = await getServerSession(authOptions);
-//   if (!session?.user?.email) return { ok: false, status: 401 as const };
-//   const p = await prisma.profile.findUnique({
-//     where: { userEmail: session.user.email },
-//     select: { role: true },
-//   });
-//   const role = (p?.role || "").toLowerCase();
-//   return { ok: ["admin", "owner"].includes(role), status: 403 as const };
-// }
-
-// export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
-//   const auth = await canDelete();
-//   if (!auth.ok) return NextResponse.json<DeleteResponse>({ status: auth.status, error: "Forbidden" });
-//   if (!params?.id) return NextResponse.json<DeleteResponse>({ status: 400, error: "Missing id" });
-
-//   try {
-//     await prisma.equipmentMovement.delete({ where: { id: params.id } });
-//     return NextResponse.json<DeleteResponse>({ status: 200 });
-//   } catch {
-//     return NextResponse.json<DeleteResponse>({ status: 500, error: "Delete failed" });
-//   }
-// }
-
-// app/api/equipment/movements/[id]/route.tsx
-
 import { NextResponse } from "next/server";
 import prisma from "@/app/libs/prismadb";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/libs/authOption";
 import type { DeleteResponse } from "@/app/types/equipment";
+import { isAdminRole } from "@/app/libs/roles";
+import {
+  buildChangeSet,
+  createAuditLog,
+  getRequestAuditMeta,
+} from "@/app/libs/auditLog";
 
 /* ──────────────────────────────────────────────────────────── */
 /*  Auth helpers                                                */
 /* ──────────────────────────────────────────────────────────── */
 
-async function getRole() {
+async function getAdminProfile() {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.email) return { role: null as string | null, status: 401 as 401 | 403 };
-  const p = await prisma.profile.findUnique({
-    where: { userEmail: session.user.email },
-    select: { role: true },
-  });
-  const role = (p?.role || "").toLowerCase();
-  const ok = ["admin", "owner"].includes(role);
-  return { role, status: ok ? 200 : 403 as 401 | 403 };
-}
 
-async function requireAdmin() {
-  const { status } = await getRole();
-  return { ok: status === 200, status: (status === 200 ? 200 : (status as 401 | 403)) };
+  if (!session?.user?.email) {
+    return {
+      ok: false,
+      status: 401 as 401 | 403,
+      session: null,
+      profile: null,
+    };
+  }
+
+  const profile = await prisma.profile.findUnique({
+    where: { userEmail: session.user.email },
+    select: {
+      role: true,
+      nickname: true,
+      firstName: true,
+    },
+  });
+
+  return {
+    ok: isAdminRole(profile?.role),
+    status: 403 as 401 | 403,
+    session,
+    profile,
+  };
 }
 
 /* ──────────────────────────────────────────────────────────── */
-/*  DELETE (yours, unchanged)                                   */
+/*  DELETE                                                      */
 /* ──────────────────────────────────────────────────────────── */
 
-async function canDelete() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email) return { ok: false, status: 401 as 401 | 403 };
-  const p = await prisma.profile.findUnique({
-    where: { userEmail: session.user.email },
-    select: { role: true },
-  });
-  const role = (p?.role || "").toLowerCase();
-  return { ok: ["admin", "owner"].includes(role), status: 403 as 401 | 403 };
-}
+export async function DELETE(
+  req: Request,
+  { params }: { params: { id: string } },
+) {
+  const auth = await getAdminProfile();
 
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
-  const auth = await canDelete();
-  if (!auth.ok) return NextResponse.json<DeleteResponse>({ status: auth.status, error: "Forbidden" });
-  if (!params?.id) return NextResponse.json<DeleteResponse>({ status: 400, error: "Missing id" });
+  if (!auth.ok || !auth.session?.user?.email) {
+    return NextResponse.json<DeleteResponse>({
+      status: auth.status,
+      error: "Forbidden",
+    });
+  }
+
+  if (!params?.id) {
+    return NextResponse.json<DeleteResponse>({
+      status: 400,
+      error: "Missing id",
+    });
+  }
 
   try {
-    await prisma.equipmentMovement.delete({ where: { id: params.id } });
+    const existing = await prisma.equipmentMovement.findUnique({
+      where: { id: params.id },
+      include: {
+        equipment: true,
+      },
+    });
+
+    if (!existing) {
+      return NextResponse.json<DeleteResponse>(
+        {
+          status: 400,
+          error: "Movement not found",
+        },
+        { status: 404 },
+      );
+    }
+
+    await prisma.equipmentMovement.delete({
+      where: { id: params.id },
+    });
+
+    await createAuditLog({
+      actorEmail: auth.session.user.email,
+      actorNickname: auth.profile?.nickname || auth.profile?.firstName || null,
+      actorRole: auth.profile?.role || null,
+      action: "DELETE",
+      entity: "EquipmentMovement",
+      entityId: existing.id,
+      projectCode: existing.projectCode || null,
+      summary: `Deleted equipment movement`,
+      changes: existing,
+      ...getRequestAuditMeta(req),
+    });
+
     return NextResponse.json<DeleteResponse>({ status: 200 });
   } catch {
-    return NextResponse.json<DeleteResponse>({ status: 500, error: "Delete failed" });
+    return NextResponse.json<DeleteResponse>({
+      status: 500,
+      error: "Delete failed",
+    });
   }
 }
 
 /* ──────────────────────────────────────────────────────────── */
-/*  PATCH (fixed to your schema)                                */
+/*  PATCH                                                       */
 /* ──────────────────────────────────────────────────────────── */
 
 type PatchBody = {
   data?: {
-    at?: string; // ISO
+    at?: string;
     note?: string | null;
     byId?: string | null;
-    projectCode?: string | null; // allowed only when direction === "OUT"
+    projectCode?: string | null;
     equipment?: {
       typeCode?: string;
       assetNumber?: number;
@@ -114,44 +140,85 @@ type PatchResponse = {
   error?: string;
 };
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
-  const auth = await requireAdmin();
-  if (!auth.ok) return NextResponse.json<PatchResponse>({ status: auth.status, error: "Forbidden" });
+export async function PATCH(
+  req: Request,
+  { params }: { params: { id: string } },
+) {
+  const auth = await getAdminProfile();
+
+  if (!auth.ok || !auth.session?.user?.email) {
+    return NextResponse.json<PatchResponse>({
+      status: auth.status,
+      error: "Forbidden",
+    });
+  }
 
   const id = params?.id;
-  if (!id) return NextResponse.json<PatchResponse>({ status: 400, error: "Missing id" });
+
+  if (!id) {
+    return NextResponse.json<PatchResponse>({
+      status: 400,
+      error: "Missing id",
+    });
+  }
 
   let body: PatchBody;
+
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json<PatchResponse>({ status: 400, error: "Invalid JSON body" });
+    return NextResponse.json<PatchResponse>({
+      status: 400,
+      error: "Invalid JSON body",
+    });
   }
 
   const { data, touchEquipment = false } = body || {};
-  if (!data) return NextResponse.json<PatchResponse>({ status: 400, error: "Missing data" });
 
-  // Load current movement + equipment snapshot
+  if (!data) {
+    return NextResponse.json<PatchResponse>({
+      status: 400,
+      error: "Missing data",
+    });
+  }
+
   const movement = await prisma.equipmentMovement.findUnique({
     where: { id },
     include: { equipment: true },
   });
-  if (!movement) return NextResponse.json<PatchResponse>({ status: 404, error: "Movement not found" });
 
-  // Build movement updates
+  if (!movement) {
+    return NextResponse.json<PatchResponse>({
+      status: 404,
+      error: "Movement not found",
+    });
+  }
+
+  const beforeMovement = structuredClone(movement);
+
   const movementUpdate: Record<string, any> = {};
-  if (typeof data.note !== "undefined") movementUpdate.note = data.note;
-  if (typeof data.byId !== "undefined") movementUpdate.byId = data.byId;
+
+  if (typeof data.note !== "undefined") {
+    movementUpdate.note = data.note;
+  }
+
+  if (typeof data.byId !== "undefined") {
+    movementUpdate.byId = data.byId;
+  }
 
   if (typeof data.at !== "undefined") {
     const dt = new Date(data.at);
+
     if (isNaN(dt.getTime())) {
-      return NextResponse.json<PatchResponse>({ status: 400, error: "Invalid 'at' date/time" });
+      return NextResponse.json<PatchResponse>({
+        status: 400,
+        error: "Invalid 'at' date/time",
+      });
     }
+
     movementUpdate.at = dt;
   }
 
-  // Only allow projectCode update on OUT
   if (typeof data.projectCode !== "undefined") {
     if (movement.direction !== "OUT") {
       return NextResponse.json<PatchResponse>({
@@ -159,14 +226,19 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         error: "projectCode can only be updated for OUT (DEPLOY) movements",
       });
     }
+
     const trimmed = (data.projectCode ?? "").trim();
+
     if (!trimmed) {
-      return NextResponse.json<PatchResponse>({ status: 400, error: "projectCode is required for OUT movements" });
+      return NextResponse.json<PatchResponse>({
+        status: 400,
+        error: "projectCode is required for OUT movements",
+      });
     }
+
     movementUpdate.projectCode = trimmed;
   }
 
-  // Optional equipment identity updates (typo fixes)
   const wantsEquipUpdate =
     !!data.equipment &&
     (typeof data.equipment.typeCode !== "undefined" ||
@@ -178,49 +250,59 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (wantsEquipUpdate) {
     if (typeof data.equipment?.typeCode !== "undefined") {
       const t = String(data.equipment.typeCode || "").trim();
+
       if (!t) {
-        return NextResponse.json<PatchResponse>({ status: 400, error: "equipment.typeCode cannot be empty" });
+        return NextResponse.json<PatchResponse>({
+          status: 400,
+          error: "equipment.typeCode cannot be empty",
+        });
       }
+
       newTypeCode = t;
     }
+
     if (typeof data.equipment?.assetNumber !== "undefined") {
       const n = Number(data.equipment.assetNumber);
+
       if (!Number.isInteger(n) || n <= 0) {
-        return NextResponse.json<PatchResponse>({ status: 400, error: "equipment.assetNumber must be a positive integer" });
+        return NextResponse.json<PatchResponse>({
+          status: 400,
+          error: "equipment.assetNumber must be a positive integer",
+        });
       }
+
       newAssetNumber = n;
     }
   }
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      // 1) Update movement
       const updatedMovement = await tx.equipmentMovement.update({
         where: { id: movement.id },
         data: movementUpdate,
         include: { equipment: true },
       });
 
-      // 2) If requested, update the linked equipment identity fields
       if (wantsEquipUpdate && updatedMovement.equipmentId) {
         await tx.equipment.update({
           where: { id: updatedMovement.equipmentId },
           data: {
-            ...(typeof newTypeCode !== "undefined" ? { typeCode: newTypeCode } : {}),
-            ...(typeof newAssetNumber !== "undefined" ? { assetNumber: newAssetNumber } : {}),
+            ...(typeof newTypeCode !== "undefined"
+              ? { typeCode: newTypeCode }
+              : {}),
+            ...(typeof newAssetNumber !== "undefined"
+              ? { assetNumber: newAssetNumber }
+              : {}),
           },
         });
       }
 
-      // 3) Optionally re-derive equipment denorm fields so other pages stay in sync
       if (touchEquipment && updatedMovement.equipmentId) {
-        // Determine last movement chronologically for this equipment
         const last = await tx.equipmentMovement.findFirst({
           where: { equipmentId: updatedMovement.equipmentId },
           orderBy: { at: "desc" },
         });
 
-        // Compute status/currentProjectCode/lastMovedAt from the latest movement
         let status: string | undefined;
         let currentProjectCode: string | null | undefined;
         let lastMovedAt: Date | undefined;
@@ -237,27 +319,55 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
           }
         }
 
-        // Shape matches your EquipmentUpdateInput (all scalars)
         await tx.equipment.update({
           where: { id: updatedMovement.equipmentId },
           data: {
             ...(typeof status !== "undefined" ? { status } : {}),
-            ...(typeof currentProjectCode !== "undefined" ? { currentProjectCode } : {}),
+            ...(typeof currentProjectCode !== "undefined"
+              ? { currentProjectCode }
+              : {}),
             ...(typeof lastMovedAt !== "undefined" ? { lastMovedAt } : {}),
           },
         });
       }
 
-      return { movementId: updatedMovement.id, equipmentId: updatedMovement.equipmentId };
+      return {
+        movementId: updatedMovement.id,
+        equipmentId: updatedMovement.equipmentId,
+      };
     });
 
-    return NextResponse.json<PatchResponse>({ status: 200, updated: result });
+    const afterMovement = await prisma.equipmentMovement.findUnique({
+      where: { id: movement.id },
+      include: { equipment: true },
+    });
+
+    await createAuditLog({
+      actorEmail: auth.session.user.email,
+      actorNickname: auth.profile?.nickname || auth.profile?.firstName || null,
+      actorRole: auth.profile?.role || null,
+      action: "UPDATE",
+      entity: "EquipmentMovement",
+      entityId: movement.id,
+      projectCode: afterMovement?.projectCode || movement.projectCode || null,
+      summary: `Updated equipment movement`,
+      changes: buildChangeSet(beforeMovement as any, afterMovement as any),
+      ...getRequestAuditMeta(req),
+    });
+
+    return NextResponse.json<PatchResponse>({
+      status: 200,
+      updated: result,
+    });
   } catch (e: any) {
-    // Nice message for unique constraint collisions on (typeCode, assetNumber)
     const msg =
       e?.code === "P2002"
         ? "Another equipment already uses this TypeCode + Asset #."
         : "Update failed";
-    return NextResponse.json<PatchResponse>({ status: 500, error: msg });
+
+    return NextResponse.json<PatchResponse>({
+      status: 500,
+      error: msg,
+    });
   }
 }

@@ -10,6 +10,7 @@ import {
   isInsideRoot,
   joinDropboxPath,
 } from "@/app/libs/dropbox";
+import { isAdminRole } from "@/app/libs/roles";
 
 export const runtime = "nodejs";
 
@@ -37,11 +38,6 @@ type SessionProfile = {
 };
 
 const normalizePath = (path: string) => path.replace(/\/+$/g, "").toLowerCase();
-
-const isAdminRole = (role?: string | null) =>
-  ["admin", "superadmin", "super-admin", "owner"].includes(
-    String(role || "").toLowerCase(),
-  );
 
 const isAllowedProjectFolderName = (folderName: string) =>
   PROJECT_FOLDER_REGEX.test(folderName) ||
@@ -94,8 +90,6 @@ const isNonAdminBrowsablePath = (path: string) => {
   const normalizedPicturesPath = normalizePath(picturesPath);
   const normalizedNrContentPhotosPath = normalizePath(nrContentPhotosPath);
 
-  // Non-admin users may browse inside these approved photo areas,
-  // including any subfolders they create under them.
   return (
     normalizedPath === normalizePath(projectRoot) ||
     normalizedPath === normalizedPicturesPath ||
@@ -132,8 +126,6 @@ const isNonAdminVisibleChild = (parentPath: string, folderPath: string) => {
   }
 
   if (normalizedParent === normalizePath(projectRoot)) {
-    // Non-admin users should not browse the parent 0-CONTENTS-WET-PICS folder.
-    // They can only jump directly to 0-CONTENTS-WET-PICS/2 NR CONTENT PHOTOS.
     return normalizedFolder === normalizePath(picturesPath);
   }
 
@@ -144,9 +136,6 @@ const isNonAdminVisibleChild = (parentPath: string, folderPath: string) => {
   const normalizedPicturesPath = normalizePath(picturesPath);
   const normalizedNrContentPhotosPath = normalizePath(nrContentPhotosPath);
 
-  // Allow folders inside the approved photo areas too.
-  // Example: 1-PICTURES/Living Room or
-  // 0-CONTENTS-WET-PICS/2 NR CONTENT PHOTOS/Living Room.
   if (normalizedParent === normalizedPicturesPath) return true;
   if (normalizedParent.startsWith(`${normalizedPicturesPath}/`)) return true;
   if (normalizedParent === normalizedNrContentPhotosPath) return true;
@@ -168,8 +157,10 @@ const dropboxPathExists = async (path: string) => {
       error instanceof Error
         ? error.message.toLowerCase()
         : String(error).toLowerCase();
+
     if (message.includes("path/not_found") || message.includes("not_found"))
       return false;
+
     throw error;
   }
 };
@@ -243,8 +234,6 @@ export async function POST(request: Request) {
         return isNonAdminVisibleChild(requestedPath, folder.path);
       });
 
-    // Non-admin shortcut: show the approved NR photo folder directly at project level.
-    // This avoids exposing/browsing the parent 0-CONTENTS-WET-PICS folder.
     if (!isAdmin) {
       const requestedProjectName = getProjectNameFromPath(requestedPath);
       const requestedProjectRoot = requestedProjectName

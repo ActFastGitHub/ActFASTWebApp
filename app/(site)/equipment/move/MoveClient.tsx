@@ -1,3 +1,5 @@
+//app\(site)\equipment\move\MoveClient.tsx
+
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -29,6 +31,7 @@ import {
   isDeleteError,
 } from "@/app/types/equipment";
 import { sortProjects } from "@/app/utils/projectSorted";
+import { isAdminRole } from "@/app/libs/roles";
 
 /* ──────────────────────────────────────────────────────────── */
 /*  LocalStorage keys                                           */
@@ -696,8 +699,7 @@ export default function MoveClient(): JSX.Element {
 
   /* Session & routing hooks (always called) */
   const { status, data: session } = useSession();
-  const role = (session?.user?.role || "").toLowerCase();
-  const isAdmin = role === "admin" || role === "owner";
+  const isAdmin = isAdminRole(session?.user?.role);
 
   const router = useRouter();
   const params = useSearchParams();

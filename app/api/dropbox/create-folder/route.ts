@@ -11,6 +11,8 @@ import {
   isInsideRoot,
   joinDropboxPath,
 } from "@/app/libs/dropbox";
+import { isAdminRole } from "@/app/libs/roles";
+import { createAuditLog, getRequestAuditMeta } from "@/app/libs/auditLog";
 
 export const runtime = "nodejs";
 
@@ -21,11 +23,6 @@ const CONTENTS_WET_PICS_FOLDER_NAME = "0-CONTENTS-WET-PICS";
 const NR_CONTENT_PHOTOS_FOLDER_NAME = "2 NR CONTENT PHOTOS";
 
 const normalizePath = (path: string) => path.replace(/\/+$/g, "").toLowerCase();
-
-const isAdminRole = (role?: string | null) =>
-  ["admin", "superadmin", "super-admin", "owner"].includes(
-    String(role || "").toLowerCase(),
-  );
 
 const isAllowedProjectFolderName = (folderName: string) =>
   PROJECT_FOLDER_REGEX.test(folderName) ||
@@ -90,9 +87,14 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
+
     const profile = await prisma.profile.findUnique({
       where: { userEmail: session.user.email },
-      select: { role: true },
+      select: {
+        role: true,
+        nickname: true,
+        firstName: true,
+      },
     });
 
     const isAdmin = isAdminRole(profile?.role);
@@ -144,6 +146,25 @@ export async function POST(request: Request) {
     }>("/files/create_folder_v2", {
       path: newPath,
       autorename: false,
+    });
+
+    await createAuditLog({
+      actorEmail: session.user.email,
+      actorNickname: profile?.nickname || profile?.firstName || null,
+      actorRole: profile?.role || null,
+      action: "CREATE",
+      entity: "DropboxFolder",
+      entityId: data.metadata.path_display,
+      projectCode: getProjectNameFromPath(newPath) || null,
+      summary: `Created Dropbox folder: ${folderName}`,
+      changes: {
+        parentPath,
+        folderName,
+        newPath,
+        createdFolderName: data.metadata.name,
+        createdFolderPath: data.metadata.path_display,
+      },
+      ...getRequestAuditMeta(request),
     });
 
     return NextResponse.json({

@@ -3,7 +3,7 @@
 import React, { ChangeEvent, FormEvent, useState } from "react";
 import { Session } from "next-auth";
 import { FaEdit, FaTrashAlt, FaEye, FaEyeSlash } from "react-icons/fa";
-// (CHANGED) import Chevron icons for collapse
+import { isAdminRole } from "@/app/libs/roles";
 import { ChevronDownIcon, ChevronRightIcon } from "@heroicons/react/24/solid";
 
 import {
@@ -67,6 +67,7 @@ const SubcontractorSection = ({
 
   // (CHANGED) Toggling function
   const handleToggle = () => setIsCollapsed((prev) => !prev);
+  const canManageSubcon = isAdminRole(session?.user?.role);
 
   return (
     // (CHANGED) Updated container styling to match the collapsible pattern
@@ -226,9 +227,7 @@ const SubcontractorSection = ({
                       >
                         {showSubDetails[sub.id] ? <FaEyeSlash /> : <FaEye />}
                       </button>
-                      {["admin", "lead", "owner"].includes(
-                        session?.user.role as string,
-                      ) && (
+                      {canManageSubcon && (
                         <button
                           onClick={() => handleSubEditToggle(sub.id)}
                           className="rounded bg-blue-500 p-2 text-white hover:bg-blue-600"
@@ -236,9 +235,7 @@ const SubcontractorSection = ({
                           <FaEdit />
                         </button>
                       )}
-                      {["admin", "lead", "owner"].includes(
-                        session?.user.role as string,
-                      ) && (
+                      {canManageSubcon && (
                         <button
                           onClick={() => deleteSubcontractor(sub.id)}
                           className="rounded bg-red-500 p-2 text-white hover:bg-red-600"

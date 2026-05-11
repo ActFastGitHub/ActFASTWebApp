@@ -1,3 +1,5 @@
+// app\(site)\e\[type]\[asset]\page.tsx
+
 "use client";
 
 import { useEffect } from "react";

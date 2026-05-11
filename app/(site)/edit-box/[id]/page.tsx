@@ -1,4 +1,4 @@
-// app/(site)/edit-box/[id]/page.tsx
+// app\(site)\edit-box\[id]\page.tsx
 
 "use client";
 

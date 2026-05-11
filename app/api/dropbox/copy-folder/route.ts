@@ -9,6 +9,8 @@ import {
   getDropboxRootPath,
   isInsideRoot,
 } from "@/app/libs/dropbox";
+import { isAdminRole } from "@/app/libs/roles";
+import { createAuditLog, getRequestAuditMeta } from "@/app/libs/auditLog";
 
 export const runtime = "nodejs";
 
@@ -85,13 +87,17 @@ export async function POST(request: Request) {
   }
 
   try {
-    /* 🔐 Admin check */
+    /* 🔐 Admin / Owner / Super Admin check */
     const profile = await prisma.profile.findUnique({
       where: { userEmail: session.user.email },
-      select: { role: true },
+      select: {
+        role: true,
+        nickname: true,
+        firstName: true,
+      },
     });
 
-    if (String(profile?.role || "").toLowerCase() !== "admin") {
+    if (!isAdminRole(profile?.role)) {
       return jsonError("Admin access required", 403);
     }
 
@@ -156,6 +162,26 @@ export async function POST(request: Request) {
       to_path: destinationPath,
       autorename: false, // ❌ prevent "(1)"
       allow_ownership_transfer: false,
+    });
+
+    /* 🧾 Audit successful project folder creation */
+    await createAuditLog({
+      actorEmail: session.user.email,
+      actorNickname: profile?.nickname || profile?.firstName || null,
+      actorRole: profile?.role || null,
+      action: "CREATE",
+      entity: "DropboxProjectFolder",
+      entityId: data.metadata.path_display,
+      projectCode: destinationFolderName,
+      summary: `Created Dropbox project folder from template: ${destinationFolderName}`,
+      changes: {
+        sourcePath,
+        destinationPath,
+        destinationFolderName,
+        dropboxFolderName: data.metadata.name,
+        dropboxFolderPath: data.metadata.path_display,
+      },
+      ...getRequestAuditMeta(request),
     });
 
     return NextResponse.json({

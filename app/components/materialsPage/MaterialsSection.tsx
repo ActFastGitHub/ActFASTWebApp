@@ -5,7 +5,7 @@
 import React, { ChangeEvent, FormEvent, useState } from "react";
 import { Session } from "next-auth";
 import { FaEdit, FaTrashAlt, FaEye, FaEyeSlash } from "react-icons/fa";
-// (CHANGED) import Chevron icons from heroicons for collapse arrow
+import { isAdminRole } from "@/app/libs/roles";
 import { ChevronDownIcon, ChevronRightIcon } from "@heroicons/react/24/solid";
 
 import {
@@ -103,6 +103,7 @@ const MaterialSection = ({
 
   // (CHANGED) Toggle function
   const handleToggle = () => setIsCollapsed((prev) => !prev);
+  const canManageMaterials = isAdminRole(session?.user?.role);
 
   return (
     <div className="mb-6 rounded bg-white p-4 shadow">
@@ -348,9 +349,7 @@ const MaterialSection = ({
                           <FaEye />
                         )}
                       </button>
-                      {["admin", "lead", "owner"].includes(
-                        session?.user.role as string,
-                      ) && (
+                      {canManageMaterials && (
                         <button
                           onClick={() => handleMaterialEditToggle(material.id)}
                           className="rounded bg-blue-500 p-2 text-white hover:bg-blue-600"
@@ -358,9 +357,7 @@ const MaterialSection = ({
                           <FaEdit />
                         </button>
                       )}
-                      {["admin", "lead", "owner"].includes(
-                        session?.user.role as string,
-                      ) && (
+                      {canManageMaterials && (
                         <button
                           onClick={() => deleteMaterial(material.id)}
                           className="rounded bg-red-500 p-2 text-white hover:bg-red-600"

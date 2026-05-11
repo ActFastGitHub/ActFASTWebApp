@@ -1,4 +1,4 @@
-// api/global-search/laborcosts/route.tsx
+// app\api\global-search\laborcosts\route.tsx
 
 export const dynamic = "force-dynamic";
 
