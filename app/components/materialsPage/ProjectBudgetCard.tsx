@@ -337,7 +337,7 @@ export default function ProjectBudgetCard({
         </div>
       </button>
 
-      {!isCollapsed && (
+      {isCollapsed && (
         <div className="space-y-5 bg-gray-50 p-4 sm:p-6">
           <div className="flex flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">

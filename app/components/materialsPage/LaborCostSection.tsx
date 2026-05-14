@@ -530,7 +530,7 @@ export default function LaborCostSection({
         </div>
       </button>
 
-      {!isCollapsed && (
+      {isCollapsed && (
         <div className="space-y-5 bg-gray-50 p-4 sm:p-6">
           {/* SEARCH */}
           <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">

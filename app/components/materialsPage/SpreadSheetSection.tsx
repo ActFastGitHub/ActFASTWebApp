@@ -761,7 +761,7 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
         )}
       </button>
 
-      {!isCollapsed && (
+      {isCollapsed && (
         <div className="space-y-5 bg-gray-50 p-4 sm:p-6">
           <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
