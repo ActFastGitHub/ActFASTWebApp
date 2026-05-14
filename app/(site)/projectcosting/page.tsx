@@ -663,9 +663,9 @@ const ProjectCostManagement = () => {
     <div className="relative min-h-screen overflow-x-hidden bg-gradient-to-br from-slate-100 via-gray-100 to-blue-50">
       <Navbar />
 
-      <main className="mx-auto w-full max-w-7xl px-4 pb-12 pt-24 sm:px-6 lg:px-8">
+      <main className="relative z-0 mx-auto w-full max-w-7xl px-4 pb-12 pt-24 sm:px-6 lg:px-8">
         {/* HEADER + PROJECT SELECTOR */}
-        <section className="overflow-hidden z-50 mt-5 mb-6 rounded-3xl bg-slate-950 p-5 text-white shadow-lg sm:p-7">
+        <section className="relative z-40 mb-6 mt-5 overflow-visible rounded-3xl bg-slate-950 p-5 text-white shadow-lg sm:p-7">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0">
               <p className="text-sm font-semibold uppercase tracking-wide text-blue-200">
@@ -682,7 +682,7 @@ const ProjectCostManagement = () => {
               </p>
             </div>
 
-            <div className="w-full rounded-2xl bg-white/10 p-4 backdrop-blur lg:max-w-md">
+            <div className="relative z-50 w-full rounded-2xl bg-white/10 p-4 backdrop-blur lg:max-w-md">
               <label
                 htmlFor="searchProject"
                 className="mb-2 block text-sm font-semibold text-slate-100"
@@ -698,7 +698,7 @@ const ProjectCostManagement = () => {
                   setQuery("");
                 }}
               >
-                <div className="relative z-50">
+                <div className="relative">
                   <Combobox.Input
                     id="searchProject"
                     className="w-full rounded-xl border border-white/20 bg-white py-3 pl-4 pr-11 text-sm font-medium text-gray-900 shadow-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-300"
@@ -712,7 +712,7 @@ const ProjectCostManagement = () => {
                   </Combobox.Button>
 
                   {filteredProjects.length > 0 && (
-                    <Combobox.Options className="absolute z-[9999] mt-2 max-h-72 w-full overflow-auto rounded-2xl bg-white py-2 text-sm shadow-2xl ring-1 ring-black/10">
+                    <Combobox.Options className="absolute left-0 top-full z-[9999] mt-2 max-h-72 w-full overflow-auto rounded-2xl bg-white py-2 text-sm shadow-2xl ring-1 ring-black/10">
                       {filteredProjects.map((project) => (
                         <Combobox.Option
                           key={project.id}
@@ -752,7 +752,7 @@ const ProjectCostManagement = () => {
                   )}
 
                   {query !== "" && filteredProjects.length === 0 && (
-                    <div className="absolute z-[9999] mt-2 w-full rounded-2xl bg-white px-4 py-3 text-sm text-gray-500 shadow-2xl ring-1 ring-black/10">
+                    <div className="absolute left-0 top-full z-[9999] mt-2 w-full rounded-2xl bg-white px-4 py-3 text-sm text-gray-500 shadow-2xl ring-1 ring-black/10">
                       No projects found.
                     </div>
                   )}
@@ -762,359 +762,362 @@ const ProjectCostManagement = () => {
           </div>
         </section>
 
-        {/* GLOBAL SEARCH */}
-        <section className="relative z-10 mb-6 rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <MagnifyingGlassIcon className="h-5 w-5 shrink-0 text-blue-600" />
-                <h2 className="text-xl font-bold text-gray-900">
-                  Global Search
-                </h2>
+        <div className="relative z-10 space-y-6">
+          {/* GLOBAL SEARCH */}
+          <section className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <MagnifyingGlassIcon className="h-5 w-5 shrink-0 text-blue-600" />
+                  <h2 className="text-xl font-bold text-gray-900">
+                    Global Search
+                  </h2>
+                </div>
+
+                <p className="mt-1 text-sm text-gray-500">
+                  Search materials, subcontractors, or labor costs across all
+                  projects.
+                </p>
               </div>
 
-              <p className="mt-1 text-sm text-gray-500">
-                Search materials, subcontractors, or labor costs across all
-                projects.
-              </p>
+              {globalSearchTerm.length >= 2 && (
+                <div className="w-fit rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">
+                  {globalSearchLoading
+                    ? "Searching..."
+                    : `${globalResultCount} result(s) found`}
+                </div>
+              )}
             </div>
 
-            {globalSearchTerm.length >= 2 && (
-              <div className="w-fit rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">
-                {globalSearchLoading
-                  ? "Searching..."
-                  : `${globalResultCount} result(s) found`}
-              </div>
+            <div className="relative mt-4">
+              <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+
+              <input
+                type="text"
+                value={globalSearchTerm}
+                className="w-full rounded-2xl border border-gray-200 bg-gray-50 py-3 pl-12 pr-4 text-sm shadow-sm outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                placeholder="Example: Laminate, General Flooring, employee name..."
+                onChange={(e) => handleGlobalSearch(e.target.value)}
+              />
+            </div>
+          </section>
+
+          {/* GLOBAL SEARCH EMPTY STATE */}
+          {globalSearchTerm.length >= 2 &&
+            !globalSearchLoading &&
+            globalResultCount === 0 && (
+              <section className="rounded-3xl border border-dashed border-gray-300 bg-white p-8 text-center shadow-sm">
+                <MagnifyingGlassIcon className="mx-auto h-12 w-12 text-gray-400" />
+
+                <h3 className="mt-4 text-lg font-bold text-gray-900">
+                  No results found
+                </h3>
+
+                <p className="mx-auto mt-2 max-w-lg text-sm text-gray-500">
+                  Try searching using project codes, suppliers, employee names,
+                  subcontractors, or material descriptions.
+                </p>
+              </section>
             )}
-          </div>
 
-          <div className="relative mt-4">
-            <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+          {/* GLOBAL SEARCH RESULTS */}
+          {globalResultCount > 0 && (
+            <section className="rounded-3xl border border-blue-100 bg-blue-50/60 p-4 shadow-sm sm:p-6">
+              <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">
+                    Global Search Results
+                  </h3>
 
-            <input
-              type="text"
-              value={globalSearchTerm}
-              className="w-full rounded-2xl border border-gray-200 bg-gray-50 py-3 pl-12 pr-4 text-sm shadow-sm outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
-              placeholder="Example: Laminate, General Flooring, employee name..."
-              onChange={(e) => handleGlobalSearch(e.target.value)}
-            />
-          </div>
-        </section>
+                  <p className="text-sm text-gray-500">
+                    Matching records from all projects.
+                  </p>
+                </div>
 
-        {/* GLOBAL SEARCH EMPTY STATE */}
-        {globalSearchTerm.length >= 2 &&
-          !globalSearchLoading &&
-          globalResultCount === 0 && (
-            <section className="mb-6 rounded-3xl border border-dashed border-gray-300 bg-white p-8 text-center shadow-sm">
-              <MagnifyingGlassIcon className="mx-auto h-12 w-12 text-gray-400" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGlobalSearchTerm("");
+                    setGlobalMaterials([]);
+                    setGlobalSubcontractors([]);
+                    setGlobalLabor([]);
+                  }}
+                  className="w-fit rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 shadow-sm transition hover:bg-gray-50"
+                >
+                  Clear Search
+                </button>
+              </div>
 
-              <h3 className="mt-4 text-lg font-bold text-gray-900">
-                No results found
-              </h3>
+              <div className="space-y-8">
+                {globalMaterials.length > 0 && (
+                  <div>
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <CubeIcon className="h-5 w-5 text-blue-700" />
+                        <h4 className="text-lg font-bold text-blue-800">
+                          Materials
+                        </h4>
+                      </div>
 
-              <p className="mx-auto mt-2 max-w-lg text-sm text-gray-500">
-                Try searching using project codes, suppliers, employee names,
-                subcontractors, or material descriptions.
+                      <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-blue-700 shadow-sm">
+                        {globalMaterials.length} result(s)
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      {globalMaterials.map((mat) => (
+                        <div
+                          key={mat.id}
+                          className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm"
+                        >
+                          <p className="break-words text-xs font-semibold uppercase text-blue-600">
+                            {mat.projectCode}
+                          </p>
+
+                          <h5 className="mt-2 break-words text-lg font-bold text-gray-900">
+                            {mat.type || "Material"}
+                          </h5>
+
+                          {mat.description && (
+                            <p className="mt-1 break-words text-sm text-gray-600">
+                              {mat.description}
+                            </p>
+                          )}
+
+                          <div className="mt-3 space-y-1 text-sm text-gray-500">
+                            {mat.supplierName && (
+                              <p>
+                                Supplier:{" "}
+                                <span className="font-semibold text-gray-800">
+                                  {mat.supplierName}
+                                </span>
+                              </p>
+                            )}
+
+                            {mat.totalCost !== undefined && (
+                              <p>
+                                Total:{" "}
+                                <span className="font-bold text-blue-700">
+                                  {formatCurrency(mat.totalCost)}
+                                </span>
+                              </p>
+                            )}
+                          </div>
+
+                          {mat.status && (
+                            <span className="mt-3 inline-flex rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+                              {mat.status}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {globalSubcontractors.length > 0 && (
+                  <div>
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <UserGroupIcon className="h-5 w-5 text-purple-700" />
+                        <h4 className="text-lg font-bold text-purple-800">
+                          Subcontractors
+                        </h4>
+                      </div>
+
+                      <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-purple-700 shadow-sm">
+                        {globalSubcontractors.length} result(s)
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      {globalSubcontractors.map((sub) => (
+                        <div
+                          key={sub.id}
+                          className="min-w-0 rounded-2xl border border-purple-100 bg-white p-4 shadow-sm"
+                        >
+                          <p className="break-words text-xs font-semibold uppercase text-purple-600">
+                            {sub.projectCode}
+                          </p>
+
+                          <h5 className="mt-2 break-words text-lg font-bold text-gray-900">
+                            {sub.name}
+                          </h5>
+
+                          {sub.expertise && (
+                            <p className="mt-1 break-words text-sm text-gray-600">
+                              {sub.expertise}
+                            </p>
+                          )}
+
+                          <div className="mt-3 space-y-1 text-sm text-gray-500">
+                            {sub.contactInfo && (
+                              <p className="break-words">{sub.contactInfo}</p>
+                            )}
+
+                            {sub.totalCost !== undefined && (
+                              <p>
+                                Total:{" "}
+                                <span className="font-bold text-purple-700">
+                                  {formatCurrency(sub.totalCost)}
+                                </span>
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {globalLabor.length > 0 && (
+                  <div>
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <UserIcon className="h-5 w-5 text-emerald-700" />
+                        <h4 className="text-lg font-bold text-emerald-800">
+                          Labor Costs
+                        </h4>
+                      </div>
+
+                      <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-emerald-700 shadow-sm">
+                        {globalLabor.length} result(s)
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      {globalLabor.map((lab) => (
+                        <div
+                          key={lab.id}
+                          className="min-w-0 rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm"
+                        >
+                          <p className="break-words text-xs font-semibold uppercase text-emerald-600">
+                            {lab.projectCode}
+                          </p>
+
+                          <h5 className="mt-2 break-words text-lg font-bold text-gray-900">
+                            {lab.employeeName}
+                          </h5>
+
+                          {lab.role && (
+                            <p className="mt-1 break-words text-sm text-gray-600">
+                              {lab.role}
+                            </p>
+                          )}
+
+                          <p className="mt-3 text-sm text-gray-500">
+                            {lab.hoursWorked} hrs @{" "}
+                            {formatCurrency(lab.hourlyRate)} ={" "}
+                            <span className="font-bold text-emerald-700">
+                              {formatCurrency(lab.totalCost)}
+                            </span>
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* NO PROJECT SELECTED */}
+          {!selectedProject && (
+            <section className="rounded-3xl border border-dashed border-gray-300 bg-white/80 p-8 text-center shadow-sm">
+              <FolderIcon className="mx-auto h-12 w-12 text-gray-400" />
+
+              <h2 className="mt-4 text-xl font-bold text-gray-900">
+                Select a project to begin
+              </h2>
+
+              <p className="mx-auto mt-2 max-w-xl text-sm text-gray-500">
+                Choose a project from the search box above to view budget
+                summary, spreadsheet, materials, subcontractors, and labor
+                costs.
               </p>
             </section>
           )}
 
-        {/* GLOBAL SEARCH RESULTS */}
-        {globalResultCount > 0 && (
-          <section className="mb-6 rounded-3xl border border-blue-100 bg-blue-50/60 p-4 shadow-sm sm:p-6">
-            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h3 className="text-xl font-bold text-gray-900">
-                  Global Search Results
-                </h3>
+          {/* SELECTED PROJECT SECTIONS */}
+          {selectedProject && (
+            <div className="space-y-6">
+              <ProjectBudgetCard
+                selectedProject={selectedProject}
+                newBudget={newBudget}
+                setNewBudget={setNewBudget}
+                handleUpdateBudget={handleUpdateBudget}
+              />
 
-                <p className="text-sm text-gray-500">
-                  Matching records from all projects.
-                </p>
-              </div>
+              <SpreadsheetSection selectedProject={selectedProject} />
 
-              <button
-                type="button"
-                onClick={() => {
-                  setGlobalSearchTerm("");
-                  setGlobalMaterials([]);
-                  setGlobalSubcontractors([]);
-                  setGlobalLabor([]);
-                }}
-                className="w-fit rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 shadow-sm transition hover:bg-gray-50"
-              >
-                Clear Search
-              </button>
+              <MaterialSection
+                session={session}
+                selectedProject={selectedProject}
+                materials={materials}
+                materialsSearchTerm={materialsSearchTerm}
+                setMaterialsSearchTerm={setMaterialsSearchTerm}
+                handleCreateMaterial={handleCreateMaterial}
+                newMaterial={newMaterial}
+                setNewMaterial={setNewMaterial}
+                editableMaterialId={editableMaterialId}
+                editMaterialData={editMaterialData}
+                handleMaterialChange={handleMaterialChange}
+                handleMaterialEditToggle={handleMaterialEditToggle}
+                updateMaterial={updateMaterial}
+                deleteMaterial={deleteMaterial}
+                toggleMaterialDetails={toggleMaterialDetails}
+                showMaterialDetails={showMaterialDetails}
+                materialsPage={materialsPage}
+                materialsTotalPages={materialsTotalPages}
+                handleMaterialPageChange={handleMaterialPageChange}
+              />
+
+              <SubcontractorSection
+                session={session}
+                selectedProject={selectedProject}
+                subcontractors={subcontractors}
+                subSearchTerm={subSearchTerm}
+                setSubSearchTerm={setSubSearchTerm}
+                handleCreateSubcontractor={handleCreateSubcontractor}
+                newSubcontractor={newSubcontractor}
+                setNewSubcontractor={setNewSubcontractor}
+                editableSubcontractorId={editableSubcontractorId}
+                editSubcontractorData={editSubcontractorData}
+                handleSubChange={handleSubChange}
+                handleSubEditToggle={handleSubEditToggle}
+                updateSubcontractor={updateSubcontractor}
+                deleteSubcontractor={deleteSubcontractor}
+                toggleSubDetails={toggleSubDetails}
+                showSubDetails={showSubDetails}
+                subPage={subPage}
+                subTotalPages={subTotalPages}
+                handleSubPageChange={handleSubPageChange}
+              />
+
+              <LaborCostSection
+                session={session}
+                selectedProject={selectedProject}
+                laborCosts={laborCosts}
+                laborSearchTerm={laborSearchTerm}
+                setLaborSearchTerm={setLaborSearchTerm}
+                handleCreateLaborCost={handleCreateLaborCost}
+                newLaborCost={newLaborCost}
+                setNewLaborCost={setNewLaborCost}
+                editableLaborCostId={editableLaborCostId}
+                editLaborCostData={editLaborCostData}
+                handleLaborChange={handleLaborChange}
+                handleLaborEditToggle={handleLaborEditToggle}
+                updateLaborCost={updateLaborCost}
+                deleteLaborCost={deleteLaborCost}
+                toggleLaborDetails={toggleLaborDetails}
+                showLaborDetails={showLaborDetails}
+                laborPage={laborPage}
+                laborTotalPages={laborTotalPages}
+                handleLaborPageChange={handleLaborPageChange}
+              />
             </div>
-
-            <div className="space-y-8">
-              {globalMaterials.length > 0 && (
-                <div>
-                  <div className="mb-4 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <CubeIcon className="h-5 w-5 text-blue-700" />
-                      <h4 className="text-lg font-bold text-blue-800">
-                        Materials
-                      </h4>
-                    </div>
-
-                    <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-blue-700 shadow-sm">
-                      {globalMaterials.length} result(s)
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    {globalMaterials.map((mat) => (
-                      <div
-                        key={mat.id}
-                        className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm"
-                      >
-                        <p className="break-words text-xs font-semibold uppercase text-blue-600">
-                          {mat.projectCode}
-                        </p>
-
-                        <h5 className="mt-2 break-words text-lg font-bold text-gray-900">
-                          {mat.type || "Material"}
-                        </h5>
-
-                        {mat.description && (
-                          <p className="mt-1 break-words text-sm text-gray-600">
-                            {mat.description}
-                          </p>
-                        )}
-
-                        <div className="mt-3 space-y-1 text-sm text-gray-500">
-                          {mat.supplierName && (
-                            <p>
-                              Supplier:{" "}
-                              <span className="font-semibold text-gray-800">
-                                {mat.supplierName}
-                              </span>
-                            </p>
-                          )}
-
-                          {mat.totalCost !== undefined && (
-                            <p>
-                              Total:{" "}
-                              <span className="font-bold text-blue-700">
-                                {formatCurrency(mat.totalCost)}
-                              </span>
-                            </p>
-                          )}
-                        </div>
-
-                        {mat.status && (
-                          <span className="mt-3 inline-flex rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
-                            {mat.status}
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {globalSubcontractors.length > 0 && (
-                <div>
-                  <div className="mb-4 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <UserGroupIcon className="h-5 w-5 text-purple-700" />
-                      <h4 className="text-lg font-bold text-purple-800">
-                        Subcontractors
-                      </h4>
-                    </div>
-
-                    <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-purple-700 shadow-sm">
-                      {globalSubcontractors.length} result(s)
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    {globalSubcontractors.map((sub) => (
-                      <div
-                        key={sub.id}
-                        className="min-w-0 rounded-2xl border border-purple-100 bg-white p-4 shadow-sm"
-                      >
-                        <p className="break-words text-xs font-semibold uppercase text-purple-600">
-                          {sub.projectCode}
-                        </p>
-
-                        <h5 className="mt-2 break-words text-lg font-bold text-gray-900">
-                          {sub.name}
-                        </h5>
-
-                        {sub.expertise && (
-                          <p className="mt-1 break-words text-sm text-gray-600">
-                            {sub.expertise}
-                          </p>
-                        )}
-
-                        <div className="mt-3 space-y-1 text-sm text-gray-500">
-                          {sub.contactInfo && (
-                            <p className="break-words">{sub.contactInfo}</p>
-                          )}
-
-                          {sub.totalCost !== undefined && (
-                            <p>
-                              Total:{" "}
-                              <span className="font-bold text-purple-700">
-                                {formatCurrency(sub.totalCost)}
-                              </span>
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {globalLabor.length > 0 && (
-                <div>
-                  <div className="mb-4 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <UserIcon className="h-5 w-5 text-emerald-700" />
-                      <h4 className="text-lg font-bold text-emerald-800">
-                        Labor Costs
-                      </h4>
-                    </div>
-
-                    <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-emerald-700 shadow-sm">
-                      {globalLabor.length} result(s)
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    {globalLabor.map((lab) => (
-                      <div
-                        key={lab.id}
-                        className="min-w-0 rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm"
-                      >
-                        <p className="break-words text-xs font-semibold uppercase text-emerald-600">
-                          {lab.projectCode}
-                        </p>
-
-                        <h5 className="mt-2 break-words text-lg font-bold text-gray-900">
-                          {lab.employeeName}
-                        </h5>
-
-                        {lab.role && (
-                          <p className="mt-1 break-words text-sm text-gray-600">
-                            {lab.role}
-                          </p>
-                        )}
-
-                        <p className="mt-3 text-sm text-gray-500">
-                          {lab.hoursWorked} hrs @{" "}
-                          {formatCurrency(lab.hourlyRate)} ={" "}
-                          <span className="font-bold text-emerald-700">
-                            {formatCurrency(lab.totalCost)}
-                          </span>
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </section>
-        )}
-
-        {/* NO PROJECT SELECTED */}
-        {!selectedProject && (
-          <section className="rounded-3xl border border-dashed border-gray-300 bg-white/80 p-8 text-center shadow-sm">
-            <FolderIcon className="mx-auto h-12 w-12 text-gray-400" />
-
-            <h2 className="mt-4 text-xl font-bold text-gray-900">
-              Select a project to begin
-            </h2>
-
-            <p className="mx-auto mt-2 max-w-xl text-sm text-gray-500">
-              Choose a project from the search box above to view budget summary,
-              spreadsheet, materials, subcontractors, and labor costs.
-            </p>
-          </section>
-        )}
-
-        {/* SELECTED PROJECT SECTIONS */}
-        {selectedProject && (
-          <div className="space-y-6">
-            <ProjectBudgetCard
-              selectedProject={selectedProject}
-              newBudget={newBudget}
-              setNewBudget={setNewBudget}
-              handleUpdateBudget={handleUpdateBudget}
-            />
-
-            <SpreadsheetSection selectedProject={selectedProject} />
-
-            <MaterialSection
-              session={session}
-              selectedProject={selectedProject}
-              materials={materials}
-              materialsSearchTerm={materialsSearchTerm}
-              setMaterialsSearchTerm={setMaterialsSearchTerm}
-              handleCreateMaterial={handleCreateMaterial}
-              newMaterial={newMaterial}
-              setNewMaterial={setNewMaterial}
-              editableMaterialId={editableMaterialId}
-              editMaterialData={editMaterialData}
-              handleMaterialChange={handleMaterialChange}
-              handleMaterialEditToggle={handleMaterialEditToggle}
-              updateMaterial={updateMaterial}
-              deleteMaterial={deleteMaterial}
-              toggleMaterialDetails={toggleMaterialDetails}
-              showMaterialDetails={showMaterialDetails}
-              materialsPage={materialsPage}
-              materialsTotalPages={materialsTotalPages}
-              handleMaterialPageChange={handleMaterialPageChange}
-            />
-
-            <SubcontractorSection
-              session={session}
-              selectedProject={selectedProject}
-              subcontractors={subcontractors}
-              subSearchTerm={subSearchTerm}
-              setSubSearchTerm={setSubSearchTerm}
-              handleCreateSubcontractor={handleCreateSubcontractor}
-              newSubcontractor={newSubcontractor}
-              setNewSubcontractor={setNewSubcontractor}
-              editableSubcontractorId={editableSubcontractorId}
-              editSubcontractorData={editSubcontractorData}
-              handleSubChange={handleSubChange}
-              handleSubEditToggle={handleSubEditToggle}
-              updateSubcontractor={updateSubcontractor}
-              deleteSubcontractor={deleteSubcontractor}
-              toggleSubDetails={toggleSubDetails}
-              showSubDetails={showSubDetails}
-              subPage={subPage}
-              subTotalPages={subTotalPages}
-              handleSubPageChange={handleSubPageChange}
-            />
-
-            <LaborCostSection
-              session={session}
-              selectedProject={selectedProject}
-              laborCosts={laborCosts}
-              laborSearchTerm={laborSearchTerm}
-              setLaborSearchTerm={setLaborSearchTerm}
-              handleCreateLaborCost={handleCreateLaborCost}
-              newLaborCost={newLaborCost}
-              setNewLaborCost={setNewLaborCost}
-              editableLaborCostId={editableLaborCostId}
-              editLaborCostData={editLaborCostData}
-              handleLaborChange={handleLaborChange}
-              handleLaborEditToggle={handleLaborEditToggle}
-              updateLaborCost={updateLaborCost}
-              deleteLaborCost={deleteLaborCost}
-              toggleLaborDetails={toggleLaborDetails}
-              showLaborDetails={showLaborDetails}
-              laborPage={laborPage}
-              laborTotalPages={laborTotalPages}
-              handleLaborPageChange={handleLaborPageChange}
-            />
-          </div>
-        )}
+          )}
+        </div>
       </main>
     </div>
   );
