@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { setCookie } from "cookies-next";
-import { FaEye, FaEyeSlash } from "react-icons/fa";  // Fa = Font Awesome
+import { FaEye, FaEyeSlash } from "react-icons/fa"; // Fa = Font Awesome
 
 interface ModalProps {
   showModal: boolean;
@@ -11,12 +11,15 @@ interface ModalProps {
 const Modal: React.FC<ModalProps> = ({ showModal, onClose }) => {
   const [accessCode, setAccessCode] = useState("");
   const [error, setError] = useState("");
-  const [show, setShow] = useState(false);      // toggle visibility
+  const [show, setShow] = useState(false); // toggle visibility
   const router = useRouter();
 
   const handleAccessCodeSubmit = () => {
     if (accessCode === process.env.NEXT_PUBLIC_ACTFAST_ACCESS_CODE) {
-      setCookie("accessCode", accessCode, { path: "/", maxAge: 7 * 24 * 60 * 60 });
+      setCookie("accessCode", accessCode, {
+        path: "/",
+        maxAge: 90 * 24 * 60 * 60,
+      });
       localStorage.setItem("accessCode", accessCode);
       router.push("/login");
     } else {
@@ -43,9 +46,18 @@ const Modal: React.FC<ModalProps> = ({ showModal, onClose }) => {
           aria-label="Close"
         >
           {/* Close icon */}
-          <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12" />
+          <svg
+            className="h-6 w-6"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
           </svg>
         </button>
 
@@ -89,4 +101,3 @@ const Modal: React.FC<ModalProps> = ({ showModal, onClose }) => {
 };
 
 export default Modal;
-

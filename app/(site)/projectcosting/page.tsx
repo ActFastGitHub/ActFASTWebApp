@@ -1,3 +1,5 @@
+// app\(site)\projectcosting\page.tsx
+
 "use client";
 
 import React, { useEffect, useState, FormEvent, ChangeEvent } from "react";
@@ -8,12 +10,18 @@ import toast from "react-hot-toast";
 import axios from "axios";
 import { sortProjects } from "@/app/utils/projectSorted";
 
-// Material Types
 import * as Types from "@/app/types/materialsPageTypes";
 
-// Headless UI + Heroicons
 import { Combobox } from "@headlessui/react";
-import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/24/outline";
+import {
+  CheckIcon,
+  ChevronUpDownIcon,
+  MagnifyingGlassIcon,
+  FolderIcon,
+  CubeIcon,
+  UserGroupIcon,
+  UserIcon,
+} from "@heroicons/react/24/outline";
 
 import ProjectBudgetCard from "@/app/components/materialsPage/ProjectBudgetCard";
 import MaterialSection from "@/app/components/materialsPage/MaterialsSection";
@@ -21,34 +29,27 @@ import SubcontractorSection from "@/app/components/materialsPage/SubcontractorSe
 import LaborCostSection from "@/app/components/materialsPage/LaborCostSection";
 import SpreadsheetSection from "@/app/components/materialsPage/SpreadSheetSection";
 
+const formatCurrency = (value?: number | null) => {
+  return new Intl.NumberFormat("en-CA", {
+    style: "currency",
+    currency: "CAD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(value || 0));
+};
+
 const ProjectCostManagement = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  /**
-   * State: Projects + selected project
-   */
   const [projects, setProjects] = useState<Types.Project[]>([]);
   const [projectFilter, setProjectFilter] = useState("");
   const [selectedProject, setSelectedProject] = useState<Types.Project | null>(
     null,
   );
   const [newBudget, setNewBudget] = useState<number>(0);
-
-  // For the Headless UI Combobox typing
   const [query, setQuery] = useState("");
 
-  // Computed list: filters projects in real-time as the user types
-  const filteredProjects =
-    query === ""
-      ? projects
-      : projects.filter((p) =>
-          p.code.toLowerCase().includes(query.toLowerCase()),
-        );
-
-  /**
-   * State: Materials
-   */
   const [materials, setMaterials] = useState<Types.Material[]>([]);
   const [materialsPage, setMaterialsPage] = useState(1);
   const [materialsTotalPages, setMaterialsTotalPages] = useState(1);
@@ -63,9 +64,6 @@ const ProjectCostManagement = () => {
     [key: string]: boolean;
   }>({});
 
-  /**
-   * State: Subcontractors
-   */
   const [subcontractors, setSubcontractors] = useState<Types.Subcontractor[]>(
     [],
   );
@@ -84,9 +82,6 @@ const ProjectCostManagement = () => {
     [key: string]: boolean;
   }>({});
 
-  /**
-   * State: Labor Costs
-   */
   const [laborCosts, setLaborCosts] = useState<Types.LaborCost[]>([]);
   const [laborPage, setLaborPage] = useState(1);
   const [laborTotalPages, setLaborTotalPages] = useState(1);
@@ -103,41 +98,48 @@ const ProjectCostManagement = () => {
     [key: string]: boolean;
   }>({});
 
-  /**
-   * Auth check
-   */
+  const [globalSearchTerm, setGlobalSearchTerm] = useState("");
+  const [globalMaterials, setGlobalMaterials] = useState<Types.Material[]>([]);
+  const [globalSubcontractors, setGlobalSubcontractors] = useState<
+    Types.Subcontractor[]
+  >([]);
+  const [globalLabor, setGlobalLabor] = useState<Types.LaborCost[]>([]);
+  const [globalSearchLoading, setGlobalSearchLoading] = useState(false);
+
+  const filteredProjects =
+    query === ""
+      ? projects
+      : projects.filter((p) =>
+          p.code.toLowerCase().includes(query.toLowerCase()),
+        );
+
+  const globalResultCount =
+    globalMaterials.length + globalSubcontractors.length + globalLabor.length;
+
   useEffect(() => {
     if (status !== "loading" && !session) {
       router.push("/login");
     }
   }, [session, status, router]);
 
-  /** =========================
-   *  Fetch Projects
-   *  =========================*/
   const fetchProjects = async () => {
     try {
       const response = await axios.get<{ projects: Types.Project[] }>(
         "/api/projects",
       );
-      if (response.data && response.data.projects) {
+
+      if (response.data?.projects) {
         const sortedProjects = sortProjects(response.data.projects, {
           order: "desc",
           pinCode: "POSSIBLE NEW CLAIM",
         });
+
         setProjects(sortedProjects);
 
-        // If there is a selected projectFilter, reset `selectedProject`
         if (projectFilter) {
-          const found = sortedProjects.find(
-            (p: Types.Project) => p.code === projectFilter,
-          );
-          if (found) {
-            setSelectedProject(found);
-            setNewBudget(found.budget || 0);
-          } else {
-            setSelectedProject(null);
-          }
+          const found = sortedProjects.find((p) => p.code === projectFilter);
+          setSelectedProject(found || null);
+          setNewBudget(found?.budget || 0);
         }
       }
     } catch (error) {
@@ -151,24 +153,19 @@ const ProjectCostManagement = () => {
       setSelectedProject(null);
       return;
     }
+
     const found = projects.find((p) => p.code === projectFilter);
-    if (found) {
-      setSelectedProject(found);
-      setNewBudget(found.budget || 0);
-    } else {
-      setSelectedProject(null);
-    }
+    setSelectedProject(found || null);
+    setNewBudget(found?.budget || 0);
   };
 
-  /** =========================
-   *  Fetch + Create + Update + Delete for Materials
-   *  =========================*/
   const fetchMaterials = async (page = 1) => {
     if (!projectFilter) {
       setMaterials([]);
       setMaterialsTotalPages(1);
       return;
     }
+
     try {
       const response = await axios.get("/api/projects/materials", {
         params: {
@@ -178,13 +175,9 @@ const ProjectCostManagement = () => {
           limit: 30,
         },
       });
-      if (response.data && response.data.materials) {
-        setMaterials(response.data.materials);
-        setMaterialsTotalPages(response.data.totalPages);
-      } else {
-        setMaterials([]);
-        setMaterialsTotalPages(1);
-      }
+
+      setMaterials(response.data?.materials || []);
+      setMaterialsTotalPages(response.data?.totalPages || 1);
     } catch (error) {
       console.error("Error fetching materials:", error);
       toast.error("Failed to fetch materials");
@@ -193,22 +186,22 @@ const ProjectCostManagement = () => {
 
   const handleCreateMaterial = async (e: FormEvent) => {
     e.preventDefault();
+
     if (!projectFilter) {
       toast.error("No project selected. Please select a project first.");
       return;
     }
+
     try {
-      const finalPayload = { ...newMaterial };
-      finalPayload.type = finalPayload.type || "";
+      const finalPayload = { ...newMaterial, type: newMaterial.type || "" };
 
       await axios.post("/api/projects/materials", {
         data: { ...finalPayload, projectCode: projectFilter },
       });
-      toast.success("Material created successfully!");
 
-      // Re-fetch
+      toast.success("Material created successfully!");
       fetchMaterials(materialsPage);
-      fetchProjects(); // Update project subtotals
+      fetchProjects();
       setNewMaterial({});
     } catch (error) {
       console.error("Error creating material:", error);
@@ -218,8 +211,10 @@ const ProjectCostManagement = () => {
 
   const handleMaterialEditToggle = (materialId: string) => {
     setEditableMaterialId((prev) => (prev === materialId ? null : materialId));
+
     if (!editMaterialData[materialId]) {
       const found = materials.find((mat) => mat.id === materialId);
+
       if (found) {
         setEditMaterialData((prevData) => ({
           ...prevData,
@@ -234,6 +229,7 @@ const ProjectCostManagement = () => {
     materialId: string,
   ) => {
     const { name, value } = e.target;
+
     setEditMaterialData((prev) => ({
       ...prev,
       [materialId]: {
@@ -248,21 +244,18 @@ const ProjectCostManagement = () => {
 
   const updateMaterial = async (materialId: string, e: FormEvent) => {
     e.preventDefault();
+
     if (!projectFilter) {
       toast.error("No project selected. Please select a project first.");
       return;
     }
-    try {
-      const finalPayload = {
-        ...editMaterialData[materialId],
-        projectCode: projectFilter,
-      };
-      await axios.patch(`/api/projects/materials/${materialId}`, {
-        data: finalPayload,
-      });
-      toast.success("Material updated successfully");
 
-      // Re-fetch
+    try {
+      await axios.patch(`/api/projects/materials/${materialId}`, {
+        data: { ...editMaterialData[materialId], projectCode: projectFilter },
+      });
+
+      toast.success("Material updated successfully");
       fetchMaterials(materialsPage);
       fetchProjects();
       setEditableMaterialId(null);
@@ -276,7 +269,6 @@ const ProjectCostManagement = () => {
     try {
       await axios.delete(`/api/projects/materials/${materialId}`);
       toast.success("Material deleted successfully");
-
       fetchMaterials(materialsPage);
       fetchProjects();
     } catch (error) {
@@ -298,15 +290,13 @@ const ProjectCostManagement = () => {
     }
   };
 
-  /** =========================
-   *  Fetch + Create + Update + Delete for Subcontractors
-   *  =========================*/
   const fetchSubcontractors = async (page = 1) => {
     if (!projectFilter) {
       setSubcontractors([]);
       setSubTotalPages(1);
       return;
     }
+
     try {
       const response = await axios.get("/api/projects/subcontractor", {
         params: {
@@ -316,13 +306,9 @@ const ProjectCostManagement = () => {
           limit: 30,
         },
       });
-      if (response.data && response.data.subcontractors) {
-        setSubcontractors(response.data.subcontractors);
-        setSubTotalPages(response.data.totalPages);
-      } else {
-        setSubcontractors([]);
-        setSubTotalPages(1);
-      }
+
+      setSubcontractors(response.data?.subcontractors || []);
+      setSubTotalPages(response.data?.totalPages || 1);
     } catch (error) {
       console.error("Error fetching subcontractors:", error);
       toast.error("Failed to fetch subcontractors");
@@ -331,16 +317,18 @@ const ProjectCostManagement = () => {
 
   const handleCreateSubcontractor = async (e: FormEvent) => {
     e.preventDefault();
+
     if (!projectFilter) {
       toast.error("No project selected. Please select a project first.");
       return;
     }
+
     try {
       await axios.post("/api/projects/subcontractor", {
         data: { ...newSubcontractor, projectCode: projectFilter },
       });
-      toast.success("Subcontractor created successfully!");
 
+      toast.success("Subcontractor created successfully!");
       fetchSubcontractors(subPage);
       fetchProjects();
       setNewSubcontractor({});
@@ -352,8 +340,10 @@ const ProjectCostManagement = () => {
 
   const handleSubEditToggle = (subId: string) => {
     setEditableSubcontractorId((prev) => (prev === subId ? null : subId));
+
     if (!editSubcontractorData[subId]) {
       const found = subcontractors.find((s) => s.id === subId);
+
       if (found) {
         setEditSubcontractorData((prevData) => ({
           ...prevData,
@@ -368,6 +358,7 @@ const ProjectCostManagement = () => {
     subId: string,
   ) => {
     const { name, value } = e.target;
+
     setEditSubcontractorData((prev) => ({
       ...prev,
       [subId]: {
@@ -379,19 +370,18 @@ const ProjectCostManagement = () => {
 
   const updateSubcontractor = async (subId: string, e: FormEvent) => {
     e.preventDefault();
+
     if (!projectFilter) {
       toast.error("No project selected.");
       return;
     }
+
     try {
       await axios.patch(`/api/projects/subcontractor/${subId}`, {
-        data: {
-          ...editSubcontractorData[subId],
-          projectCode: projectFilter,
-        },
+        data: { ...editSubcontractorData[subId], projectCode: projectFilter },
       });
-      toast.success("Subcontractor updated successfully");
 
+      toast.success("Subcontractor updated successfully");
       fetchSubcontractors(subPage);
       fetchProjects();
       setEditableSubcontractorId(null);
@@ -405,7 +395,6 @@ const ProjectCostManagement = () => {
     try {
       await axios.delete(`/api/projects/subcontractor/${subId}`);
       toast.success("Subcontractor deleted successfully");
-
       fetchSubcontractors(subPage);
       fetchProjects();
     } catch (error) {
@@ -427,15 +416,13 @@ const ProjectCostManagement = () => {
     }
   };
 
-  /** =========================
-   *  Fetch + Create + Update + Delete for Labor Costs
-   *  =========================*/
   const fetchLaborCosts = async (page = 1) => {
     if (!projectFilter) {
       setLaborCosts([]);
       setLaborTotalPages(1);
       return;
     }
+
     try {
       const response = await axios.get("/api/projects/laborcost", {
         params: {
@@ -445,13 +432,9 @@ const ProjectCostManagement = () => {
           limit: 30,
         },
       });
-      if (response.data && response.data.laborCosts) {
-        setLaborCosts(response.data.laborCosts);
-        setLaborTotalPages(response.data.totalPages);
-      } else {
-        setLaborCosts([]);
-        setLaborTotalPages(1);
-      }
+
+      setLaborCosts(response.data?.laborCosts || []);
+      setLaborTotalPages(response.data?.totalPages || 1);
     } catch (error) {
       console.error("Error fetching labor costs:", error);
       toast.error("Failed to fetch labor costs");
@@ -460,19 +443,22 @@ const ProjectCostManagement = () => {
 
   const handleCreateLaborCost = async (e: FormEvent) => {
     e.preventDefault();
+
     if (!projectFilter) {
       toast.error("No project selected.");
       return;
     }
+
     try {
       const finalPayload = {
         ...newLaborCost,
         hourlyRate: newLaborCost.hourlyRate || 35,
         projectCode: projectFilter,
       };
-      await axios.post("/api/projects/laborcost", { data: finalPayload });
-      toast.success("Labor cost entry created successfully!");
 
+      await axios.post("/api/projects/laborcost", { data: finalPayload });
+
+      toast.success("Labor cost entry created successfully!");
       fetchLaborCosts(laborPage);
       fetchProjects();
       setNewLaborCost({});
@@ -484,8 +470,10 @@ const ProjectCostManagement = () => {
 
   const handleLaborEditToggle = (laborId: string) => {
     setEditableLaborCostId((prev) => (prev === laborId ? null : laborId));
+
     if (!editLaborCostData[laborId]) {
       const found = laborCosts.find((l) => l.id === laborId);
+
       if (found) {
         setEditLaborCostData((prevData) => ({
           ...prevData,
@@ -500,6 +488,7 @@ const ProjectCostManagement = () => {
     laborId: string,
   ) => {
     const { name, value } = e.target;
+
     setEditLaborCostData((prev) => ({
       ...prev,
       [laborId]: {
@@ -514,19 +503,18 @@ const ProjectCostManagement = () => {
 
   const updateLaborCost = async (laborId: string, e: FormEvent) => {
     e.preventDefault();
+
     if (!projectFilter) {
       toast.error("No project selected.");
       return;
     }
+
     try {
       await axios.patch(`/api/projects/laborcost/${laborId}`, {
-        data: {
-          ...editLaborCostData[laborId],
-          projectCode: projectFilter,
-        },
+        data: { ...editLaborCostData[laborId], projectCode: projectFilter },
       });
-      toast.success("Labor cost entry updated successfully");
 
+      toast.success("Labor cost entry updated successfully");
       fetchLaborCosts(laborPage);
       fetchProjects();
       setEditableLaborCostId(null);
@@ -540,7 +528,6 @@ const ProjectCostManagement = () => {
     try {
       await axios.delete(`/api/projects/laborcost/${laborId}`);
       toast.success("Labor cost entry deleted successfully");
-
       fetchLaborCosts(laborPage);
       fetchProjects();
     } catch (error) {
@@ -562,21 +549,21 @@ const ProjectCostManagement = () => {
     }
   };
 
-  /** =========================
-   *  Update Project Budget
-   *  =========================*/
   const handleUpdateBudget = async (e: FormEvent) => {
     e.preventDefault();
+
     if (!selectedProject) return;
+
     try {
       const response = await axios.patch("/api/projects", {
         id: selectedProject.id,
         code: selectedProject.code,
         budget: newBudget,
       });
+
       if (response.data.status === 200) {
         toast.success("Project budget updated successfully!");
-        fetchProjects(); // refresh the list
+        fetchProjects();
       } else {
         toast.error(response.data.message || "Error updating budget.");
       }
@@ -586,18 +573,49 @@ const ProjectCostManagement = () => {
     }
   };
 
-  /** =========================
-   *  useEffect: On load + watchers
-   *  =========================*/
+  const handleGlobalSearch = async (term: string) => {
+    setGlobalSearchTerm(term);
+
+    if (term.trim().length < 2) {
+      setGlobalMaterials([]);
+      setGlobalSubcontractors([]);
+      setGlobalLabor([]);
+      return;
+    }
+
+    try {
+      setGlobalSearchLoading(true);
+
+      const [materialsRes, subcontractorsRes, laborRes] = await Promise.all([
+        axios.get("/api/global-search/materials", {
+          params: { searchTerm: term },
+        }),
+        axios.get("/api/global-search/subcontractors", {
+          params: { searchTerm: term },
+        }),
+        axios.get("/api/global-search/laborcosts", {
+          params: { searchTerm: term },
+        }),
+      ]);
+
+      setGlobalMaterials(materialsRes.data.materials || []);
+      setGlobalSubcontractors(subcontractorsRes.data.subcontractors || []);
+      setGlobalLabor(laborRes.data.laborCosts || []);
+    } catch (error) {
+      console.error("Global search error:", error);
+      toast.error("Global search failed.");
+    } finally {
+      setGlobalSearchLoading(false);
+    }
+  };
+
   useEffect(() => {
-    // initial load of projects
     if (session?.user.email) {
       fetchProjects();
     }
   }, [session?.user.email]);
 
   useEffect(() => {
-    // When projectFilter changes, reselect the project & fetch sub-lists
     refreshSelectedProject();
     setMaterialsPage(1);
     setSubPage(1);
@@ -607,324 +625,420 @@ const ProjectCostManagement = () => {
     fetchLaborCosts(1);
   }, [projectFilter]);
 
-  // Trigger material refetch on materialsSearchTerm changes
   useEffect(() => {
     setMaterialsPage(1);
-    if (projectFilter) {
-      fetchMaterials(1);
-    }
-  }, [materialsSearchTerm]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (projectFilter) fetchMaterials(1);
+  }, [materialsSearchTerm]);
 
-  // Trigger subcontractor refetch on subSearchTerm changes
   useEffect(() => {
     setSubPage(1);
-    if (projectFilter) {
-      fetchSubcontractors(1);
-    }
-  }, [subSearchTerm]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (projectFilter) fetchSubcontractors(1);
+  }, [subSearchTerm]);
 
-  // Trigger labor refetch on laborSearchTerm changes
   useEffect(() => {
     setLaborPage(1);
-    if (projectFilter) {
-      fetchLaborCosts(1);
-    }
-  }, [laborSearchTerm]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (projectFilter) fetchLaborCosts(1);
+  }, [laborSearchTerm]);
 
-  // Whenever we pick a new selectedProject, set newBudget
   useEffect(() => {
     if (selectedProject && typeof selectedProject.budget === "number") {
       setNewBudget(selectedProject.budget);
     }
   }, [selectedProject]);
 
-  /** =========================
-   *  RENDER
-   *  =========================*/
-
-  /**
-   * Global Search Results
-   */
-  const [globalMaterials, setGlobalMaterials] = useState<Types.Material[]>([]);
-  const [globalSubcontractors, setGlobalSubcontractors] = useState<
-    Types.Subcontractor[]
-  >([]);
-  const [globalLabor, setGlobalLabor] = useState<Types.LaborCost[]>([]);
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen overflow-x-hidden bg-gray-100 pt-24">
+        <Navbar />
+        <div className="flex min-h-[60vh] items-center justify-center px-4">
+          <div className="rounded-2xl bg-white px-6 py-4 text-sm font-medium text-gray-600 shadow-sm">
+            Loading project cost management...
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="relative min-h-screen bg-gray-100">
+    <div className="relative min-h-screen overflow-x-hidden bg-gradient-to-br from-slate-100 via-gray-100 to-blue-50">
       <Navbar />
-      <div className="p-6 pt-24">
-        {/* HEADER: Title + Project Combobox */}
-        <div className="mb-6 flex flex-col items-start space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
-          <h1 className="text-3xl font-bold">Manage Project Costs</h1>
 
-          {/* Project Combobox */}
-          <div className="w-full sm:w-auto">
-            <label
-              htmlFor="searchProject"
-              className="mb-1 block text-sm font-semibold text-gray-700"
-            >
-              Search or Select a Project
-            </label>
-            <Combobox
-              as="div"
-              value={projectFilter}
-              onChange={(selectedValue) => {
-                setProjectFilter(selectedValue ?? "");
-              }}
-            >
-              <div className="relative mt-1">
-                <Combobox.Input
-                  id="searchProject"
-                  className="w-full rounded-md border border-gray-300 bg-white py-2 pl-3 pr-10 text-sm leading-5 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:w-64"
-                  displayValue={(selectedCode: string) => selectedCode}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Type to filter..."
-                />
+      <main className="mx-auto w-full max-w-7xl px-4 pb-12 pt-24 sm:px-6 lg:px-8">
+        {/* HEADER + PROJECT SELECTOR */}
+        <section className="overflow-hidden z-50 mt-5 mb-6 rounded-3xl bg-slate-950 p-5 text-white shadow-lg sm:p-7">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold uppercase tracking-wide text-blue-200">
+                Project Cost Management
+              </p>
 
-                <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2">
-                  <ChevronUpDownIcon
-                    className="h-5 w-5 text-gray-400"
-                    aria-hidden="true"
+              <h1 className="mt-2 break-words text-3xl font-bold sm:text-4xl">
+                Manage Project Costs
+              </h1>
+
+              <p className="mt-2 max-w-2xl text-sm text-slate-300">
+                Track budgets, materials, subcontractors, labor costs, and
+                project expenses in one organized workspace.
+              </p>
+            </div>
+
+            <div className="w-full rounded-2xl bg-white/10 p-4 backdrop-blur lg:max-w-md">
+              <label
+                htmlFor="searchProject"
+                className="mb-2 block text-sm font-semibold text-slate-100"
+              >
+                Search or select project
+              </label>
+
+              <Combobox
+                as="div"
+                value={projectFilter}
+                onChange={(selectedValue) => {
+                  setProjectFilter(selectedValue ?? "");
+                  setQuery("");
+                }}
+              >
+                <div className="relative z-50">
+                  <Combobox.Input
+                    id="searchProject"
+                    className="w-full rounded-xl border border-white/20 bg-white py-3 pl-4 pr-11 text-sm font-medium text-gray-900 shadow-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-300"
+                    displayValue={(selectedCode: string) => selectedCode}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Type project code..."
                   />
-                </Combobox.Button>
 
-                {/* Options */}
-                {filteredProjects.length > 0 && (
-                  <Combobox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                    {filteredProjects.map((project) => (
-                      <Combobox.Option
-                        key={project.id}
-                        value={project.code}
-                        className={({ active }) =>
-                          `relative cursor-pointer select-none py-2 pl-3 pr-9 ${
-                            active ? "bg-blue-600 text-white" : "text-gray-900"
-                          }`
-                        }
-                      >
-                        {({ active, selected }) => (
-                          <>
-                            <span
-                              className={`block truncate ${
-                                selected ? "font-semibold" : ""
-                              }`}
-                            >
-                              {project.code}
-                            </span>
-                            {selected && (
+                  <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-3">
+                    <ChevronUpDownIcon className="h-5 w-5 text-gray-400" />
+                  </Combobox.Button>
+
+                  {filteredProjects.length > 0 && (
+                    <Combobox.Options className="absolute z-[9999] mt-2 max-h-72 w-full overflow-auto rounded-2xl bg-white py-2 text-sm shadow-2xl ring-1 ring-black/10">
+                      {filteredProjects.map((project) => (
+                        <Combobox.Option
+                          key={project.id}
+                          value={project.code}
+                          className={({ active }) =>
+                            `relative cursor-pointer select-none px-4 py-3 ${
+                              active
+                                ? "bg-blue-600 text-white"
+                                : "text-gray-900"
+                            }`
+                          }
+                        >
+                          {({ active, selected }) => (
+                            <>
                               <span
-                                className={`absolute inset-y-0 right-0 flex items-center pr-4 ${
-                                  active ? "text-white" : "text-blue-600"
+                                className={`block truncate ${
+                                  selected ? "font-bold" : ""
                                 }`}
                               >
-                                <CheckIcon
-                                  className="h-5 w-5"
-                                  aria-hidden="true"
-                                />
+                                {project.code}
                               </span>
-                            )}
-                          </>
-                        )}
-                      </Combobox.Option>
-                    ))}
-                  </Combobox.Options>
-                )}
 
-                {/* If no projects found */}
-                {query !== "" && filteredProjects.length === 0 && (
-                  <div className="absolute z-10 mt-1 w-full cursor-default rounded-md bg-white px-3 py-2 text-sm text-gray-500 shadow-lg ring-1 ring-black ring-opacity-5">
-                    No projects found.
-                  </div>
-                )}
+                              {selected && (
+                                <span
+                                  className={`absolute inset-y-0 right-0 flex items-center pr-4 ${
+                                    active ? "text-white" : "text-blue-600"
+                                  }`}
+                                >
+                                  <CheckIcon className="h-5 w-5" />
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </Combobox.Option>
+                      ))}
+                    </Combobox.Options>
+                  )}
+
+                  {query !== "" && filteredProjects.length === 0 && (
+                    <div className="absolute z-[9999] mt-2 w-full rounded-2xl bg-white px-4 py-3 text-sm text-gray-500 shadow-2xl ring-1 ring-black/10">
+                      No projects found.
+                    </div>
+                  )}
+                </div>
+              </Combobox>
+            </div>
+          </div>
+        </section>
+
+        {/* GLOBAL SEARCH */}
+        <section className="relative z-10 mb-6 rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <MagnifyingGlassIcon className="h-5 w-5 shrink-0 text-blue-600" />
+                <h2 className="text-xl font-bold text-gray-900">
+                  Global Search
+                </h2>
               </div>
-            </Combobox>
-          </div>
-        </div>
-        {/* END Header */}
 
-        {/* Show data sections only if a project is selected */}
+              <p className="mt-1 text-sm text-gray-500">
+                Search materials, subcontractors, or labor costs across all
+                projects.
+              </p>
+            </div>
 
-        {/* GLOBAL SEARCH SECTION */}
-        <div className="mb-8 rounded bg-white p-4 shadow">
-          <h2 className="mb-2 text-2xl font-bold text-gray-800">
-            Global Search
-          </h2>
-          <p className="mb-4 text-sm text-gray-600">
-            Search materials, subcontractors, or labor costs across all projects
-          </p>
-          <input
-            type="text"
-            className="w-full rounded border border-gray-300 px-4 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            placeholder="Search keyword (e.g., 'Laminate', 'General Flooring', employee name)..."
-            onChange={(e) => {
-              const term = e.target.value;
-              setMaterialsSearchTerm(term);
-              if (term.length >= 2) {
-                axios
-                  .get("/api/global-search/materials", {
-                    params: { searchTerm: term },
-                  })
-                  .then((res) => {
-                    setGlobalMaterials(res.data.materials || []);
-                  });
-                axios
-                  .get("/api/global-search/subcontractors", {
-                    params: { searchTerm: term },
-                  })
-                  .then((res) => {
-                    setGlobalSubcontractors(res.data.subcontractors || []);
-                  });
-                axios
-                  .get("/api/global-search/laborcosts", {
-                    params: { searchTerm: term },
-                  })
-                  .then((res) => {
-                    setGlobalLabor(res.data.laborCosts || []);
-                  });
-              } else {
-                setGlobalMaterials([]);
-                setGlobalSubcontractors([]);
-                setGlobalLabor([]);
-              }
-            }}
-          />
-        </div>
-
-        {(globalMaterials.length > 0 ||
-          globalSubcontractors.length > 0 ||
-          globalLabor.length > 0) && (
-          <div className="mt-6">
-            <h3 className="mb-4 text-2xl font-bold text-gray-800">
-              🔍 Global Search Results
-            </h3>
-
-            {/* === MATERIALS === */}
-            {globalMaterials.length > 0 && (
-              <section className="mb-8">
-                <h4 className="mb-2 text-xl font-semibold text-blue-700">
-                  📦 Materials
-                </h4>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {globalMaterials.map((mat) => (
-                    <div
-                      key={mat.id}
-                      className="rounded border border-blue-200 bg-white p-4 shadow-sm"
-                    >
-                      <div className="mb-2 text-sm text-gray-600">
-                        <span className="font-medium text-blue-700">
-                          Project:
-                        </span>{" "}
-                        <span className="font-semibold">{mat.projectCode}</span>
-                      </div>
-                      <div className="text-lg font-bold text-gray-800">
-                        {mat.type}
-                      </div>
-                      {mat.description && (
-                        <p className="text-sm text-gray-600">
-                          {mat.description}
-                        </p>
-                      )}
-                      {mat.supplierName && (
-                        <p className="mt-1 text-sm text-gray-600">
-                          <span className="font-medium">Supplier:</span>{" "}
-                          {mat.supplierName}
-                        </p>
-                      )}
-                      {mat.status && (
-                        <p className="mt-1 text-sm italic text-gray-500">
-                          Status: {mat.status}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* === SUBCONTRACTORS === */}
-            {globalSubcontractors.length > 0 && (
-              <section className="mb-8">
-                <h4 className="mb-2 text-xl font-semibold text-purple-700">
-                  🧰 Subcontractors
-                </h4>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {globalSubcontractors.map((sub) => (
-                    <div
-                      key={sub.id}
-                      className="rounded border border-purple-200 bg-white p-4 shadow-sm"
-                    >
-                      <div className="mb-2 text-sm text-gray-600">
-                        <span className="font-medium text-purple-700">
-                          Project:
-                        </span>{" "}
-                        <span className="font-semibold">{sub.projectCode}</span>
-                      </div>
-                      <div className="text-lg font-bold text-gray-800">
-                        {sub.name}
-                      </div>
-                      {sub.expertise && (
-                        <p className="text-sm text-gray-600">
-                          <span className="font-medium">Expertise:</span>{" "}
-                          {sub.expertise}
-                        </p>
-                      )}
-                      {sub.contactInfo && (
-                        <p className="mt-1 text-sm text-gray-500">
-                          {sub.contactInfo}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* === LABOR COSTS === */}
-            {globalLabor.length > 0 && (
-              <section className="mb-8">
-                <h4 className="mb-2 text-xl font-semibold text-green-700">
-                  👷 Labor Costs
-                </h4>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {globalLabor.map((lab) => (
-                    <div
-                      key={lab.id}
-                      className="rounded border border-green-200 bg-white p-4 shadow-sm"
-                    >
-                      <div className="mb-2 text-sm text-gray-600">
-                        <span className="font-medium text-green-700">
-                          Project:
-                        </span>{" "}
-                        <span className="font-semibold">{lab.projectCode}</span>
-                      </div>
-                      <div className="text-lg font-bold text-gray-800">
-                        {lab.employeeName}
-                      </div>
-                      {lab.role && (
-                        <p className="text-sm text-gray-600">
-                          <span className="font-medium">Role:</span> {lab.role}
-                        </p>
-                      )}
-                      <p className="mt-1 text-sm text-gray-500">
-                        {lab.hoursWorked} hrs @ ${lab.hourlyRate.toFixed(2)} ={" "}
-                        <span className="font-semibold text-green-700">
-                          ${lab.totalCost.toFixed(2)}
-                        </span>
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </section>
+            {globalSearchTerm.length >= 2 && (
+              <div className="w-fit rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">
+                {globalSearchLoading
+                  ? "Searching..."
+                  : `${globalResultCount} result(s) found`}
+              </div>
             )}
           </div>
+
+          <div className="relative mt-4">
+            <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+
+            <input
+              type="text"
+              value={globalSearchTerm}
+              className="w-full rounded-2xl border border-gray-200 bg-gray-50 py-3 pl-12 pr-4 text-sm shadow-sm outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
+              placeholder="Example: Laminate, General Flooring, employee name..."
+              onChange={(e) => handleGlobalSearch(e.target.value)}
+            />
+          </div>
+        </section>
+
+        {/* GLOBAL SEARCH EMPTY STATE */}
+        {globalSearchTerm.length >= 2 &&
+          !globalSearchLoading &&
+          globalResultCount === 0 && (
+            <section className="mb-6 rounded-3xl border border-dashed border-gray-300 bg-white p-8 text-center shadow-sm">
+              <MagnifyingGlassIcon className="mx-auto h-12 w-12 text-gray-400" />
+
+              <h3 className="mt-4 text-lg font-bold text-gray-900">
+                No results found
+              </h3>
+
+              <p className="mx-auto mt-2 max-w-lg text-sm text-gray-500">
+                Try searching using project codes, suppliers, employee names,
+                subcontractors, or material descriptions.
+              </p>
+            </section>
+          )}
+
+        {/* GLOBAL SEARCH RESULTS */}
+        {globalResultCount > 0 && (
+          <section className="mb-6 rounded-3xl border border-blue-100 bg-blue-50/60 p-4 shadow-sm sm:p-6">
+            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">
+                  Global Search Results
+                </h3>
+
+                <p className="text-sm text-gray-500">
+                  Matching records from all projects.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setGlobalSearchTerm("");
+                  setGlobalMaterials([]);
+                  setGlobalSubcontractors([]);
+                  setGlobalLabor([]);
+                }}
+                className="w-fit rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 shadow-sm transition hover:bg-gray-50"
+              >
+                Clear Search
+              </button>
+            </div>
+
+            <div className="space-y-8">
+              {globalMaterials.length > 0 && (
+                <div>
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <CubeIcon className="h-5 w-5 text-blue-700" />
+                      <h4 className="text-lg font-bold text-blue-800">
+                        Materials
+                      </h4>
+                    </div>
+
+                    <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-blue-700 shadow-sm">
+                      {globalMaterials.length} result(s)
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {globalMaterials.map((mat) => (
+                      <div
+                        key={mat.id}
+                        className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm"
+                      >
+                        <p className="break-words text-xs font-semibold uppercase text-blue-600">
+                          {mat.projectCode}
+                        </p>
+
+                        <h5 className="mt-2 break-words text-lg font-bold text-gray-900">
+                          {mat.type || "Material"}
+                        </h5>
+
+                        {mat.description && (
+                          <p className="mt-1 break-words text-sm text-gray-600">
+                            {mat.description}
+                          </p>
+                        )}
+
+                        <div className="mt-3 space-y-1 text-sm text-gray-500">
+                          {mat.supplierName && (
+                            <p>
+                              Supplier:{" "}
+                              <span className="font-semibold text-gray-800">
+                                {mat.supplierName}
+                              </span>
+                            </p>
+                          )}
+
+                          {mat.totalCost !== undefined && (
+                            <p>
+                              Total:{" "}
+                              <span className="font-bold text-blue-700">
+                                {formatCurrency(mat.totalCost)}
+                              </span>
+                            </p>
+                          )}
+                        </div>
+
+                        {mat.status && (
+                          <span className="mt-3 inline-flex rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+                            {mat.status}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {globalSubcontractors.length > 0 && (
+                <div>
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <UserGroupIcon className="h-5 w-5 text-purple-700" />
+                      <h4 className="text-lg font-bold text-purple-800">
+                        Subcontractors
+                      </h4>
+                    </div>
+
+                    <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-purple-700 shadow-sm">
+                      {globalSubcontractors.length} result(s)
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {globalSubcontractors.map((sub) => (
+                      <div
+                        key={sub.id}
+                        className="min-w-0 rounded-2xl border border-purple-100 bg-white p-4 shadow-sm"
+                      >
+                        <p className="break-words text-xs font-semibold uppercase text-purple-600">
+                          {sub.projectCode}
+                        </p>
+
+                        <h5 className="mt-2 break-words text-lg font-bold text-gray-900">
+                          {sub.name}
+                        </h5>
+
+                        {sub.expertise && (
+                          <p className="mt-1 break-words text-sm text-gray-600">
+                            {sub.expertise}
+                          </p>
+                        )}
+
+                        <div className="mt-3 space-y-1 text-sm text-gray-500">
+                          {sub.contactInfo && (
+                            <p className="break-words">{sub.contactInfo}</p>
+                          )}
+
+                          {sub.totalCost !== undefined && (
+                            <p>
+                              Total:{" "}
+                              <span className="font-bold text-purple-700">
+                                {formatCurrency(sub.totalCost)}
+                              </span>
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {globalLabor.length > 0 && (
+                <div>
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <UserIcon className="h-5 w-5 text-emerald-700" />
+                      <h4 className="text-lg font-bold text-emerald-800">
+                        Labor Costs
+                      </h4>
+                    </div>
+
+                    <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-emerald-700 shadow-sm">
+                      {globalLabor.length} result(s)
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {globalLabor.map((lab) => (
+                      <div
+                        key={lab.id}
+                        className="min-w-0 rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm"
+                      >
+                        <p className="break-words text-xs font-semibold uppercase text-emerald-600">
+                          {lab.projectCode}
+                        </p>
+
+                        <h5 className="mt-2 break-words text-lg font-bold text-gray-900">
+                          {lab.employeeName}
+                        </h5>
+
+                        {lab.role && (
+                          <p className="mt-1 break-words text-sm text-gray-600">
+                            {lab.role}
+                          </p>
+                        )}
+
+                        <p className="mt-3 text-sm text-gray-500">
+                          {lab.hoursWorked} hrs @{" "}
+                          {formatCurrency(lab.hourlyRate)} ={" "}
+                          <span className="font-bold text-emerald-700">
+                            {formatCurrency(lab.totalCost)}
+                          </span>
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
         )}
 
+        {/* NO PROJECT SELECTED */}
+        {!selectedProject && (
+          <section className="rounded-3xl border border-dashed border-gray-300 bg-white/80 p-8 text-center shadow-sm">
+            <FolderIcon className="mx-auto h-12 w-12 text-gray-400" />
+
+            <h2 className="mt-4 text-xl font-bold text-gray-900">
+              Select a project to begin
+            </h2>
+
+            <p className="mx-auto mt-2 max-w-xl text-sm text-gray-500">
+              Choose a project from the search box above to view budget summary,
+              spreadsheet, materials, subcontractors, and labor costs.
+            </p>
+          </section>
+        )}
+
+        {/* SELECTED PROJECT SECTIONS */}
         {selectedProject && (
-          <>
-            {/* SPREADSHEET SECTION */}
-            <SpreadsheetSection selectedProject={selectedProject} />
-            {/* PROJECT BUDGET / SUMMARY */}
+          <div className="space-y-6">
             <ProjectBudgetCard
               selectedProject={selectedProject}
               newBudget={newBudget}
@@ -932,7 +1046,8 @@ const ProjectCostManagement = () => {
               handleUpdateBudget={handleUpdateBudget}
             />
 
-            {/* MATERIALS SECTION */}
+            <SpreadsheetSection selectedProject={selectedProject} />
+
             <MaterialSection
               session={session}
               selectedProject={selectedProject}
@@ -955,7 +1070,6 @@ const ProjectCostManagement = () => {
               handleMaterialPageChange={handleMaterialPageChange}
             />
 
-            {/* SUBCONTRACTORS SECTION */}
             <SubcontractorSection
               session={session}
               selectedProject={selectedProject}
@@ -978,7 +1092,6 @@ const ProjectCostManagement = () => {
               handleSubPageChange={handleSubPageChange}
             />
 
-            {/* LABOR COSTS SECTION */}
             <LaborCostSection
               session={session}
               selectedProject={selectedProject}
@@ -1000,9 +1113,9 @@ const ProjectCostManagement = () => {
               laborTotalPages={laborTotalPages}
               handleLaborPageChange={handleLaborPageChange}
             />
-          </>
+          </div>
         )}
-      </div>
+      </main>
     </div>
   );
 };

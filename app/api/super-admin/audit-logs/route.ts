@@ -1,4 +1,4 @@
-// app\api\super-admin\audit-logs\route.ts
+// app/api/super-admin/audit-logs/route.ts
 
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
@@ -23,10 +23,27 @@ async function getCurrentProfile(email: string) {
   });
 }
 
+function cleanParam(value: string | null) {
+  return String(value || "").trim();
+}
+
 function toSafeTake(value: string | null) {
-  const take = Number(value || 100);
-  if (!Number.isFinite(take)) return 100;
-  return Math.min(Math.max(take, 1), 500);
+  const take = Number(value || 25);
+  if (!Number.isFinite(take)) return 25;
+  return Math.min(Math.max(take, 5), 100);
+}
+
+function toSafeSkip(value: string | null) {
+  const skip = Number(value || 0);
+  if (!Number.isFinite(skip)) return 0;
+  return Math.max(skip, 0);
+}
+
+function toSafeDate(value: string) {
+  if (!value) return null;
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 export async function GET(request: Request) {
@@ -45,62 +62,82 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
 
-    const action = String(searchParams.get("action") || "").trim();
-    const entity = String(searchParams.get("entity") || "").trim();
-    const entityId = String(searchParams.get("entityId") || "").trim();
-    const projectCode = String(searchParams.get("projectCode") || "").trim();
-    const actorEmail = String(searchParams.get("actorEmail") || "").trim();
+    const action = cleanParam(searchParams.get("action"));
+    const entity = cleanParam(searchParams.get("entity"));
+    const entityId = cleanParam(searchParams.get("entityId"));
+    const projectCode = cleanParam(searchParams.get("projectCode"));
+    const actorEmail = cleanParam(searchParams.get("actorEmail"));
+    const search = cleanParam(searchParams.get("search"));
 
-    const from = String(searchParams.get("from") || "").trim();
-    const to = String(searchParams.get("to") || "").trim();
+    const from = cleanParam(searchParams.get("from"));
+    const to = cleanParam(searchParams.get("to"));
+
+    const fromDate = toSafeDate(from);
+    const toDate = toSafeDate(to);
 
     const take = toSafeTake(searchParams.get("take"));
-    const skip = Number(searchParams.get("skip") || 0);
+    const skip = toSafeSkip(searchParams.get("skip"));
 
-    const logs = await prisma.auditLog.findMany({
-      where: {
-        ...(action ? { action } : {}),
-        ...(entity ? { entity } : {}),
-        ...(entityId ? { entityId } : {}),
-        ...(projectCode ? { projectCode } : {}),
-        ...(actorEmail ? { actorEmail } : {}),
-        ...(from || to
-          ? {
-              createdAt: {
-                ...(from ? { gte: new Date(from) } : {}),
-                ...(to ? { lte: new Date(to) } : {}),
-              },
-            }
-          : {}),
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-      take,
-      skip: Number.isFinite(skip) ? Math.max(skip, 0) : 0,
-    });
+    const where = {
+      ...(action ? { action } : {}),
+      ...(entity ? { entity } : {}),
+      ...(entityId ? { entityId } : {}),
+      ...(projectCode ? { projectCode } : {}),
+      ...(actorEmail
+        ? { actorEmail: { contains: actorEmail, mode: "insensitive" as const } }
+        : {}),
 
-    const total = await prisma.auditLog.count({
-      where: {
-        ...(action ? { action } : {}),
-        ...(entity ? { entity } : {}),
-        ...(entityId ? { entityId } : {}),
-        ...(projectCode ? { projectCode } : {}),
-        ...(actorEmail ? { actorEmail } : {}),
-        ...(from || to
-          ? {
-              createdAt: {
-                ...(from ? { gte: new Date(from) } : {}),
-                ...(to ? { lte: new Date(to) } : {}),
+      ...(fromDate || toDate
+        ? {
+            createdAt: {
+              ...(fromDate ? { gte: fromDate } : {}),
+              ...(toDate ? { lte: toDate } : {}),
+            },
+          }
+        : {}),
+
+      ...(search
+        ? {
+            OR: [
+              {
+                actorEmail: { contains: search, mode: "insensitive" as const },
               },
-            }
-          : {}),
-      },
-    });
+              {
+                actorNickname: {
+                  contains: search,
+                  mode: "insensitive" as const,
+                },
+              },
+              { actorRole: { contains: search, mode: "insensitive" as const } },
+              { action: { contains: search, mode: "insensitive" as const } },
+              { entity: { contains: search, mode: "insensitive" as const } },
+              { entityId: { contains: search, mode: "insensitive" as const } },
+              {
+                projectCode: { contains: search, mode: "insensitive" as const },
+              },
+              { summary: { contains: search, mode: "insensitive" as const } },
+            ],
+          }
+        : {}),
+    };
+
+    const [logs, total] = await Promise.all([
+      prisma.auditLog.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        take,
+        skip,
+      }),
+      prisma.auditLog.count({ where }),
+    ]);
 
     return NextResponse.json({
       status: 200,
       total,
+      take,
+      skip,
+      page: Math.floor(skip / take) + 1,
+      totalPages: Math.max(Math.ceil(total / take), 1),
       logs,
     });
   } catch (error) {
