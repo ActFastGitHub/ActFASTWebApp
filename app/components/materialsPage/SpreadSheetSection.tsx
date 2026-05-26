@@ -428,8 +428,6 @@
 //   );
 // }
 
-// app/components/materialsPage/SpreadSheetSection.tsx
-
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -443,6 +441,11 @@ import {
   TrashIcon,
   CloudArrowUpIcon,
   TableCellsIcon,
+  CalculatorIcon,
+  DocumentDuplicateIcon,
+  PencilSquareIcon,
+  ClockIcon,
+  HomeModernIcon,
 } from "@heroicons/react/24/outline";
 import { Project } from "@/app/types/materialsPageTypes";
 
@@ -455,6 +458,10 @@ type Props = {
   selectedProject: Project | null;
 };
 
+const cn = (...classes: Array<string | false | null | undefined>) => {
+  return classes.filter(Boolean).join(" ");
+};
+
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("en-CA", {
     style: "currency",
@@ -464,7 +471,52 @@ const formatCurrency = (value: number) =>
   }).format(Number(value || 0));
 
 const actionButtonClass =
-  "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-bold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60";
+
+const SummaryCard = ({
+  label,
+  value,
+  helper,
+  icon: Icon,
+  accent = "blue",
+}: {
+  label: string;
+  value: string;
+  helper: string;
+  icon: React.ElementType;
+  accent?: "blue" | "emerald" | "slate";
+}) => {
+  const accentClasses = {
+    blue: "bg-blue-50 text-blue-700 ring-blue-100",
+    emerald: "bg-emerald-50 text-emerald-700 ring-emerald-100",
+    slate: "bg-slate-50 text-slate-700 ring-slate-100",
+  };
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-slate-400">
+            {label}
+          </p>
+          <p className="mt-2 text-xl font-bold tracking-tight text-slate-950 sm:text-2xl">
+            {value}
+          </p>
+          <p className="mt-1 text-xs leading-5 text-slate-500">{helper}</p>
+        </div>
+
+        <div
+          className={cn(
+            "shrink-0 rounded-xl p-2 ring-1",
+            accentClasses[accent],
+          )}
+        >
+          <Icon className="h-4 w-4" />
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default function SpreadsheetSection({ selectedProject }: Props) {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -538,11 +590,11 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
         setLastUpdatedAt(new Date(res.data.lastUpdatedAt).toLocaleString());
       }
 
-      setCopyStatus("Spreadsheet saved!");
+      setCopyStatus("Spreadsheet saved");
       setTimeout(() => setCopyStatus(null), 2000);
     } catch (error) {
       console.error("Spreadsheet POST error:", error);
-      setCopyStatus("Failed to save.");
+      setCopyStatus("Failed to save");
       setTimeout(() => setCopyStatus(null), 2000);
     } finally {
       setIsSaving(false);
@@ -645,12 +697,12 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
       const tsvString = getTabDelimitedData();
       await navigator.clipboard.writeText(tsvString);
 
-      setCopyStatus("Copied to clipboard!");
+      setCopyStatus("Copied to clipboard");
       setTimeout(() => setCopyStatus(null), 2000);
     } catch (err) {
       console.error("Clipboard error:", err);
 
-      setCopyStatus("Failed to copy.");
+      setCopyStatus("Failed to copy");
       setTimeout(() => setCopyStatus(null), 2000);
     }
   };
@@ -664,7 +716,6 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
       if (lines.length === 0) return;
 
       const newColumns = lines[0].split("\t");
-
       const newRows: string[][] = [];
 
       for (let i = 1; i < lines.length; i++) {
@@ -692,12 +743,12 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
         rows: newRows,
       });
 
-      setCopyStatus("Pasted from clipboard!");
+      setCopyStatus("Pasted from clipboard");
       setTimeout(() => setCopyStatus(null), 2000);
     } catch (err) {
       console.error("Paste from clipboard error:", err);
 
-      setCopyStatus("Failed to paste.");
+      setCopyStatus("Failed to paste");
       setTimeout(() => setCopyStatus(null), 2000);
     }
   };
@@ -708,7 +759,7 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
     let sum = 0;
 
     for (const row of spreadsheet.rows) {
-      const val = parseFloat(row[colIndex].replace(/[^0-9.\-]/g, ""));
+      const val = parseFloat(row[colIndex]?.replace(/[^0-9.\-]/g, "") || "");
       if (!Number.isNaN(val)) sum += val;
     }
 
@@ -722,86 +773,114 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
 
   const numericColumnTotal = useMemo(() => {
     return columnTotals.reduce<number>((sum, value) => {
-      if (typeof value !== "number") {
-        return sum;
-      }
-
+      if (typeof value !== "number") return sum;
       return sum + value;
     }, 0);
   }, [columnTotals]);
 
   if (!selectedProject?.code) return null;
 
+  const projectDetails = selectedProject as Project & {
+    insured?: string;
+    address?: string;
+  };
+
+  const hasProjectName = Boolean(projectDetails.insured?.trim());
+
   return (
-    <section className="mb-6 overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
+    <section className="mb-6 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
       <button
         type="button"
         onClick={() => setIsCollapsed((prev) => !prev)}
-        className="flex w-full items-center justify-between gap-4 bg-slate-950 px-4 py-4 text-left text-white sm:px-6"
+        className="flex w-full items-start justify-between gap-4 border-b border-slate-100 bg-gradient-to-br from-white via-blue-50/30 to-white px-4 py-5 text-left sm:px-6"
       >
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-blue-200">
-            Spreadsheet / Allowance Table
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-blue-700 ring-1 ring-blue-100">
+              Spreadsheet
+            </span>
 
-          <h2 className="mt-1 truncate text-xl font-bold sm:text-2xl">
-            {selectedProject.code}
+            <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-slate-600 ring-1 ring-slate-200">
+              {selectedProject.code}
+            </span>
+
+            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 ring-1 ring-emerald-200">
+              {spreadsheet.rows.length} rows · {spreadsheet.columns.length}{" "}
+              columns
+            </span>
+          </div>
+
+          <h2 className="mt-3 truncate text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
+            {hasProjectName ? projectDetails.insured : "Allowance Spreadsheet"}
           </h2>
 
-          <p className="mt-1 text-sm text-slate-300">
-            {spreadsheet.rows.length} row(s) • {spreadsheet.columns.length}{" "}
-            column(s)
+          <p className="mt-1 text-sm text-slate-500">
+            Build allowance tables, copy/paste from Excel, and save project
+            spreadsheet data.
           </p>
+
+          {projectDetails.address && (
+            <div className="mt-3 flex min-w-0 items-center gap-2 text-sm text-slate-600">
+              <HomeModernIcon className="h-4 w-4 shrink-0 text-slate-400" />
+              <span className="truncate">{projectDetails.address}</span>
+            </div>
+          )}
         </div>
 
-        {isCollapsed ? (
-          <ChevronRightIcon className="h-6 w-6 shrink-0 text-slate-300" />
-        ) : (
-          <ChevronDownIcon className="h-6 w-6 shrink-0 text-slate-300" />
-        )}
+        <div className="shrink-0 rounded-full border border-slate-200 bg-white p-2 text-slate-500 shadow-sm">
+          {isCollapsed ? (
+            <ChevronRightIcon className="h-4 w-4" />
+          ) : (
+            <ChevronDownIcon className="h-4 w-4" />
+          )}
+        </div>
       </button>
 
-      {isCollapsed && (
-        <div className="space-y-5 bg-gray-50 p-4 sm:p-6">
-          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      {!isCollapsed && (
+        <div className="space-y-5 bg-white p-4 sm:p-6">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex items-start gap-3">
-                <div className="rounded-xl bg-blue-50 p-2 text-blue-700">
-                  <TableCellsIcon className="h-6 w-6" />
+                <div className="rounded-xl bg-blue-50 p-2 text-blue-700 ring-1 ring-blue-100">
+                  <TableCellsIcon className="h-4 w-4" />
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900">
-                    Project Spreadsheet
+                  <h3 className="text-sm font-bold text-slate-950">
+                    Project Spreadsheet Workspace
                   </h3>
 
-                  <p className="mt-1 text-sm text-gray-500">
-                    Add rows and columns, paste from Excel, copy data out, and
-                    save the table for this project.
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    Use this area for allowance calculations, internal cost
+                    planning, and Excel-friendly project tables.
                   </p>
 
-                  {lastUpdatedBy && (
-                    <p className="mt-2 text-xs text-gray-500">
-                      Last updated by{" "}
-                      <span className="font-bold text-gray-700">
-                        {lastUpdatedBy}
-                      </span>
+                  {(lastUpdatedBy || lastUpdatedAt) && (
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                      <ClockIcon className="h-4 w-4 text-slate-400" />
+                      {lastUpdatedBy && (
+                        <span>
+                          Last updated by{" "}
+                          <span className="font-bold text-slate-700">
+                            {lastUpdatedBy}
+                          </span>
+                        </span>
+                      )}
                       {lastUpdatedAt && (
-                        <>
-                          {" "}
+                        <span>
                           on{" "}
-                          <span className="font-bold text-gray-700">
+                          <span className="font-bold text-slate-700">
                             {lastUpdatedAt}
                           </span>
-                        </>
+                        </span>
                       )}
-                    </p>
+                    </div>
                   )}
                 </div>
               </div>
 
               {copyStatus && (
-                <span className="w-fit rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+                <span className="w-fit rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 ring-1 ring-blue-100">
                   {copyStatus}
                 </span>
               )}
@@ -809,59 +888,56 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
           </div>
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Total Rows
-              </p>
-              <p className="mt-2 text-2xl font-bold text-gray-900">
-                {spreadsheet.rows.length}
-              </p>
-            </div>
+            <SummaryCard
+              label="Rows"
+              value={String(spreadsheet.rows.length)}
+              helper="Current table rows"
+              icon={TableCellsIcon}
+              accent="slate"
+            />
 
-            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Numeric Column Total
-              </p>
-              <p className="mt-2 text-2xl font-bold text-gray-900">
-                {formatCurrency(numericColumnTotal)}
-              </p>
-            </div>
+            <SummaryCard
+              label="Numeric Total"
+              value={formatCurrency(numericColumnTotal)}
+              helper="Total from numeric columns"
+              icon={CalculatorIcon}
+              accent="blue"
+            />
 
-            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
-                Total Allowance
-              </p>
-              <p className="mt-2 text-2xl font-bold text-blue-900">
-                {formatCurrency(totalAllowance)}
-              </p>
-            </div>
+            <SummaryCard
+              label="Total Allowance"
+              value={formatCurrency(totalAllowance)}
+              helper="Calculated at 60% of row totals"
+              icon={DocumentDuplicateIcon}
+              accent="emerald"
+            />
           </div>
 
           {isLoading ? (
-            <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm">
-              <p className="text-sm font-semibold text-gray-600">
+            <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+              <p className="text-sm font-semibold text-slate-600">
                 Loading spreadsheet data...
               </p>
             </div>
           ) : (
             <>
-              <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                   <button
                     type="button"
                     onClick={handleAddRow}
                     className={`${actionButtonClass} bg-blue-700 text-white hover:bg-blue-800`}
                   >
-                    <PlusIcon className="h-5 w-5" />
+                    <PlusIcon className="h-4 w-4" />
                     Add Row
                   </button>
 
                   <button
                     type="button"
                     onClick={handleAddColumn}
-                    className={`${actionButtonClass} bg-blue-700 text-white hover:bg-blue-800`}
+                    className={`${actionButtonClass} bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50`}
                   >
-                    <PlusIcon className="h-5 w-5" />
+                    <PlusIcon className="h-4 w-4" />
                     Add Column
                   </button>
 
@@ -871,76 +947,86 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
                     disabled={isSaving}
                     className={`${actionButtonClass} bg-emerald-600 text-white hover:bg-emerald-700`}
                   >
-                    <CloudArrowUpIcon className="h-5 w-5" />
+                    <CloudArrowUpIcon className="h-4 w-4" />
                     {isSaving ? "Saving..." : "Save"}
                   </button>
 
                   <button
                     type="button"
                     onClick={handlePasteData}
-                    className={`${actionButtonClass} bg-purple-600 text-white hover:bg-purple-700`}
+                    className={`${actionButtonClass} bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50`}
                   >
-                    <ClipboardDocumentIcon className="h-5 w-5" />
-                    Paste
+                    <ClipboardDocumentIcon className="h-4 w-4" />
+                    Paste from Excel
                   </button>
 
                   <button
                     type="button"
                     onClick={handleCopyData}
-                    className={`${actionButtonClass} bg-orange-500 text-white hover:bg-orange-600`}
+                    className={`${actionButtonClass} bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50`}
                   >
-                    <ClipboardIcon className="h-5 w-5" />
-                    Copy
+                    <ClipboardIcon className="h-4 w-4" />
+                    Copy for Excel
                   </button>
                 </div>
               </div>
 
               {spreadsheet.columns.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-8 text-center shadow-sm">
-                  <TableCellsIcon className="mx-auto h-12 w-12 text-gray-400" />
-                  <h3 className="mt-4 text-lg font-bold text-gray-900">
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center shadow-sm">
+                  <TableCellsIcon className="mx-auto h-10 w-10 text-slate-400" />
+
+                  <h3 className="mt-4 text-lg font-bold text-slate-950">
                     No spreadsheet data yet
                   </h3>
-                  <p className="mx-auto mt-2 max-w-md text-sm text-gray-500">
-                    Start by adding a row or pasting data copied from Excel.
+
+                  <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+                    Start by adding a row, adding columns, or pasting a table
+                    copied from Excel.
                   </p>
                 </div>
               ) : (
-                <div className="max-w-full overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                <div className="max-w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                   <div className="max-w-full overflow-x-auto">
                     <table className="min-w-[900px] border-collapse text-sm">
                       <thead>
-                        <tr className="border-b bg-gray-100">
+                        <tr className="border-b border-slate-200 bg-slate-50">
                           {spreadsheet.columns.map((colName, colIndex) => (
                             <th
                               key={colIndex}
-                              className="min-w-40 border-r border-gray-200 p-3 text-left align-top"
+                              className="min-w-40 border-r border-slate-200 p-3 text-left align-top"
                             >
-                              <input
-                                type="text"
-                                value={colName}
-                                onChange={(e) =>
-                                  handleColumnRename(colIndex, e.target.value)
-                                }
-                                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-bold text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                              />
+                              <div className="space-y-2">
+                                <input
+                                  type="text"
+                                  value={colName}
+                                  onChange={(e) =>
+                                    handleColumnRename(colIndex, e.target.value)
+                                  }
+                                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-950 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                                />
 
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteColumn(colIndex)}
-                                className="mt-2 inline-flex items-center gap-1 rounded-lg bg-red-50 px-2 py-1 text-xs font-bold text-red-700 transition hover:bg-red-100"
-                              >
-                                <TrashIcon className="h-4 w-4" />
-                                Del Col
-                              </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteColumn(colIndex)}
+                                  className="inline-flex items-center gap-1 rounded-lg bg-rose-50 px-2 py-1 text-xs font-bold text-rose-700 ring-1 ring-rose-100 transition hover:bg-rose-100"
+                                >
+                                  <TrashIcon className="h-3.5 w-3.5" />
+                                  Delete Column
+                                </button>
+                              </div>
                             </th>
                           ))}
 
-                          <th className="min-w-40 border-r border-gray-200 p-3 text-right align-top font-bold text-blue-800">
-                            Allowance
+                          <th className="min-w-40 border-r border-slate-200 p-3 text-right align-top">
+                            <span className="text-sm font-bold text-blue-700">
+                              Allowance
+                            </span>
+                            <p className="mt-1 text-xs font-normal text-slate-500">
+                              60% calculated
+                            </p>
                           </th>
 
-                          <th className="min-w-28 p-3 text-center align-top font-bold text-gray-800">
+                          <th className="min-w-28 p-3 text-center align-top font-bold text-slate-700">
                             Action
                           </th>
                         </tr>
@@ -953,12 +1039,12 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
                           return (
                             <tr
                               key={rowIndex}
-                              className="border-b transition hover:bg-blue-50/40"
+                              className="border-b border-slate-100 transition hover:bg-blue-50/40"
                             >
                               {row.map((cellVal, colIndex) => (
                                 <td
                                   key={colIndex}
-                                  className="border-r border-gray-100 p-2"
+                                  className="border-r border-slate-100 p-2"
                                 >
                                   <input
                                     type="text"
@@ -970,12 +1056,12 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
                                         e.target.value,
                                       )
                                     }
-                                    className="w-full rounded-lg border border-transparent bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                                    className="w-full rounded-xl border border-transparent bg-slate-50 px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
                                   />
                                 </td>
                               ))}
 
-                              <td className="border-r border-gray-100 p-3 text-right font-bold text-blue-700">
+                              <td className="border-r border-slate-100 p-3 text-right font-bold text-blue-700">
                                 {formatCurrency(allowance)}
                               </td>
 
@@ -983,9 +1069,10 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteRow(rowIndex)}
-                                  className="inline-flex items-center justify-center rounded-xl bg-red-600 p-2 text-white shadow-sm transition hover:bg-red-700"
+                                  className="inline-flex items-center justify-center rounded-xl bg-rose-50 p-2 text-rose-700 ring-1 ring-rose-100 transition hover:bg-rose-100"
+                                  title="Delete row"
                                 >
-                                  <TrashIcon className="h-5 w-5" />
+                                  <TrashIcon className="h-4 w-4" />
                                 </button>
                               </td>
                             </tr>
@@ -994,40 +1081,26 @@ export default function SpreadsheetSection({ selectedProject }: Props) {
                       </tbody>
 
                       <tfoot>
-                        <tr className="border-t bg-gray-50">
-                          {columnTotals.map((colSum, colIndex) => {
-                            if (colSum === null) {
-                              return (
-                                <td
-                                  key={colIndex}
-                                  className="border-r border-gray-200 p-3"
-                                />
-                              );
-                            }
+                        <tr className="border-t border-slate-200 bg-slate-50">
+                          {columnTotals.map((colSum, colIndex) => (
+                            <td
+                              key={colIndex}
+                              className="border-r border-slate-200 p-3 text-right text-sm font-bold text-slate-900"
+                            >
+                              {colSum === null ? "Total" : formatCurrency(colSum)}
+                            </td>
+                          ))}
 
-                            return (
-                              <td
-                                key={colIndex}
-                                className="border-r border-gray-200 p-3 text-right font-bold text-blue-700"
-                              >
-                                {formatCurrency(colSum)}
-                              </td>
-                            );
-                          })}
-
-                          <td className="border-r border-gray-200 p-3 text-right font-bold text-blue-900">
+                          <td className="border-r border-slate-200 p-3 text-right text-sm font-bold text-blue-700">
                             {formatCurrency(totalAllowance)}
                           </td>
 
-                          <td className="p-3" />
+                          <td className="p-3 text-center text-xs font-semibold text-slate-500">
+                            Summary
+                          </td>
                         </tr>
                       </tfoot>
                     </table>
-                  </div>
-
-                  <div className="border-t border-gray-200 bg-gray-50 px-4 py-3 text-xs font-semibold text-gray-500">
-                    Swipe left/right inside the table on mobile to view more
-                    columns.
                   </div>
                 </div>
               )}

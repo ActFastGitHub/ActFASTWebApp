@@ -2,7 +2,13 @@
 
 "use client";
 
-import React, { useEffect, useState, FormEvent, ChangeEvent } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+  FormEvent,
+  ChangeEvent,
+} from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/app/components/navBar";
@@ -12,15 +18,17 @@ import { sortProjects } from "@/app/utils/projectSorted";
 
 import * as Types from "@/app/types/materialsPageTypes";
 
-import { Combobox } from "@headlessui/react";
 import {
-  CheckIcon,
-  ChevronUpDownIcon,
-  MagnifyingGlassIcon,
-  FolderIcon,
+  ArrowPathIcon,
+  CheckCircleIcon,
+  ChevronDownIcon,
   CubeIcon,
+  FolderIcon,
+  HomeModernIcon,
+  MagnifyingGlassIcon,
   UserGroupIcon,
   UserIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 
 import ProjectBudgetCard from "@/app/components/materialsPage/ProjectBudgetCard";
@@ -29,6 +37,10 @@ import SubcontractorSection from "@/app/components/materialsPage/SubcontractorSe
 import LaborCostSection from "@/app/components/materialsPage/LaborCostSection";
 import SpreadsheetSection from "@/app/components/materialsPage/SpreadSheetSection";
 
+const cn = (...classes: Array<string | false | null | undefined>) => {
+  return classes.filter(Boolean).join(" ");
+};
+
 const formatCurrency = (value?: number | null) => {
   return new Intl.NumberFormat("en-CA", {
     style: "currency",
@@ -36,6 +48,27 @@ const formatCurrency = (value?: number | null) => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(Number(value || 0));
+};
+
+const getProjectDisplayName = (project?: Types.Project | null) => {
+  if (!project) return "No project selected";
+
+  const projectWithDetails = project as Types.Project & {
+    insured?: string;
+    address?: string;
+  };
+
+  return projectWithDetails.insured?.trim() || project.code;
+};
+
+const getProjectAddress = (project?: Types.Project | null) => {
+  if (!project) return "";
+
+  const projectWithDetails = project as Types.Project & {
+    address?: string;
+  };
+
+  return projectWithDetails.address || "";
 };
 
 const ProjectCostManagement = () => {
@@ -49,6 +82,7 @@ const ProjectCostManagement = () => {
   );
   const [newBudget, setNewBudget] = useState<number>(0);
   const [query, setQuery] = useState("");
+  const [projectPickerOpen, setProjectPickerOpen] = useState(false);
 
   const [materials, setMaterials] = useState<Types.Material[]>([]);
   const [materialsPage, setMaterialsPage] = useState(1);
@@ -106,15 +140,39 @@ const ProjectCostManagement = () => {
   const [globalLabor, setGlobalLabor] = useState<Types.LaborCost[]>([]);
   const [globalSearchLoading, setGlobalSearchLoading] = useState(false);
 
-  const filteredProjects =
-    query === ""
-      ? projects
-      : projects.filter((p) =>
-          p.code.toLowerCase().includes(query.toLowerCase()),
-        );
+  const filteredProjects = useMemo(() => {
+    const cleanQuery = query.trim().toLowerCase();
+
+    if (!cleanQuery) return projects;
+
+    return projects.filter((project) => {
+      const projectWithDetails = project as Types.Project & {
+        insured?: string;
+        address?: string;
+        claimNo?: string;
+        insuranceProvider?: string;
+      };
+
+      const searchableText = [
+        project.code,
+        projectWithDetails.insured,
+        projectWithDetails.address,
+        projectWithDetails.claimNo,
+        projectWithDetails.insuranceProvider,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return searchableText.includes(cleanQuery);
+    });
+  }, [projects, query]);
 
   const globalResultCount =
     globalMaterials.length + globalSubcontractors.length + globalLabor.length;
+
+  const selectedProjectName = getProjectDisplayName(selectedProject);
+  const selectedProjectAddress = getProjectAddress(selectedProject);
 
   useEffect(() => {
     if (status !== "loading" && !session) {
@@ -599,14 +657,24 @@ const ProjectCostManagement = () => {
       ]);
 
       setGlobalMaterials(materialsRes.data.materials || []);
-      setGlobalSubcontractors(subcontractorsRes.data.subcontractors || []);
+      setGlobalSubcontractors(materialsRes.data.subcontractors || []);
       setGlobalLabor(laborRes.data.laborCosts || []);
+
+      setGlobalSubcontractors(subcontractorsRes.data.subcontractors || []);
     } catch (error) {
       console.error("Global search error:", error);
       toast.error("Global search failed.");
     } finally {
       setGlobalSearchLoading(false);
     }
+  };
+
+  const handleSelectProject = (project: Types.Project) => {
+    setProjectFilter(project.code);
+    setSelectedProject(project);
+    setNewBudget(project.budget || 0);
+    setQuery("");
+    setProjectPickerOpen(false);
   };
 
   useEffect(() => {
@@ -648,10 +716,11 @@ const ProjectCostManagement = () => {
 
   if (status === "loading") {
     return (
-      <div className="min-h-screen overflow-x-hidden bg-gray-100 pt-24">
+      <div className="min-h-screen overflow-x-hidden bg-slate-50 pt-24">
         <Navbar />
+
         <div className="flex min-h-[60vh] items-center justify-center px-4">
-          <div className="rounded-2xl bg-white px-6 py-4 text-sm font-medium text-gray-600 shadow-sm">
+          <div className="rounded-2xl border border-slate-200 bg-white px-6 py-4 text-sm font-semibold text-slate-600 shadow-sm">
             Loading project cost management...
           </div>
         </div>
@@ -660,128 +729,299 @@ const ProjectCostManagement = () => {
   }
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-gradient-to-br from-slate-100 via-gray-100 to-blue-50">
+    <div className="relative min-h-screen overflow-x-hidden bg-gradient-to-br from-slate-50 via-white to-blue-50">
       <Navbar />
 
       <main className="relative z-0 mx-auto w-full max-w-7xl px-4 pb-12 pt-24 sm:px-6 lg:px-8">
-        {/* HEADER + PROJECT SELECTOR */}
-        <section className="relative z-40 mb-6 mt-5 overflow-visible rounded-3xl bg-slate-950 p-5 text-white shadow-lg sm:p-7">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold uppercase tracking-wide text-blue-200">
-                Project Cost Management
-              </p>
-
-              <h1 className="mt-2 break-words text-3xl font-bold sm:text-4xl">
-                Manage Project Costs
-              </h1>
-
-              <p className="mt-2 max-w-2xl text-sm text-slate-300">
-                Track budgets, materials, subcontractors, labor costs, and
-                project expenses in one organized workspace.
-              </p>
-            </div>
-
-            <div className="relative z-50 w-full rounded-2xl bg-white/10 p-4 backdrop-blur lg:max-w-md">
-              <label
-                htmlFor="searchProject"
-                className="mb-2 block text-sm font-semibold text-slate-100"
-              >
-                Search or select project
-              </label>
-
-              <Combobox
-                as="div"
-                value={projectFilter}
-                onChange={(selectedValue) => {
-                  setProjectFilter(selectedValue ?? "");
-                  setQuery("");
-                }}
-              >
-                <div className="relative">
-                  <Combobox.Input
-                    id="searchProject"
-                    className="w-full rounded-xl border border-white/20 bg-white py-3 pl-4 pr-11 text-sm font-medium text-gray-900 shadow-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-300"
-                    displayValue={(selectedCode: string) => selectedCode}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Type project code..."
-                  />
-
-                  <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-3">
-                    <ChevronUpDownIcon className="h-5 w-5 text-gray-400" />
-                  </Combobox.Button>
-
-                  {filteredProjects.length > 0 && (
-                    <Combobox.Options className="absolute left-0 top-full z-[9999] mt-2 max-h-72 w-full overflow-auto rounded-2xl bg-white py-2 text-sm shadow-2xl ring-1 ring-black/10">
-                      {filteredProjects.map((project) => (
-                        <Combobox.Option
-                          key={project.id}
-                          value={project.code}
-                          className={({ active }) =>
-                            `relative cursor-pointer select-none px-4 py-3 ${
-                              active
-                                ? "bg-blue-600 text-white"
-                                : "text-gray-900"
-                            }`
-                          }
-                        >
-                          {({ active, selected }) => (
-                            <>
-                              <span
-                                className={`block truncate ${
-                                  selected ? "font-bold" : ""
-                                }`}
-                              >
-                                {project.code}
-                              </span>
-
-                              {selected && (
-                                <span
-                                  className={`absolute inset-y-0 right-0 flex items-center pr-4 ${
-                                    active ? "text-white" : "text-blue-600"
-                                  }`}
-                                >
-                                  <CheckIcon className="h-5 w-5" />
-                                </span>
-                              )}
-                            </>
-                          )}
-                        </Combobox.Option>
-                      ))}
-                    </Combobox.Options>
-                  )}
-
-                  {query !== "" && filteredProjects.length === 0 && (
-                    <div className="absolute left-0 top-full z-[9999] mt-2 w-full rounded-2xl bg-white px-4 py-3 text-sm text-gray-500 shadow-2xl ring-1 ring-black/10">
-                      No projects found.
-                    </div>
-                  )}
-                </div>
-              </Combobox>
-            </div>
-          </div>
-        </section>
-
-        <div className="relative z-10 space-y-6">
-          {/* GLOBAL SEARCH */}
-          <section className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <section className="mb-6 mt-5 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-100 bg-gradient-to-br from-white via-blue-50/40 to-white p-5 sm:p-7">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_420px] lg:items-end">
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <MagnifyingGlassIcon className="h-5 w-5 shrink-0 text-blue-600" />
-                  <h2 className="text-xl font-bold text-gray-900">
-                    Global Search
-                  </h2>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-blue-700 ring-1 ring-blue-100">
+                    Project Cost Management
+                  </span>
+
+                  <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 ring-1 ring-emerald-100">
+                    Live Cost Workspace
+                  </span>
                 </div>
 
-                <p className="mt-1 text-sm text-gray-500">
-                  Search materials, subcontractors, or labor costs across all
-                  projects.
+                <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
+                  Manage Project Costs
+                </h1>
+
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+                  Track budgets, spreadsheets, materials, subcontractors, and
+                  labor costs in one clean project workspace.
                 </p>
               </div>
 
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <label className="mb-2 block text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                  Current Project
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() => setProjectPickerOpen(true)}
+                  className="flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-left shadow-sm transition hover:border-blue-200 hover:bg-blue-50/50 focus:outline-none focus:ring-4 focus:ring-blue-100"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-slate-950">
+                      {selectedProject ? selectedProjectName : "Select project"}
+                    </p>
+
+                    <p className="mt-0.5 truncate text-xs text-slate-500">
+                      {selectedProject
+                        ? selectedProject.code
+                        : "Tap to search and choose a project"}
+                    </p>
+                  </div>
+
+                  <div className="shrink-0 rounded-xl bg-white p-2 text-blue-700 ring-1 ring-blue-100">
+                    <MagnifyingGlassIcon className="h-4 w-4" />
+                  </div>
+                </button>
+
+                {selectedProjectAddress && (
+                  <div className="mt-3 flex min-w-0 items-center gap-2 text-xs text-slate-500">
+                    <HomeModernIcon className="h-4 w-4 shrink-0 text-slate-400" />
+                    <span className="truncate">{selectedProjectAddress}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {selectedProject && (
+            <div className="grid grid-cols-1 gap-3 bg-white p-4 sm:grid-cols-3 sm:p-5">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                  Selected Project
+                </p>
+
+                <p className="mt-2 truncate text-lg font-bold text-slate-950">
+                  {selectedProjectName}
+                </p>
+
+                <p className="mt-1 text-sm font-semibold text-slate-500">
+                  {selectedProject.code}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-4">
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-blue-700">
+                  Budget
+                </p>
+
+                <p className="mt-2 text-lg font-bold text-blue-950">
+                  {formatCurrency(selectedProject.budget)}
+                </p>
+
+                <p className="mt-1 text-sm text-blue-700">
+                  Approved project budget
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4">
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700">
+                  Total Project Cost
+                </p>
+
+                <p className="mt-2 text-lg font-bold text-emerald-950">
+                  {formatCurrency(selectedProject.totalProjectCost)}
+                </p>
+
+                <p className="mt-1 text-sm text-emerald-700">
+                  Materials, subcontractors, and labor
+                </p>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {projectPickerOpen && (
+          <div className="fixed inset-0 z-[9999] flex mt-14 items-end justify-center bg-slate-950/40 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+            <div className="flex h-[82dvh] w-full flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:h-[78dvh] sm:max-h-[720px] sm:max-w-3xl sm:rounded-3xl">
+              <div className="shrink-0 border-b border-slate-200 bg-white p-4 sm:p-5">
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-bold tracking-tight text-slate-950">
+                      Select Project
+                    </h3>
+
+                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                      Search by project code, insured name, address, claim
+                      number, or insurance provider.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProjectPickerOpen(false);
+                      setQuery("");
+                    }}
+                    className="rounded-full bg-slate-100 p-2 text-slate-600 transition hover:bg-slate-200"
+                    aria-label="Close project selector"
+                  >
+                    <XMarkIcon className="h-5 w-5" />
+                  </button>
+                </div>
+
+                <div className="relative">
+                  <MagnifyingGlassIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+
+                  <input
+                    autoFocus
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Example: 2026, 1015, SMITH, claim number..."
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-base font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                  />
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                  <span>
+                    Showing{" "}
+                    <span className="font-bold text-slate-700">
+                      {filteredProjects.length}
+                    </span>{" "}
+                    project(s)
+                  </span>
+
+                  {selectedProject && (
+                    <span className="rounded-full bg-blue-50 px-2.5 py-1 font-bold text-blue-700 ring-1 ring-blue-100">
+                      Current: {selectedProject.code}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
+                {filteredProjects.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+                    <FolderIcon className="mx-auto h-10 w-10 text-slate-400" />
+
+                    <h4 className="mt-4 text-base font-bold text-slate-950">
+                      No matching projects
+                    </h4>
+
+                    <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+                      Try a different project code, insured name, address, or
+                      claim number.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {filteredProjects.map((project) => {
+                      const isSelected = selectedProject?.code === project.code;
+                      const projectName = getProjectDisplayName(project);
+                      const address = getProjectAddress(project);
+
+                      return (
+                        <button
+                          key={project.id}
+                          type="button"
+                          onClick={() => handleSelectProject(project)}
+                          className={cn(
+                            "w-full rounded-2xl border p-4 text-left shadow-sm transition",
+                            isSelected
+                              ? "border-blue-300 bg-blue-50 ring-2 ring-blue-100"
+                              : "border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/50",
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span
+                                  className={cn(
+                                    "rounded-full px-2.5 py-1 text-[11px] font-bold ring-1",
+                                    isSelected
+                                      ? "bg-blue-600 text-white ring-blue-600"
+                                      : "bg-slate-50 text-slate-600 ring-slate-200",
+                                  )}
+                                >
+                                  {project.code}
+                                </span>
+
+                                {isSelected && (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-blue-700 ring-1 ring-blue-100">
+                                    <CheckCircleIcon className="h-3.5 w-3.5" />
+                                    Selected
+                                  </span>
+                                )}
+                              </div>
+
+                              <p
+                                className={cn(
+                                  "mt-2 truncate text-sm font-bold",
+                                  isSelected
+                                    ? "text-blue-950"
+                                    : "text-slate-950",
+                                )}
+                              >
+                                {projectName}
+                              </p>
+
+                              {address && (
+                                <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-slate-500">
+                                  <HomeModernIcon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                                  <span className="truncate">{address}</span>
+                                </div>
+                              )}
+
+                              <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+                                <span className="rounded-full bg-slate-50 px-2.5 py-1 font-semibold ring-1 ring-slate-200">
+                                  Budget: {formatCurrency(project.budget)}
+                                </span>
+
+                                <span className="rounded-full bg-slate-50 px-2.5 py-1 font-semibold ring-1 ring-slate-200">
+                                  Cost:{" "}
+                                  {formatCurrency(project.totalProjectCost)}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="shrink-0 rounded-xl bg-white p-2 text-blue-700 ring-1 ring-blue-100">
+                              <FolderIcon className="h-4 w-4" />
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="relative z-10 space-y-6">
+          <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="rounded-xl bg-blue-50 p-2 text-blue-700 ring-1 ring-blue-100">
+                    <MagnifyingGlassIcon className="h-4 w-4" />
+                  </span>
+
+                  <div>
+                    <h2 className="text-xl font-bold tracking-tight text-slate-950">
+                      Global Search
+                    </h2>
+
+                    <p className="mt-1 text-sm text-slate-500">
+                      Search materials, subcontractors, and labor costs across
+                      all projects.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {globalSearchTerm.length >= 2 && (
-                <div className="w-fit rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">
+                <div className="w-fit rounded-full bg-blue-50 px-4 py-2 text-sm font-bold text-blue-700 ring-1 ring-blue-100">
                   {globalSearchLoading
                     ? "Searching..."
                     : `${globalResultCount} result(s) found`}
@@ -790,46 +1030,44 @@ const ProjectCostManagement = () => {
             </div>
 
             <div className="relative mt-4">
-              <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+              <MagnifyingGlassIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
 
               <input
                 type="text"
                 value={globalSearchTerm}
-                className="w-full rounded-2xl border border-gray-200 bg-gray-50 py-3 pl-12 pr-4 text-sm shadow-sm outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm font-semibold text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
                 placeholder="Example: Laminate, General Flooring, employee name..."
                 onChange={(e) => handleGlobalSearch(e.target.value)}
               />
             </div>
           </section>
 
-          {/* GLOBAL SEARCH EMPTY STATE */}
           {globalSearchTerm.length >= 2 &&
             !globalSearchLoading &&
             globalResultCount === 0 && (
-              <section className="rounded-3xl border border-dashed border-gray-300 bg-white p-8 text-center shadow-sm">
-                <MagnifyingGlassIcon className="mx-auto h-12 w-12 text-gray-400" />
+              <section className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center shadow-sm">
+                <MagnifyingGlassIcon className="mx-auto h-10 w-10 text-slate-400" />
 
-                <h3 className="mt-4 text-lg font-bold text-gray-900">
+                <h3 className="mt-4 text-lg font-bold text-slate-950">
                   No results found
                 </h3>
 
-                <p className="mx-auto mt-2 max-w-lg text-sm text-gray-500">
+                <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">
                   Try searching using project codes, suppliers, employee names,
                   subcontractors, or material descriptions.
                 </p>
               </section>
             )}
 
-          {/* GLOBAL SEARCH RESULTS */}
           {globalResultCount > 0 && (
-            <section className="rounded-3xl border border-blue-100 bg-blue-50/60 p-4 shadow-sm sm:p-6">
+            <section className="rounded-3xl border border-blue-100 bg-blue-50/40 p-4 shadow-sm sm:p-6">
               <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900">
+                  <h3 className="text-xl font-bold tracking-tight text-slate-950">
                     Global Search Results
                   </h3>
 
-                  <p className="text-sm text-gray-500">
+                  <p className="mt-1 text-sm text-slate-500">
                     Matching records from all projects.
                   </p>
                 </div>
@@ -842,7 +1080,7 @@ const ProjectCostManagement = () => {
                     setGlobalSubcontractors([]);
                     setGlobalLabor([]);
                   }}
-                  className="w-fit rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 shadow-sm transition hover:bg-gray-50"
+                  className="w-fit rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
                 >
                   Clear Search
                 </button>
@@ -859,7 +1097,7 @@ const ProjectCostManagement = () => {
                         </h4>
                       </div>
 
-                      <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-blue-700 shadow-sm">
+                      <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-blue-700 shadow-sm ring-1 ring-blue-100">
                         {globalMaterials.length} result(s)
                       </span>
                     </div>
@@ -870,25 +1108,25 @@ const ProjectCostManagement = () => {
                           key={mat.id}
                           className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm"
                         >
-                          <p className="break-words text-xs font-semibold uppercase text-blue-600">
+                          <p className="break-words text-xs font-bold uppercase tracking-[0.12em] text-blue-600">
                             {mat.projectCode}
                           </p>
 
-                          <h5 className="mt-2 break-words text-lg font-bold text-gray-900">
+                          <h5 className="mt-2 break-words text-lg font-bold text-slate-950">
                             {mat.type || "Material"}
                           </h5>
 
                           {mat.description && (
-                            <p className="mt-1 break-words text-sm text-gray-600">
+                            <p className="mt-1 break-words text-sm leading-6 text-slate-500">
                               {mat.description}
                             </p>
                           )}
 
-                          <div className="mt-3 space-y-1 text-sm text-gray-500">
+                          <div className="mt-3 space-y-1 text-sm text-slate-500">
                             {mat.supplierName && (
                               <p>
                                 Supplier:{" "}
-                                <span className="font-semibold text-gray-800">
+                                <span className="font-semibold text-slate-800">
                                   {mat.supplierName}
                                 </span>
                               </p>
@@ -905,7 +1143,7 @@ const ProjectCostManagement = () => {
                           </div>
 
                           {mat.status && (
-                            <span className="mt-3 inline-flex rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+                            <span className="mt-3 inline-flex rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
                               {mat.status}
                             </span>
                           )}
@@ -925,7 +1163,7 @@ const ProjectCostManagement = () => {
                         </h4>
                       </div>
 
-                      <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-purple-700 shadow-sm">
+                      <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-purple-700 shadow-sm ring-1 ring-purple-100">
                         {globalSubcontractors.length} result(s)
                       </span>
                     </div>
@@ -936,21 +1174,21 @@ const ProjectCostManagement = () => {
                           key={sub.id}
                           className="min-w-0 rounded-2xl border border-purple-100 bg-white p-4 shadow-sm"
                         >
-                          <p className="break-words text-xs font-semibold uppercase text-purple-600">
+                          <p className="break-words text-xs font-bold uppercase tracking-[0.12em] text-purple-600">
                             {sub.projectCode}
                           </p>
 
-                          <h5 className="mt-2 break-words text-lg font-bold text-gray-900">
+                          <h5 className="mt-2 break-words text-lg font-bold text-slate-950">
                             {sub.name}
                           </h5>
 
                           {sub.expertise && (
-                            <p className="mt-1 break-words text-sm text-gray-600">
+                            <p className="mt-1 break-words text-sm leading-6 text-slate-500">
                               {sub.expertise}
                             </p>
                           )}
 
-                          <div className="mt-3 space-y-1 text-sm text-gray-500">
+                          <div className="mt-3 space-y-1 text-sm text-slate-500">
                             {sub.contactInfo && (
                               <p className="break-words">{sub.contactInfo}</p>
                             )}
@@ -980,7 +1218,7 @@ const ProjectCostManagement = () => {
                         </h4>
                       </div>
 
-                      <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-emerald-700 shadow-sm">
+                      <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-emerald-700 shadow-sm ring-1 ring-emerald-100">
                         {globalLabor.length} result(s)
                       </span>
                     </div>
@@ -991,21 +1229,21 @@ const ProjectCostManagement = () => {
                           key={lab.id}
                           className="min-w-0 rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm"
                         >
-                          <p className="break-words text-xs font-semibold uppercase text-emerald-600">
+                          <p className="break-words text-xs font-bold uppercase tracking-[0.12em] text-emerald-600">
                             {lab.projectCode}
                           </p>
 
-                          <h5 className="mt-2 break-words text-lg font-bold text-gray-900">
+                          <h5 className="mt-2 break-words text-lg font-bold text-slate-950">
                             {lab.employeeName}
                           </h5>
 
                           {lab.role && (
-                            <p className="mt-1 break-words text-sm text-gray-600">
+                            <p className="mt-1 break-words text-sm leading-6 text-slate-500">
                               {lab.role}
                             </p>
                           )}
 
-                          <p className="mt-3 text-sm text-gray-500">
+                          <p className="mt-3 text-sm text-slate-500">
                             {lab.hoursWorked} hrs @{" "}
                             {formatCurrency(lab.hourlyRate)} ={" "}
                             <span className="font-bold text-emerald-700">
@@ -1021,24 +1259,31 @@ const ProjectCostManagement = () => {
             </section>
           )}
 
-          {/* NO PROJECT SELECTED */}
           {!selectedProject && (
-            <section className="rounded-3xl border border-dashed border-gray-300 bg-white/80 p-8 text-center shadow-sm">
-              <FolderIcon className="mx-auto h-12 w-12 text-gray-400" />
+            <section className="rounded-3xl border border-dashed border-slate-300 bg-white/90 p-8 text-center shadow-sm">
+              <FolderIcon className="mx-auto h-10 w-10 text-slate-400" />
 
-              <h2 className="mt-4 text-xl font-bold text-gray-900">
+              <h2 className="mt-4 text-xl font-bold text-slate-950">
                 Select a project to begin
               </h2>
 
-              <p className="mx-auto mt-2 max-w-xl text-sm text-gray-500">
-                Choose a project from the search box above to view budget
+              <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500">
+                Choose a project from the selector above to view the budget
                 summary, spreadsheet, materials, subcontractors, and labor
                 costs.
               </p>
+
+              <button
+                type="button"
+                onClick={() => setProjectPickerOpen(true)}
+                className="mt-5 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-100"
+              >
+                <FolderIcon className="h-5 w-5" />
+                Choose Project
+              </button>
             </section>
           )}
 
-          {/* SELECTED PROJECT SECTIONS */}
           {selectedProject && (
             <div className="space-y-6">
               <ProjectBudgetCard

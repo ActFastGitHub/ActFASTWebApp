@@ -2113,7 +2113,7 @@ export default function FieldPhotosPage() {
                 </div>
               )}
 
-              <div className="relative">
+              {/* <div className="relative">
                 <label className="mb-1 block text-xs font-medium text-slate-600">
                   Search and select project
                 </label>
@@ -2170,6 +2170,123 @@ export default function FieldPhotosPage() {
                         </button>
                       ))
                     )}
+                  </div>
+                )}
+              </div> */}
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-600">
+                  Search and select project
+                </label>
+
+                <button
+                  type="button"
+                  disabled={!isOnline}
+                  onClick={() => setProjectDropdownOpen(true)}
+                  className="flex w-full items-center justify-between rounded-xl border bg-white p-3 text-left disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                  <span className="min-w-0 truncate text-sm text-slate-800">
+                    {selectedProjectPath
+                      ? selectedProjectPath.split("/").filter(Boolean).pop()
+                      : "Tap to choose project..."}
+                  </span>
+                  <span className="ml-3 text-slate-400">🔎</span>
+                </button>
+
+                {projectDropdownOpen && (
+                  <div className="fixed inset-0 z-[9999] bg-black/40 p-0 sm:flex sm:items-center sm:justify-center sm:p-4">
+                    <div className="fixed bottom-0 left-0 right-0 max-h-[88dvh] overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:relative sm:bottom-auto sm:left-auto sm:right-auto sm:w-full sm:max-w-2xl sm:rounded-3xl">
+                      <div className="sticky top-0 z-10 border-b bg-white p-4">
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                          <div>
+                            <h3 className="text-lg font-bold text-slate-900">
+                              Select Project Folder
+                            </h3>
+                            <p className="text-xs text-slate-500">
+                              Search by project number, year, or name.
+                            </p>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => setProjectDropdownOpen(false)}
+                            className="rounded-full bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200"
+                          >
+                            Close
+                          </button>
+                        </div>
+
+                        <input
+                          autoFocus
+                          value={projectSearchTerm}
+                          disabled={!isOnline}
+                          onChange={(e) => setProjectSearchTerm(e.target.value)}
+                          placeholder="Example: 2026, 1015, SMITH..."
+                          className="w-full rounded-xl border border-slate-300 bg-slate-50 p-3 text-base outline-none focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                        />
+
+                        <div className="mt-2 text-xs text-slate-500">
+                          Showing {visibleProjectFolders.length} folder(s)
+                        </div>
+                      </div>
+
+                      <div className="max-h-[65dvh] overflow-y-auto p-3">
+                        {visibleProjectFolders.length === 0 ? (
+                          <div className="rounded-2xl border border-dashed p-6 text-center text-sm text-slate-500">
+                            No matching folders.
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {visibleProjectFolders.map((folder) => {
+                              const isSelected =
+                                selectedProjectPath === folder.path;
+
+                              return (
+                                <button
+                                  key={folder.path}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedProjectPath(folder.path);
+                                    setProjectSearchTerm(folder.name);
+                                    setProjectDropdownOpen(false);
+                                  }}
+                                  className={
+                                    "w-full rounded-2xl border p-4 text-left shadow-sm transition " +
+                                    (isSelected
+                                      ? "border-blue-400 bg-blue-50 ring-2 ring-blue-100"
+                                      : "border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50")
+                                  }
+                                >
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <div
+                                        className={
+                                          "truncate text-sm font-bold " +
+                                          (isSelected
+                                            ? "text-blue-900"
+                                            : "text-slate-900")
+                                        }
+                                      >
+                                        📁 {folder.name}
+                                      </div>
+                                      <div className="mt-1 break-all text-xs text-slate-500">
+                                        {folder.path}
+                                      </div>
+                                    </div>
+
+                                    {isSelected && (
+                                      <span className="shrink-0 rounded-full bg-blue-600 px-2 py-1 text-[11px] font-bold text-white">
+                                        Selected
+                                      </span>
+                                    )}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
