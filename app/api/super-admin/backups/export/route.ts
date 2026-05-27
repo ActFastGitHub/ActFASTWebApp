@@ -1,10 +1,16 @@
-// app\api\super-admin\backups\export\route.ts
+// app/api/super-admin/backups/export/route.ts
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/libs/authOption";
 import prisma from "@/app/libs/prismadb";
 import { canRunBackups } from "@/app/libs/roles";
 import { createAuditLog, getRequestAuditMeta } from "@/app/libs/auditLog";
+import {
+  APP_BACKUP_VERSION,
+  APP_SCHEMA_VERSION,
+  backupRegistry,
+  getDefaultBackupCollectionKeys,
+} from "@/app/libs/backupRegistry";
 
 export const runtime = "nodejs";
 
@@ -35,6 +41,23 @@ export async function GET(request: Request) {
   let backupLogId: string | null = null;
 
   try {
+    const { searchParams } = new URL(request.url);
+
+    const requestedCollections = searchParams
+      .getAll("collections")
+      .flatMap((value) => value.split(","))
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    const selectedCollections =
+      requestedCollections.length > 0
+        ? requestedCollections
+        : getDefaultBackupCollectionKeys();
+
+    const registryItems = backupRegistry.filter((item) =>
+      selectedCollections.includes(item.key),
+    );
+
     const backupLog = await prisma.backupLog.create({
       data: {
         requestedByEmail: session.user.email,
@@ -48,39 +71,23 @@ export async function GET(request: Request) {
 
     backupLogId = backupLog.id;
 
-    const [
-      projects,
-      finalRepairsAgreements,
-      finalRepairMaterialSelections,
-      materialCatalogItems,
-      materials,
-      subcontractors,
-      laborCosts,
-      projectUpdates,
-      auditLogs,
-      backupLogs,
-    ] = await Promise.all([
-      prisma.project.findMany(),
-      prisma.finalRepairsAgreement.findMany({
-        include: { selections: true },
-      }),
-      prisma.finalRepairMaterialSelection.findMany(),
-      prisma.materialCatalogItem.findMany(),
-      prisma.material.findMany(),
-      prisma.subcontractor.findMany(),
-      prisma.laborCost.findMany(),
-      prisma.projectUpdate.findMany(),
-      prisma.auditLog.findMany({
-        orderBy: { createdAt: "desc" },
-        take: 10000,
-      }),
-      prisma.backupLog.findMany({
-        orderBy: { createdAt: "desc" },
-        take: 1000,
-      }),
-    ]);
+    const collections: Record<string, unknown[]> = {};
+    const collectionCounts: Record<string, number> = {};
+
+    for (const item of registryItems) {
+      const records = await item.delegate.findMany();
+      collections[item.key] = records;
+      collectionCounts[item.key] = records.length;
+    }
+
+    const recordCount = Object.values(collectionCounts).reduce(
+      (sum, count) => sum + count,
+      0,
+    );
 
     const backupData = {
+      backupVersion: APP_BACKUP_VERSION,
+      schemaVersion: APP_SCHEMA_VERSION,
       exportedAt: new Date().toISOString(),
       exportedBy: {
         email: session.user.email,
@@ -88,37 +95,15 @@ export async function GET(request: Request) {
         role: profile?.role || null,
       },
       warning:
-        "This is an app-level JSON export, not a full MongoDB binary restore backup.",
-      collections: {
-        projects,
-        finalRepairsAgreements,
-        finalRepairMaterialSelections,
-        materialCatalogItems,
-        materials,
-        subcontractors,
-        laborCosts,
-        projectUpdates,
-        auditLogs,
-        backupLogs,
-      },
+        "This is an app-level JSON export, not a full MongoDB binary restore backup. Dropbox files and MongoDB Atlas snapshots remain separate.",
+      collectionCounts,
+      collections,
     };
 
     const json = JSON.stringify(backupData, null, 2);
-    const fileName = `actfast-app-backup-${new Date()
+    const fileName = `actfast-app-backup-v2-${new Date()
       .toISOString()
       .slice(0, 10)}.json`;
-
-    const recordCount =
-      projects.length +
-      finalRepairsAgreements.length +
-      finalRepairMaterialSelections.length +
-      materialCatalogItems.length +
-      materials.length +
-      subcontractors.length +
-      laborCosts.length +
-      projectUpdates.length +
-      auditLogs.length +
-      backupLogs.length;
 
     await prisma.backupLog.update({
       where: { id: backupLogId },
@@ -141,7 +126,9 @@ export async function GET(request: Request) {
       summary: `Created JSON backup export with ${recordCount} record(s)`,
       changes: {
         fileName,
-        recordCount,
+        backupVersion: APP_BACKUP_VERSION,
+        schemaVersion: APP_SCHEMA_VERSION,
+        collectionCounts,
       },
       ...getRequestAuditMeta(request),
     });

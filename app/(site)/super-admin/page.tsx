@@ -1,8 +1,6 @@
-// app\(site)\super-admin\page.tsx
-
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
@@ -12,12 +10,14 @@ import {
   FaChevronRight,
   FaDatabase,
   FaDownload,
+  FaExclamationTriangle,
   FaFilter,
   FaHistory,
   FaSearch,
   FaShieldAlt,
   FaSyncAlt,
   FaTimes,
+  FaUpload,
 } from "react-icons/fa";
 
 type AuditLog = {
@@ -60,6 +60,37 @@ type AuditFilters = {
   to: string;
 };
 
+type RestoreMode = "INSERT_MISSING" | "UPSERT" | "REPLACE_SELECTED";
+
+type RestorePreviewItem = {
+  collectionKey: string;
+  label?: string;
+  supported: boolean;
+  incoming: number;
+  existing: number;
+  missing: number;
+  errors: string[];
+};
+
+type RestorePreview = {
+  status: number;
+  valid: boolean;
+  dryRun: boolean;
+  mode: RestoreMode;
+  backupVersion: string | null;
+  schemaVersion: string | null;
+  exportedAt: string | null;
+  exportedBy: {
+    email?: string | null;
+    nickname?: string | null;
+    role?: string | null;
+  } | null;
+  warnings: string[];
+  availableCollections: string[];
+  selectedCollections: string[];
+  preview: RestorePreviewItem[];
+};
+
 const emptyAuditFilters: AuditFilters = {
   search: "",
   action: "",
@@ -83,6 +114,28 @@ const actionOptions = [
 
 const pageSizeOptions = [10, 25, 50, 100];
 
+const restoreModeOptions: {
+  value: RestoreMode;
+  label: string;
+  help: string;
+}[] = [
+  {
+    value: "INSERT_MISSING",
+    label: "Insert missing only",
+    help: "Safest option. Existing records are skipped.",
+  },
+  {
+    value: "UPSERT",
+    label: "Upsert / update existing",
+    help: "Creates missing records and updates existing matching IDs.",
+  },
+  {
+    value: "REPLACE_SELECTED",
+    label: "Replace selected collections",
+    help: "Dangerous. Deletes selected collections first, then imports.",
+  },
+];
+
 function formatDate(value?: string | null) {
   if (!value) return "N/A";
 
@@ -105,6 +158,7 @@ function getActiveFilterCount(filters: AuditFilters) {
 export default function SuperAdminPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
+  const restoreFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [backupLogs, setBackupLogs] = useState<BackupLog[]>([]);
@@ -113,6 +167,7 @@ export default function SuperAdminPage() {
 
   const [loadingAuditLogs, setLoadingAuditLogs] = useState(false);
   const [loadingBackups, setLoadingBackups] = useState(false);
+  const [creatingBackup, setCreatingBackup] = useState(false);
 
   const [auditFilters, setAuditFilters] =
     useState<AuditFilters>(emptyAuditFilters);
@@ -123,6 +178,19 @@ export default function SuperAdminPage() {
   const [auditPage, setAuditPage] = useState(1);
   const [auditPageSize, setAuditPageSize] = useState(25);
 
+  const [restoreFileName, setRestoreFileName] = useState("");
+  const [restoreBackupData, setRestoreBackupData] = useState<any>(null);
+  const [restorePreview, setRestorePreview] = useState<RestorePreview | null>(
+    null,
+  );
+  const [selectedRestoreCollections, setSelectedRestoreCollections] = useState<
+    string[]
+  >([]);
+  const [restoreMode, setRestoreMode] = useState<RestoreMode>("INSERT_MISSING");
+  const [restoreConfirmText, setRestoreConfirmText] = useState("");
+  const [loadingRestorePreview, setLoadingRestorePreview] = useState(false);
+  const [restoringBackup, setRestoringBackup] = useState(false);
+
   const activeFilterCount = useMemo(
     () => getActiveFilterCount(auditFilters),
     [auditFilters],
@@ -132,6 +200,21 @@ export default function SuperAdminPage() {
   const firstRecordNumber =
     auditTotal === 0 ? 0 : (auditPage - 1) * auditPageSize + 1;
   const lastRecordNumber = Math.min(auditPage * auditPageSize, auditTotal);
+
+  const selectedRestoreSummary = useMemo(() => {
+    if (!restorePreview) return { records: 0, collections: 0 };
+
+    const selected = new Set(selectedRestoreCollections);
+
+    const records = restorePreview.preview
+      .filter((item) => selected.has(item.collectionKey))
+      .reduce((sum, item) => sum + item.incoming, 0);
+
+    return {
+      records,
+      collections: selectedRestoreCollections.length,
+    };
+  }, [restorePreview, selectedRestoreCollections]);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
@@ -144,6 +227,13 @@ export default function SuperAdminPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      fetchAuditLogs(1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auditPageSize]);
 
   const readApiResponse = async (res: Response) => {
     const text = await res.text();
@@ -251,16 +341,187 @@ export default function SuperAdminPage() {
   };
 
   const downloadJsonBackup = () => {
+    setCreatingBackup(true);
     window.location.href = "/api/super-admin/backups/export";
-    setTimeout(fetchBackupLogs, 2000);
+
+    setTimeout(() => {
+      fetchBackupLogs();
+      setCreatingBackup(false);
+    }, 2000);
   };
 
-  useEffect(() => {
-    if (status === "authenticated") {
-      fetchAuditLogs(1);
+  const handleRestoreFileChange = async (
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    try {
+      setRestoreFileName(file.name);
+      setRestorePreview(null);
+      setSelectedRestoreCollections([]);
+      setRestoreBackupData(null);
+
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+
+      setRestoreBackupData(parsed);
+      toast.success("Backup file loaded. Run dry-run validation next.");
+    } catch (error: any) {
+      toast.error(error?.message || "Invalid JSON backup file");
+      setRestoreFileName("");
+      setRestorePreview(null);
+      setSelectedRestoreCollections([]);
+      setRestoreBackupData(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auditPageSize]);
+  };
+
+  const runRestoreDryRun = async () => {
+    if (!restoreBackupData) {
+      toast.error("Please choose a JSON backup file first.");
+      return;
+    }
+
+    try {
+      setLoadingRestorePreview(true);
+
+      const res = await fetch("/api/super-admin/backups/restore", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          backupData: restoreBackupData,
+          dryRun: true,
+          mode: restoreMode,
+          selectedCollections:
+            selectedRestoreCollections.length > 0
+              ? selectedRestoreCollections
+              : undefined,
+        }),
+      });
+
+      const data = await readApiResponse(res);
+
+      if (!res.ok) {
+        throw new Error(data.message || "Restore preview failed");
+      }
+
+      setRestorePreview(data);
+
+      const supportedCollections = (data.preview || [])
+        .filter((item: RestorePreviewItem) => item.supported)
+        .map((item: RestorePreviewItem) => item.collectionKey);
+
+      setSelectedRestoreCollections((current) =>
+        current.length > 0 ? current : supportedCollections,
+      );
+
+      toast.success("Dry-run validation complete.");
+    } catch (error: any) {
+      toast.error(error?.message || "Restore preview failed");
+    } finally {
+      setLoadingRestorePreview(false);
+    }
+  };
+
+  const toggleRestoreCollection = (collectionKey: string) => {
+    setSelectedRestoreCollections((current) => {
+      if (current.includes(collectionKey)) {
+        return current.filter((item) => item !== collectionKey);
+      }
+
+      return [...current, collectionKey];
+    });
+  };
+
+  const selectAllRestoreCollections = () => {
+    if (!restorePreview) return;
+
+    setSelectedRestoreCollections(
+      restorePreview.preview
+        .filter((item) => item.supported)
+        .map((item) => item.collectionKey),
+    );
+  };
+
+  const clearRestoreCollections = () => {
+    setSelectedRestoreCollections([]);
+  };
+
+  const resetRestoreTool = () => {
+    setRestoreFileName("");
+    setRestoreBackupData(null);
+    setRestorePreview(null);
+    setSelectedRestoreCollections([]);
+    setRestoreMode("INSERT_MISSING");
+    setRestoreConfirmText("");
+
+    if (restoreFileInputRef.current) {
+      restoreFileInputRef.current.value = "";
+    }
+  };
+
+  const runRestore = async () => {
+    if (!restoreBackupData) {
+      toast.error("Please choose a JSON backup file first.");
+      return;
+    }
+
+    if (selectedRestoreCollections.length === 0) {
+      toast.error("Please select at least one collection to restore.");
+      return;
+    }
+
+    if (
+      restoreMode === "REPLACE_SELECTED" &&
+      restoreConfirmText !== "RESTORE"
+    ) {
+      toast.error("Type RESTORE to confirm replace mode.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Restore ${selectedRestoreSummary.records} record(s) into ${selectedRestoreSummary.collections} collection(s) using ${restoreMode}?`,
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setRestoringBackup(true);
+
+      const res = await fetch("/api/super-admin/backups/restore", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          backupData: restoreBackupData,
+          dryRun: false,
+          mode: restoreMode,
+          selectedCollections: selectedRestoreCollections,
+          confirmText: restoreConfirmText,
+        }),
+      });
+
+      const data = await readApiResponse(res);
+
+      if (!res.ok) {
+        throw new Error(data.message || "Restore failed");
+      }
+
+      toast.success("Restore completed.");
+      fetchAuditLogs(1);
+      fetchBackupLogs();
+
+      console.log("RESTORE RESULT:", data);
+    } catch (error: any) {
+      toast.error(error?.message || "Restore failed");
+    } finally {
+      setRestoringBackup(false);
+    }
+  };
 
   if (status === "loading") {
     return <div className="p-10 text-center">Loading...</div>;
@@ -407,11 +668,11 @@ export default function SuperAdminPage() {
                 <FaShieldAlt /> Super Admin
               </p>
               <h1 className="mt-1 text-2xl font-black sm:text-3xl">
-                Audit Logs & Backups
+                Audit Logs, Backups & Restore
               </h1>
               <p className="mt-2 max-w-3xl text-sm text-slate-600">
-                View system activity, filter audit history, export CSV records,
-                and create app-level JSON backups.
+                View system activity, export audit history, create app-level
+                JSON backups, and safely preview selective restore operations.
               </p>
             </div>
 
@@ -460,11 +721,252 @@ export default function SuperAdminPage() {
             <button
               type="button"
               onClick={downloadJsonBackup}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-bold text-white hover:bg-blue-700"
+              disabled={creatingBackup}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-bold text-white hover:bg-blue-700 disabled:bg-blue-300"
             >
-              <FaDownload /> Download JSON Backup
+              <FaDownload />{" "}
+              {creatingBackup ? "Preparing Backup..." : "Download JSON Backup"}
             </button>
           </div>
+        </section>
+
+        <section className="mt-6 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h2 className="flex items-center gap-2 text-xl font-black">
+                <FaUpload /> Restore JSON Backup
+              </h2>
+              <p className="mt-1 max-w-3xl text-sm text-slate-600">
+                Upload an app-level JSON backup, run a dry-run validation, then
+                selectively restore only the collections you need.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={resetRestoreTool}
+              className="flex items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200"
+            >
+              <FaTimes /> Reset Restore Tool
+            </button>
+          </div>
+
+          <div className="mt-5 grid gap-4 lg:grid-cols-3">
+            <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+              <p className="text-sm font-black">1. Choose backup file</p>
+              <input
+                ref={restoreFileInputRef}
+                type="file"
+                accept="application/json,.json"
+                onChange={handleRestoreFileChange}
+                className="mt-3 w-full rounded-xl border border-slate-300 bg-white p-2 text-sm"
+              />
+              <p className="mt-2 break-all text-xs text-slate-500">
+                {restoreFileName || "No file selected."}
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+              <p className="text-sm font-black">2. Restore mode</p>
+              <select
+                value={restoreMode}
+                onChange={(event) =>
+                  setRestoreMode(event.target.value as RestoreMode)
+                }
+                className="mt-3 w-full rounded-xl border border-slate-300 bg-white p-2 text-sm"
+              >
+                {restoreModeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-2 text-xs text-slate-500">
+                {
+                  restoreModeOptions.find(
+                    (option) => option.value === restoreMode,
+                  )?.help
+                }
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+              <p className="text-sm font-black">3. Dry-run first</p>
+              <button
+                type="button"
+                onClick={runRestoreDryRun}
+                disabled={!restoreBackupData || loadingRestorePreview}
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white hover:bg-slate-800 disabled:bg-slate-400"
+              >
+                <FaSearch />{" "}
+                {loadingRestorePreview ? "Checking..." : "Run Dry-Run Check"}
+              </button>
+            </div>
+          </div>
+
+          {restorePreview && (
+            <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <h3 className="text-lg font-black">Restore Preview</h3>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Backup Version:{" "}
+                    <span className="font-bold">
+                      {restorePreview.backupVersion || "Unknown"}
+                    </span>{" "}
+                    · Schema Version:{" "}
+                    <span className="font-bold">
+                      {restorePreview.schemaVersion || "Unknown"}
+                    </span>
+                  </p>
+                  <p className="text-sm text-slate-600">
+                    Exported: {formatDate(restorePreview.exportedAt)}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl bg-blue-50 p-3 text-sm text-blue-800">
+                  <p className="font-black">
+                    Selected: {selectedRestoreSummary.collections} collection(s)
+                  </p>
+                  <p>{selectedRestoreSummary.records} incoming record(s)</p>
+                </div>
+              </div>
+
+              {restorePreview.warnings?.length > 0 && (
+                <div className="mt-4 rounded-2xl bg-amber-50 p-4 text-sm text-amber-800">
+                  <p className="mb-2 flex items-center gap-2 font-black">
+                    <FaExclamationTriangle /> Warnings
+                  </p>
+                  <ul className="list-disc space-y-1 pl-5">
+                    {restorePreview.warnings.map((warning) => (
+                      <li key={warning}>{warning}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={selectAllRestoreCollections}
+                  className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800"
+                >
+                  Select All Supported
+                </button>
+                <button
+                  type="button"
+                  onClick={clearRestoreCollections}
+                  className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200"
+                >
+                  Clear Selection
+                </button>
+              </div>
+
+              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {restorePreview.preview.map((item) => {
+                  const checked = selectedRestoreCollections.includes(
+                    item.collectionKey,
+                  );
+
+                  return (
+                    <label
+                      key={item.collectionKey}
+                      className={
+                        "rounded-2xl p-4 ring-1 " +
+                        (item.supported
+                          ? checked
+                            ? "bg-blue-50 ring-blue-300"
+                            : "bg-slate-50 ring-slate-200"
+                          : "bg-red-50 ring-red-200")
+                      }
+                    >
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          disabled={!item.supported}
+                          checked={checked}
+                          onChange={() =>
+                            toggleRestoreCollection(item.collectionKey)
+                          }
+                          className="mt-1"
+                        />
+
+                        <div className="min-w-0">
+                          <p className="font-black">
+                            {item.label || item.collectionKey}
+                          </p>
+                          <p className="break-all text-xs text-slate-500">
+                            {item.collectionKey}
+                          </p>
+
+                          <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                            <div className="rounded-xl bg-white p-2">
+                              <p className="font-bold">Incoming</p>
+                              <p>{item.incoming}</p>
+                            </div>
+                            <div className="rounded-xl bg-white p-2">
+                              <p className="font-bold">Existing</p>
+                              <p>{item.existing}</p>
+                            </div>
+                            <div className="rounded-xl bg-white p-2">
+                              <p className="font-bold">Missing</p>
+                              <p>{item.missing}</p>
+                            </div>
+                          </div>
+
+                          {item.errors?.length > 0 && (
+                            <div className="mt-3 rounded-xl bg-red-100 p-2 text-xs text-red-700">
+                              {item.errors.join(", ")}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+
+              {restoreMode === "REPLACE_SELECTED" && (
+                <div className="mt-5 rounded-2xl bg-red-50 p-4 text-sm text-red-800 ring-1 ring-red-200">
+                  <p className="flex items-center gap-2 font-black">
+                    <FaExclamationTriangle /> Dangerous restore mode
+                  </p>
+                  <p className="mt-1">
+                    This will delete the selected collections before importing
+                    records from the backup.
+                  </p>
+                  <label className="mt-3 block">
+                    <span className="text-xs font-bold">
+                      Type RESTORE to confirm
+                    </span>
+                    <input
+                      value={restoreConfirmText}
+                      onChange={(event) =>
+                        setRestoreConfirmText(event.target.value)
+                      }
+                      placeholder="RESTORE"
+                      className="mt-1 w-full rounded-xl border border-red-300 bg-white p-2 text-sm"
+                    />
+                  </label>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={runRestore}
+                disabled={
+                  restoringBackup ||
+                  selectedRestoreCollections.length === 0 ||
+                  (restoreMode === "REPLACE_SELECTED" &&
+                    restoreConfirmText !== "RESTORE")
+                }
+                className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-red-600 px-4 py-3 text-sm font-black text-white hover:bg-red-700 disabled:bg-slate-400"
+              >
+                <FaUpload />{" "}
+                {restoringBackup ? "Restoring..." : "Run Selected Restore"}
+              </button>
+            </div>
+          )}
         </section>
 
         <section className="mt-6 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
