@@ -285,6 +285,10 @@ export default function FieldPhotosPage() {
   const lastCaptureAtRef = useRef(0);
   const pinchDistanceRef = useRef<number | null>(null);
 
+  // Used by the folder gallery photo viewer for swipe navigation.
+  const galleryTouchStartXRef = useRef<number | null>(null);
+  const galleryTouchStartYRef = useRef<number | null>(null);
+
   /* ─────────────────────────────
      Folder states
   ───────────────────────────── */
@@ -390,6 +394,14 @@ export default function FieldPhotosPage() {
     galleryPage * GALLERY_PAGE_SIZE,
   );
 
+  const selectedGalleryPhotoIndex = useMemo(() => {
+    if (!selectedGalleryPhoto) return -1;
+
+    return galleryFiles.findIndex(
+      (photo) => photo.path === selectedGalleryPhoto.path,
+    );
+  }, [galleryFiles, selectedGalleryPhoto]);
+
   /* ─────────────────────────────
      Project folder helpers
   ───────────────────────────── */
@@ -477,6 +489,49 @@ export default function FieldPhotosPage() {
   useEffect(() => {
     if (galleryPage > galleryTotalPages) setGalleryPage(galleryTotalPages);
   }, [galleryPage, galleryTotalPages]);
+
+  useEffect(() => {
+    if (!galleryOpen) return;
+
+    const originalBodyOverflow = document.body.style.overflow;
+    const originalHtmlOverflow = document.documentElement.style.overflow;
+
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    const handleGalleryKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setGalleryOpen(false);
+        setSelectedGalleryPhoto(null);
+        return;
+      }
+
+      if (!selectedGalleryPhoto) return;
+
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        showPreviousGalleryPhoto();
+      }
+
+      if (event.key === "ArrowRight") {
+        event.preventDefault();
+        showNextGalleryPhoto();
+      }
+    };
+
+    window.addEventListener("keydown", handleGalleryKeyDown);
+
+    return () => {
+      document.body.style.overflow = originalBodyOverflow;
+      document.documentElement.style.overflow = originalHtmlOverflow;
+      window.removeEventListener("keydown", handleGalleryKeyDown);
+    };
+  }, [
+    galleryOpen,
+    selectedGalleryPhoto,
+    selectedGalleryPhotoIndex,
+    galleryFiles,
+  ]);
 
   const updateQueueItem = async (
     id: string,
@@ -1840,19 +1895,11 @@ export default function FieldPhotosPage() {
   const getSafeRoomFolderParentPath = () => {
     if (!selectedProjectPath || !currentBrowsePath) return "";
 
-    const relativeParts = getRelativeFolderParts();
-
-    if (relativeParts[0] === "1-PICTURES") {
-      return `${selectedProjectPath}/1-PICTURES`;
-    }
-
-    if (
-      relativeParts[0] === "0-CONTENTS-WET-PICS" &&
-      relativeParts[1] === "2 NR CONTENT PHOTOS"
-    ) {
-      return `${selectedProjectPath}/0-CONTENTS-WET-PICS/2 NR CONTENT PHOTOS`;
-    }
-
+    // Create subfolders inside the folder the user is currently viewing.
+    // Example:
+    // /REFERENCE/PROJECT/1-PICTURES/TEST
+    // + new folder "TEST 1"
+    // = /REFERENCE/PROJECT/1-PICTURES/TEST/TEST 1
     return currentBrowsePath;
   };
 
@@ -1872,7 +1919,7 @@ export default function FieldPhotosPage() {
     }
 
     if (!newFolderName.trim()) {
-      toast.error("Enter a room or area name");
+      toast.error("Enter a folder name");
       return;
     }
 
@@ -1898,9 +1945,73 @@ export default function FieldPhotosPage() {
       setCurrentBrowsePath(data.folder.path);
       setSelectedUploadPath(data.folder.path);
       await fetchChildFolders(data.folder.path);
-      toast.success("Room folder created and selected");
+      toast.success("Subfolder created and selected");
     } catch (error) {
-      handleError(error, "Failed to create room folder");
+      handleError(error, "Failed to create subfolder");
+    }
+  };
+
+  const openGalleryPhoto = (photo: DropboxImageFile) => {
+    setSelectedGalleryPhoto(photo);
+    setGalleryOpen(true);
+  };
+
+  const showPreviousGalleryPhoto = () => {
+    if (galleryFiles.length === 0) return;
+
+    const currentIndex =
+      selectedGalleryPhotoIndex >= 0 ? selectedGalleryPhotoIndex : 0;
+    const previousIndex =
+      currentIndex <= 0 ? galleryFiles.length - 1 : currentIndex - 1;
+
+    setSelectedGalleryPhoto(galleryFiles[previousIndex]);
+  };
+
+  const showNextGalleryPhoto = () => {
+    if (galleryFiles.length === 0) return;
+
+    const currentIndex =
+      selectedGalleryPhotoIndex >= 0 ? selectedGalleryPhotoIndex : 0;
+    const nextIndex =
+      currentIndex >= galleryFiles.length - 1 ? 0 : currentIndex + 1;
+
+    setSelectedGalleryPhoto(galleryFiles[nextIndex]);
+  };
+
+  const handleGalleryViewerTouchStart = (event: TouchEvent<HTMLDivElement>) => {
+    const firstTouch = event.touches[0];
+    if (!firstTouch) return;
+
+    galleryTouchStartXRef.current = firstTouch.clientX;
+    galleryTouchStartYRef.current = firstTouch.clientY;
+  };
+
+  const handleGalleryViewerTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
+    const firstTouch = event.changedTouches[0];
+
+    if (
+      !firstTouch ||
+      galleryTouchStartXRef.current === null ||
+      galleryTouchStartYRef.current === null
+    ) {
+      return;
+    }
+
+    const deltaX = firstTouch.clientX - galleryTouchStartXRef.current;
+    const deltaY = firstTouch.clientY - galleryTouchStartYRef.current;
+
+    galleryTouchStartXRef.current = null;
+    galleryTouchStartYRef.current = null;
+
+    const isHorizontalSwipe =
+      Math.abs(deltaX) > 50 && Math.abs(deltaX) > Math.abs(deltaY);
+
+    if (!isHorizontalSwipe) return;
+
+    if (deltaX > 0) {
+      showPreviousGalleryPhoto();
+    } else {
+      showNextGalleryPhoto();
     }
   };
 
@@ -2112,67 +2223,6 @@ export default function FieldPhotosPage() {
                   folders.
                 </div>
               )}
-
-              {/* <div className="relative">
-                <label className="mb-1 block text-xs font-medium text-slate-600">
-                  Search and select project
-                </label>
-                <input
-                  value={projectSearchTerm}
-                  disabled={!isOnline}
-                  onFocus={() => setProjectDropdownOpen(true)}
-                  onChange={(e) => {
-                    setProjectSearchTerm(e.target.value);
-                    setProjectDropdownOpen(true);
-                  }}
-                  placeholder={
-                    selectedProjectPath
-                      ? selectedProjectPath.split("/").filter(Boolean).pop()
-                      : "Type project name or number..."
-                  }
-                  className="w-full rounded-xl border p-3 pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setProjectDropdownOpen((prev) => !prev)}
-                  disabled={!isOnline}
-                  className="absolute bottom-2 right-2 rounded-lg bg-slate-100 px-2 py-1 text-sm text-slate-600 disabled:opacity-50"
-                >
-                  ▼
-                </button>
-                {projectDropdownOpen && (
-                  <div className="absolute z-30 mt-2 max-h-80 w-full overflow-auto rounded-xl border bg-white shadow-xl">
-                    {visibleProjectFolders.length === 0 ? (
-                      <div className="p-3 text-sm text-slate-500">
-                        No matching folders.
-                      </div>
-                    ) : (
-                      visibleProjectFolders.map((folder) => (
-                        <button
-                          key={folder.path}
-                          type="button"
-                          onClick={() => {
-                            setSelectedProjectPath(folder.path);
-                            setProjectSearchTerm(folder.name);
-                            setProjectDropdownOpen(false);
-                          }}
-                          className={
-                            "block w-full px-3 py-3 text-left text-sm hover:bg-blue-50 " +
-                            (selectedProjectPath === folder.path
-                              ? "bg-blue-100 font-semibold text-blue-900"
-                              : "text-slate-800")
-                          }
-                        >
-                          <div>📁 {folder.name}</div>
-                          <div className="mt-0.5 break-all text-xs text-slate-400">
-                            {folder.path}
-                          </div>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div> */}
 
               <div>
                 <label className="mb-1 block text-xs font-medium text-slate-600">
@@ -2452,10 +2502,9 @@ export default function FieldPhotosPage() {
                   <div className="mb-3 rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">
                     <div className="font-semibold">Folder safety tip</div>
                     <p className="mt-1">
-                      For rooms like Living Room or Bedroom, use “Create
-                      Subfolder / Area Folder”. It will create the folder under
-                      the main photo folder instead of accidentally nesting it
-                      inside another room.
+                      Create Subfolder now uses the folder you are currently
+                      viewing. If you are inside TEST and create TEST 1, it will
+                      be created inside TEST.
                     </p>
                   </div>
                   <div className="mb-3 rounded-xl border p-3">
@@ -2518,7 +2567,7 @@ export default function FieldPhotosPage() {
                       </button>
                     </div>
                     <p className="mt-2 text-xs text-slate-500">
-                      Safe parent:{" "}
+                      New folder will be created inside:{" "}
                       <span className="break-all font-medium">
                         {getSafeRoomFolderParentPath() ||
                           "Select a photo folder first"}
@@ -2839,10 +2888,7 @@ export default function FieldPhotosPage() {
                       <button
                         key={photo.path}
                         type="button"
-                        onClick={() => {
-                          setSelectedGalleryPhoto(photo);
-                          setGalleryOpen(true);
-                        }}
+                        onClick={() => openGalleryPhoto(photo)}
                         className="group overflow-hidden rounded-xl border bg-slate-50 text-left shadow-sm hover:ring-2 hover:ring-blue-400"
                       >
                         {photo.previewUrl ? (
@@ -3081,13 +3127,39 @@ export default function FieldPhotosPage() {
               </button>
             </div>
             {selectedGalleryPhoto ? (
-              <div className="flex min-h-0 flex-1 flex-col gap-3">
-                <div className="min-h-0 flex-1 overflow-hidden rounded-2xl bg-black">
+              <div
+                className="flex min-h-0 flex-1 flex-col gap-3"
+                onTouchStart={handleGalleryViewerTouchStart}
+                onTouchEnd={handleGalleryViewerTouchEnd}
+              >
+                <div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl bg-black">
+                  {galleryFiles.length > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={showPreviousGalleryPhoto}
+                        className="absolute left-2 top-1/2 z-10 hidden -translate-y-1/2 rounded-full bg-white/15 px-4 py-3 text-3xl font-bold text-white backdrop-blur hover:bg-white/25 sm:block"
+                        aria-label="Previous photo"
+                      >
+                        ‹
+                      </button>
+                      <button
+                        type="button"
+                        onClick={showNextGalleryPhoto}
+                        className="absolute right-2 top-1/2 z-10 hidden -translate-y-1/2 rounded-full bg-white/15 px-4 py-3 text-3xl font-bold text-white backdrop-blur hover:bg-white/25 sm:block"
+                        aria-label="Next photo"
+                      >
+                        ›
+                      </button>
+                    </>
+                  )}
+
                   {selectedGalleryPhoto.previewUrl ? (
                     <img
                       src={selectedGalleryPhoto.previewUrl}
                       alt={selectedGalleryPhoto.name}
-                      className="h-full w-full object-contain"
+                      className="h-full w-full select-none object-contain"
+                      draggable={false}
                     />
                   ) : (
                     <div className="flex h-full items-center justify-center text-white/70">
@@ -3095,15 +3167,47 @@ export default function FieldPhotosPage() {
                     </div>
                   )}
                 </div>
+
                 <div className="rounded-xl bg-white/10 p-3 text-sm">
-                  <div className="break-all font-semibold">
-                    {selectedGalleryPhoto.name}
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="break-all font-semibold">
+                        {selectedGalleryPhoto.name}
+                      </div>
+                      <div className="mt-1 text-white/70">
+                        Owner: {selectedGalleryPhoto.owner || "unknown"} •
+                        Source: {selectedGalleryPhoto.source} • Size:{" "}
+                        {formatFileSize(selectedGalleryPhoto.size)}
+                      </div>
+                      {galleryFiles.length > 1 && (
+                        <div className="mt-1 text-xs text-white/50">
+                          Photo {selectedGalleryPhotoIndex + 1} of{" "}
+                          {galleryFiles.length} • Swipe left/right or use
+                          keyboard arrows.
+                        </div>
+                      )}
+                    </div>
+
+                    {galleryFiles.length > 1 && (
+                      <div className="flex shrink-0 gap-2">
+                        <button
+                          type="button"
+                          onClick={showPreviousGalleryPhoto}
+                          className="rounded-lg bg-white/20 px-4 py-2 font-medium text-white hover:bg-white/30"
+                        >
+                          ← Prev
+                        </button>
+                        <button
+                          type="button"
+                          onClick={showNextGalleryPhoto}
+                          className="rounded-lg bg-white/20 px-4 py-2 font-medium text-white hover:bg-white/30"
+                        >
+                          Next →
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <div className="mt-1 text-white/70">
-                    Owner: {selectedGalleryPhoto.owner || "unknown"} • Source:{" "}
-                    {selectedGalleryPhoto.source} • Size:{" "}
-                    {formatFileSize(selectedGalleryPhoto.size)}
-                  </div>
+
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button
                       type="button"
@@ -3135,7 +3239,7 @@ export default function FieldPhotosPage() {
                     <button
                       key={photo.path}
                       type="button"
-                      onClick={() => setSelectedGalleryPhoto(photo)}
+                      onClick={() => openGalleryPhoto(photo)}
                       className="overflow-hidden rounded-xl bg-white/10 text-left hover:bg-white/20"
                     >
                       {photo.previewUrl ? (
