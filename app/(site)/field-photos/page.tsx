@@ -14,7 +14,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
 import Navbar from "@/app/components/navBar";
-import { isAdminRole } from "@/app/libs/roles";
+import { isAdminRole, isSuperAdminRole } from "@/app/libs/roles";
 
 /* ─────────────────────────────
    Safety / performance settings
@@ -337,6 +337,8 @@ export default function FieldPhotosPage() {
 
   // Admin/template project folder states.
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [isFolderActionLoading, setIsFolderActionLoading] = useState(false);
   const [showOnlyProjectFolders, setShowOnlyProjectFolders] = useState(true);
   const [templateProjectName, setTemplateProjectName] = useState("");
   const [isCreatingTemplateProject, setIsCreatingTemplateProject] =
@@ -577,6 +579,7 @@ export default function FieldPhotosPage() {
           "unknown";
 
         setIsAdmin(isAdminRole(data?.role));
+        setIsSuperAdmin(isSuperAdminRole(data?.role));
         setPhotoTakerName(cleanFileNamePart(name));
       } catch {
         const fallback = session.user?.name || session.user?.email || "unknown";
@@ -1951,6 +1954,162 @@ export default function FieldPhotosPage() {
     }
   };
 
+  const renameCurrentFolder = async () => {
+    if (!isSuperAdmin) {
+      toast.error("Only superadmin can rename Dropbox folders");
+      return;
+    }
+
+    if (!isOnline) {
+      toast.error("You are offline. Folder rename is disabled for now.");
+      return;
+    }
+
+    if (!currentBrowsePath) {
+      toast.error("Select a folder first");
+      return;
+    }
+
+    const currentName =
+      currentBrowsePath.split("/").filter(Boolean).pop() || "folder";
+
+    const newFolderName = window.prompt(
+      `Rename folder:\n\n${currentName}\n\nEnter the new folder name:`,
+      currentName,
+    );
+
+    if (!newFolderName || newFolderName.trim() === currentName) return;
+
+    const confirmed = window.confirm(
+      `Rename this Dropbox folder?\n\nFrom: ${currentName}\nTo: ${newFolderName.trim()}\n\nIf this is a project folder, the matching Project code and related projectCode records will also be updated.`,
+    );
+
+    if (!confirmed) return;
+
+    setIsFolderActionLoading(true);
+
+    try {
+      const res = await fetch("/api/dropbox/rename-folder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          path: currentBrowsePath,
+          newFolderName: newFolderName.trim(),
+        }),
+      });
+
+      const data = await readApiResponse(res);
+
+      if (!res.ok) {
+        throw new Error(
+          data.detail || data.message || "Failed to rename folder",
+        );
+      }
+
+      const renamedPath = data.folder.path;
+
+      if (
+        selectedProjectPath &&
+        currentBrowsePath.toLowerCase() === selectedProjectPath.toLowerCase()
+      ) {
+        setSelectedProjectPath(renamedPath);
+      }
+
+      setCurrentBrowsePath(renamedPath);
+      setSelectedUploadPath(renamedPath);
+
+      await fetchProjectFolders();
+      await fetchChildFolders(renamedPath);
+      await fetchGalleryFiles(renamedPath);
+
+      toast.success("Folder renamed successfully");
+    } catch (error) {
+      handleError(error, "Failed to rename folder");
+    } finally {
+      setIsFolderActionLoading(false);
+    }
+  };
+
+  const deleteCurrentFolder = async () => {
+    if (!isSuperAdmin) {
+      toast.error("Only superadmin can delete Dropbox folders");
+      return;
+    }
+
+    if (!isOnline) {
+      toast.error("You are offline. Folder deletion is disabled for now.");
+      return;
+    }
+
+    if (!currentBrowsePath) {
+      toast.error("Select a folder first");
+      return;
+    }
+
+    const currentName =
+      currentBrowsePath.split("/").filter(Boolean).pop() || "folder";
+
+    const confirmText = window.prompt(
+      `This will delete the Dropbox folder and its contents:\n\n${currentBrowsePath}\n\nType DELETE to confirm.`,
+    );
+
+    if (confirmText !== "DELETE") return;
+
+    setIsFolderActionLoading(true);
+
+    try {
+      const parentPath = currentBrowsePath.split("/").slice(0, -1).join("/");
+
+      const res = await fetch("/api/dropbox/delete-folder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          path: currentBrowsePath,
+          confirmText,
+        }),
+      });
+
+      const data = await readApiResponse(res);
+
+      if (!res.ok) {
+        throw new Error(
+          data.detail || data.message || "Failed to delete folder",
+        );
+      }
+
+      await fetchProjectFolders();
+
+      if (
+        selectedProjectPath &&
+        currentBrowsePath.toLowerCase() === selectedProjectPath.toLowerCase()
+      ) {
+        setSelectedProjectPath("");
+        setCurrentBrowsePath("");
+        setSelectedUploadPath("");
+        setChildFolders([]);
+        setGalleryFiles([]);
+      } else {
+        const safeParentPath =
+          parentPath &&
+          selectedProjectPath &&
+          parentPath.toLowerCase().startsWith(selectedProjectPath.toLowerCase())
+            ? parentPath
+            : selectedProjectPath;
+
+        setCurrentBrowsePath(safeParentPath);
+        setSelectedUploadPath(safeParentPath);
+        await fetchChildFolders(safeParentPath);
+        await fetchGalleryFiles(safeParentPath);
+      }
+
+      toast.success(`Folder deleted: ${currentName}`);
+    } catch (error) {
+      handleError(error, "Failed to delete folder");
+    } finally {
+      setIsFolderActionLoading(false);
+    }
+  };
+
   const openGalleryPhoto = (photo: DropboxImageFile) => {
     setSelectedGalleryPhoto(photo);
     setGalleryOpen(true);
@@ -2507,6 +2666,38 @@ export default function FieldPhotosPage() {
                       be created inside TEST.
                     </p>
                   </div>
+                  {isSuperAdmin && currentBrowsePath && (
+                    <div className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3">
+                      <div className="mb-2 text-sm font-semibold text-red-900">
+                        Superadmin folder controls
+                      </div>
+                      <p className="mb-3 text-xs text-red-800">
+                        Rename or delete the folder you are currently viewing.
+                        If this is a root project folder, renaming it also
+                        updates the matching Project code and related project
+                        records.
+                      </p>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <button
+                          type="button"
+                          onClick={renameCurrentFolder}
+                          disabled={!isOnline || isFolderActionLoading}
+                          className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:bg-slate-400"
+                        >
+                          Rename Current Folder
+                        </button>
+                        <button
+                          type="button"
+                          onClick={deleteCurrentFolder}
+                          disabled={!isOnline || isFolderActionLoading}
+                          className="rounded-lg bg-red-700 px-4 py-2 text-sm font-medium text-white hover:bg-red-800 disabled:bg-slate-400"
+                        >
+                          Delete Current Folder
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="mb-3 rounded-xl border p-3">
                     <div className="mb-2 text-sm font-semibold text-slate-800">
                       Quick photo destinations

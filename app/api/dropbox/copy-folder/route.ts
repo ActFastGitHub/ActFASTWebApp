@@ -33,8 +33,6 @@ type DropboxApiError = Error & {
   error_summary?: string;
 };
 
-/* ─────────── Helpers ─────────── */
-
 const joinDropboxPath = (...parts: string[]) => {
   const cleanedParts = parts
     .map((part) => part.trim())
@@ -77,7 +75,20 @@ async function dropboxPathExists(path: string) {
   }
 }
 
-/* ─────────── API ─────────── */
+async function findProjectByNormalizedCode(normalizedCode: string) {
+  const projects = await prisma.project.findMany({
+    select: {
+      id: true,
+      code: true,
+    },
+  });
+
+  return (
+    projects.find(
+      (project) => project.code.trim().toUpperCase() === normalizedCode,
+    ) || null
+  );
+}
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
@@ -87,7 +98,6 @@ export async function POST(request: Request) {
   }
 
   try {
-    /* 🔐 Admin / Owner / Super Admin check */
     const profile = await prisma.profile.findUnique({
       where: { userEmail: session.user.email },
       select: {
@@ -102,7 +112,6 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json().catch(() => ({}));
-
     const rootPath = getDropboxRootPath();
 
     const destinationFolderName = String(
@@ -125,13 +134,11 @@ export async function POST(request: Request) {
       );
     }
 
-    /* ✅ FORCE correct template path */
+    const normalizedProjectCode = destinationFolderName.toUpperCase();
+
     const sourcePath = joinDropboxPath(rootPath, TEMPLATE_FOLDER_NAME);
+    const destinationPath = joinDropboxPath(rootPath, normalizedProjectCode);
 
-    /* ✅ Destination */
-    const destinationPath = joinDropboxPath(rootPath, destinationFolderName);
-
-    /* 🛡️ Root safety */
     if (!isInsideRoot(sourcePath) || !isInsideRoot(destinationPath)) {
       return jsonError(
         "Invalid Dropbox path",
@@ -140,13 +147,11 @@ export async function POST(request: Request) {
       );
     }
 
-    /* 🛡️ Ensure template exists */
     const templateExists = await dropboxPathExists(sourcePath);
     if (!templateExists) {
       return jsonError("Template folder does not exist", 404, sourcePath);
     }
 
-    /* 🛡️ Prevent duplicates */
     const destinationExists = await dropboxPathExists(destinationPath);
     if (destinationExists) {
       return jsonError(
@@ -156,15 +161,48 @@ export async function POST(request: Request) {
       );
     }
 
-    /* 📁 COPY */
+    const existingProject = await findProjectByNormalizedCode(
+      normalizedProjectCode,
+    );
+
     const data = await dropboxApiFetch<DropboxCopyResponse>("/files/copy_v2", {
       from_path: sourcePath,
       to_path: destinationPath,
-      autorename: false, // ❌ prevent "(1)"
+      autorename: false,
       allow_ownership_transfer: false,
     });
 
-    /* 🧾 Audit successful project folder creation */
+    let project = existingProject;
+    let projectDatabaseStatus: "CREATED" | "ALREADY_EXISTS" = "ALREADY_EXISTS";
+
+    if (!project) {
+      project = await prisma.project.create({
+        data: {
+          code: normalizedProjectCode,
+          projectStatus: "Not Started",
+        },
+        select: {
+          id: true,
+          code: true,
+        },
+      });
+
+      projectDatabaseStatus = "CREATED";
+
+      await createAuditLog({
+        actorEmail: session.user.email,
+        actorNickname: profile?.nickname || profile?.firstName || null,
+        actorRole: profile?.role || null,
+        action: "CREATE",
+        entity: "Project",
+        entityId: project.id,
+        projectCode: project.code,
+        summary: `Created project record from Dropbox template creator: ${project.code}`,
+        changes: project,
+        ...getRequestAuditMeta(request),
+      });
+    }
+
     await createAuditLog({
       actorEmail: session.user.email,
       actorNickname: profile?.nickname || profile?.firstName || null,
@@ -172,14 +210,16 @@ export async function POST(request: Request) {
       action: "CREATE",
       entity: "DropboxProjectFolder",
       entityId: data.metadata.path_display,
-      projectCode: destinationFolderName,
-      summary: `Created Dropbox project folder from template: ${destinationFolderName}`,
+      projectCode: normalizedProjectCode,
+      summary: `Created Dropbox project folder from template: ${normalizedProjectCode}`,
       changes: {
         sourcePath,
         destinationPath,
-        destinationFolderName,
+        destinationFolderName: normalizedProjectCode,
         dropboxFolderName: data.metadata.name,
         dropboxFolderPath: data.metadata.path_display,
+        projectDatabaseStatus,
+        projectId: project?.id || null,
       },
       ...getRequestAuditMeta(request),
     });
@@ -189,6 +229,11 @@ export async function POST(request: Request) {
       folder: {
         name: data.metadata.name,
         path: data.metadata.path_display,
+      },
+      project: {
+        id: project?.id || null,
+        code: project?.code || normalizedProjectCode,
+        databaseStatus: projectDatabaseStatus,
       },
       status: 200,
     });
