@@ -52,27 +52,28 @@ const DataDeletionInstructions = () => {
           <h2 className="mb-2 text-xl font-semibold text-red-600">
             How to Request Data Deletion
           </h2>
-          <ol className="list-decimal list-inside space-y-2">
+          <ol className="list-inside list-decimal space-y-2">
             <li>
-              <strong>Email us</strong> at{' '}
+              <strong>Email us</strong> at{" "}
               <a
                 href="mailto:info@actfast.ca?subject=Data%20Deletion%20Request"
                 className="text-red-600 underline hover:text-red-400"
               >
                 info@actfast.ca
-              </a>{' '}
+              </a>{" "}
               with the subject line <em>“Data Deletion Request”</em>.
             </li>
             <li>
               In your message, please include:
-              <ul className="list-disc list-inside ml-6 mt-1">
+              <ul className="ml-6 mt-1 list-inside list-disc">
                 <li>Full name</li>
                 <li>Email or phone number used with us</li>
                 <li>Any project code or account ID (if available)</li>
               </ul>
             </li>
             <li>
-              We will acknowledge receipt within <strong>2 business days</strong>
+              We will acknowledge receipt within{" "}
+              <strong>2 business days</strong>
               and complete deletion within <strong>30 days</strong>.
             </li>
           </ol>
@@ -80,10 +81,10 @@ const DataDeletionInstructions = () => {
 
         <section className="mb-6">
           <p>
-            <strong>Self‑service deletion:</strong> If you have an online
-            account, you can log in and navigate to{' '}
-            <em>Account &gt; Privacy Settings &gt; Delete My Data</em> for an
-            immediate deletion request.
+            <strong>Portal accounts:</strong> If your information is connected
+            to an employee portal account or active project workflow, we may
+            need to verify your identity before deleting, correcting, or
+            restricting the information.
           </p>
         </section>
 
@@ -92,15 +93,21 @@ const DataDeletionInstructions = () => {
             Contact Information
           </h2>
           <address className="space-y-1 not-italic text-gray-300">
-            ActFAST Restoration and Repairs<br />
-            Phone: <a href="tel:+16045185129" className="underline hover:text-red-400">+1‑604‑518‑5129</a><br />
-            Email:{' '}
+            ActFAST Restoration and Repairs
+            <br />
+            Phone:{" "}
+            <a href="tel:+16045185129" className="underline hover:text-red-400">
+              +1‑604‑518‑5129
+            </a>
+            <br />
+            Email:{" "}
             <a
               href="mailto:info@actfast.ca"
               className="text-red-600 underline hover:text-red-400"
             >
               info@actfast.ca
-            </a><br />
+            </a>
+            <br />
             Address: Unit 108 – 11539 136 St., Surrey, BC V3R 0G3, Canada
           </address>
         </section>

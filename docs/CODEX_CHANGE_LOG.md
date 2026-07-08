@@ -60,3 +60,42 @@ Verification:
 Reversal notes:
 - To undo this documentation update before committing, restore the changed docs files.
 - If this update is committed later, revert the commit with `git revert`.
+
+## 2026-07-08 - Added Compliance Pages and Cookie Notice
+
+Branch:
+- Not created because Git status was blocked by the repository ownership warning in the Codex sandbox.
+
+Status:
+- Completed
+
+Changed files:
+- app/components/CookieConsent.tsx
+- app/components/legal/LegalPageShell.tsx
+- app/layout.tsx
+- app/components/footer.tsx
+- app/(site)/privacypolicy/page.tsx
+- app/(site)/cookiepolicy/page.tsx
+- app/(site)/termsofuse/page.tsx
+- app/(site)/delete-my-data/page.tsx
+- docs/CODEX_CHANGE_LOG.md
+- public/sitemap.xml
+- public/sitemap-0.xml
+- version.json
+
+Summary:
+- Added a site-wide cookie notice for necessary cookies and browser storage.
+- Updated the Privacy Policy to match the actual site code, including employee portal cookies, NextAuth, contact form email handling, local storage, social login, YouTube embeds, Google Places testimonials, Dropbox, and Cloudinary.
+- Added Cookie Policy and Terms of Use pages using the existing legal-page visual style.
+- Updated footer links so visitors can reach the compliance pages.
+- Corrected the Data Deletion page so it no longer claims a self-service privacy settings flow that was not found in the current app.
+
+Verification:
+- `npx prettier --check app\components\CookieConsent.tsx app\components\legal\LegalPageShell.tsx app\components\footer.tsx app\layout.tsx app\(site)\privacypolicy\page.tsx app\(site)\cookiepolicy\page.tsx app\(site)\termsofuse\page.tsx app\(site)\delete-my-data\page.tsx`
+- `npx tsc --noEmit`
+- `npm run build` succeeded after rerunning with network access for the existing Prisma-backed prerender route.
+- Local smoke test returned 200 for `/`, `/privacypolicy`, `/cookiepolicy`, `/termsofuse`, and `/delete-my-data`.
+
+Reversal notes:
+- To undo before committing, restore the files listed above.
+- If committed later, revert the commit with `git revert`.

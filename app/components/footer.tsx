@@ -49,6 +49,12 @@ const Footer: React.FC = () => {
           <Link href="/privacypolicy" className="hover:underline">
             Privacy Policy
           </Link>
+          <Link href="/cookiepolicy" className="hover:underline">
+            Cookie Policy
+          </Link>
+          <Link href="/termsofuse" className="hover:underline">
+            Terms of Use
+          </Link>
         </motion.div>
 
         {/* Logo */}
@@ -131,7 +137,12 @@ const Footer: React.FC = () => {
           </p>
           <p className="mt-1 text-xs">
             Built & maintained by{" "}
-            <Link href="https://www.linkedin.com/in/angelo-guerra/" className="font-semibold">Angelo Guerra</Link>
+            <Link
+              href="https://www.linkedin.com/in/angelo-guerra/"
+              className="font-semibold"
+            >
+              Angelo Guerra
+            </Link>
           </p>
           <VersionInfo />
         </motion.div>

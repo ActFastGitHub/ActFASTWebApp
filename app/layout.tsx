@@ -5,6 +5,7 @@ import { Inter } from "next/font/google";
 import Provider from "@/app/context/AuthContext";
 import ToasterContext from "@/app/context/ToasterContext";
 import { ModeProvider } from "@/app/context/ModeContext";
+import CookieConsent from "@/app/components/CookieConsent";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -16,7 +17,8 @@ export const metadata = {
   keywords:
     "Restoration, Repairs, Flood Damage, Water Damage, Mold Removal, Fire Damage, Insurance Claims, Surrey, Metro Vancouver, Okanagan, Kelowna, Vernon, Filipino Community",
   openGraph: {
-    title: "ActFAST Restoration and Repairs | Surrey, Metro Vancouver, Okanagan",
+    title:
+      "ActFAST Restoration and Repairs | Surrey, Metro Vancouver, Okanagan",
     description:
       "ActFAST is a restoration and repairs company serving Surrey, Metro Vancouver, and the Okanagan region. Specializing in water, flood, mold, and fire insurance claims, we cater to a wide range of communities.",
     url: "https://www.actfast.ca",
@@ -45,7 +47,10 @@ export default function RootLayout({
       <body className={inter.className}>
         <Provider>
           <ToasterContext />
-          <ModeProvider>{children}</ModeProvider>
+          <ModeProvider>
+            {children}
+            <CookieConsent />
+          </ModeProvider>
         </Provider>
       </body>
     </html>
