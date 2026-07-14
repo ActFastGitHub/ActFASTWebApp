@@ -34,11 +34,14 @@ const Footer: React.FC = () => {
           }}
           transition={{ duration: 0.5 }}
         >
-          <Link href="#" className="hover:underline">
+          <Link href="/" className="hover:underline">
             Home
           </Link>
           <Link href="/services" className="hover:underline">
             Services
+          </Link>
+          <Link href="/faq" className="hover:underline">
+            FAQ
           </Link>
           <Link href="/featured" className="hover:underline">
             Featured

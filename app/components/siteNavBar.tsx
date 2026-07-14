@@ -152,6 +152,13 @@ const Navbar: React.FC<NavbarProps> = ({ onPortalClick }) => {
                 Services
               </Link>
 
+              <Link
+                href="/faq"
+                className="rounded-md px-2 py-2 text-sm font-medium text-gray-300 hover:text-white"
+              >
+                FAQ
+              </Link>
+
               {/* ✅ Locations dropdown */}
               <div className="relative" ref={locationsRef}>
                 <button
@@ -240,6 +247,13 @@ const Navbar: React.FC<NavbarProps> = ({ onPortalClick }) => {
               className="block rounded-md px-3 py-2 text-base font-medium text-gray-300 hover:text-white"
             >
               Services
+            </Link>
+
+            <Link
+              href="/faq"
+              className="block rounded-md px-3 py-2 text-base font-medium text-gray-300 hover:text-white"
+            >
+              FAQ
             </Link>
 
             {/* ✅ Mobile Locations expandable */}

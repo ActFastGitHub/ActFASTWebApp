@@ -27,7 +27,7 @@ const projects = [
   {
     title: "Agas Fire Restoration",
     description:
-      "This home was completely destroyed by fire and required a full rebuild from the foundation up. Today, it stands fully restored—stronger, safer, and better than ever before.",
+      "This home was severely damaged by fire and required a major rebuild from the foundation up. The completed work restored the property for continued residential use.",
     before: Array.from(
       { length: 6 },
       (_, i) => `/images/Projects/Agas/Before/Before (${i + 1}).jpg`
@@ -40,7 +40,7 @@ const projects = [
   {
     title: "EPS Fire Restoration",
     description:
-      "After a severe fire left this duplex completely destroyed, our team rebuilt the home from the ground up. The result is a fully restored and modernized property that reflects expert craftsmanship and a commitment to quality.",
+      "After a severe fire caused extensive damage to this duplex, our team rebuilt the home from the ground up. The completed project restored and modernized the property with careful repair work.",
     before: Array.from(
       { length: 32 },
       (_, i) => `/images/Projects/EPS/Before/Before (${i + 1}).jpg`

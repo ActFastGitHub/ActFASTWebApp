@@ -61,21 +61,21 @@ const SERVICES: readonly Service[] = [
   ),
   makeService(
     "Fire Damage Restoration",
-    "Soot removal, odor elimination, and complete rebuild after fire loss.",
+    "Soot removal, odor treatment, and repair planning after fire loss.",
     "FireDamage",
     "Fire",
     52
   ),
   makeService(
     "Mold Remediation",
-    "Certified inspection, containment, and safe removal of mold colonies.",
+    "Assessment, containment, and remediation methods based on site conditions.",
     "MoldRemediation",
     "Mold",
     31
   ),
   makeService(
     "Asbestos Abatement",
-    "Licensed testing and removal to keep your home free of asbestos hazards.",
+    "Careful coordination for suspected asbestos materials in older properties.",
     "AsbestosAbatement",
     "Asbestos",
     9

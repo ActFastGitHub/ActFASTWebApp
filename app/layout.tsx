@@ -10,6 +10,7 @@ import CookieConsent from "@/app/components/CookieConsent";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
+  metadataBase: new URL("https://www.actfast.ca"),
   title: "ActFAST Restoration and Repairs | Surrey, Metro Vancouver, Okanagan",
   description:
     "ActFAST is a restoration and repairs company based in Surrey, Metro Vancouver, and the Okanagan region. We specialize in water, flood, mold, and fire insurance claims, serving communities across Kelowna, Vernon, and nearby cities.",

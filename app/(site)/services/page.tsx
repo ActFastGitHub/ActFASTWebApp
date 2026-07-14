@@ -222,7 +222,8 @@ function ServicesPageInner() {
               animate={controls}
               transition={{ duration: 0.5, delay: 0.2 }}
             >
-              At ActFast Restoration & Repairs we handle insurance claims for
+              At ActFast Restoration & Repairs we help document and coordinate
+              restoration work involving
               water, fire, mold, asbestos, repairs, and contents restoration
               across Metro Vancouver and Surrey. We respond fast and restore
               your property efficiently.
@@ -242,7 +243,7 @@ function ServicesPageInner() {
             services={[
               "Emergency Water Removal",
               "Structural Drying",
-              "Mold Prevention",
+              "Moisture Control",
               "Sewage Cleanup",
             ]}
             images={water}
@@ -275,8 +276,8 @@ function ServicesPageInner() {
             num={3}
             title="Mold Remediation 🦠"
             bullets={[
-              "Safe and certified mold removal to prevent health risks.",
-              "Inspection, testing, and full mold treatment.",
+              "Containment and remediation methods based on site conditions.",
+              "Inspection, moisture review, and remediation planning.",
               "Works with homeowners & insurance adjusters.",
             ]}
             services={[
@@ -286,7 +287,7 @@ function ServicesPageInner() {
               "Moisture Control",
             ]}
             images={mold}
-            cta="Protect Your Home from Dangerous Mold – Contact Us!"
+            cta="Concerned About Mold? Contact Us!"
             open={open}
           />
 
@@ -295,9 +296,9 @@ function ServicesPageInner() {
             num={4}
             title="Asbestos Abatement ⚠️"
             bullets={[
-              "Licensed testing and removal of asbestos‑containing materials.",
+              "Coordination for suspected asbestos‑containing materials.",
               "Containment, safe disposal, and air‑quality clearance reports.",
-              "Meets all WorkSafeBC and federal regulations.",
+              "Qualified professionals are involved where required by the project.",
             ]}
             services={[
               "Asbestos Inspection & Sampling",
@@ -326,7 +327,7 @@ function ServicesPageInner() {
               "Roofing & Structural Work",
             ]}
             images={repairs}
-            cta="Need Property Repairs? We’ve Got You Covered!"
+            cta="Need Property Repairs? Call Our Team!"
             open={open}
           />
 
